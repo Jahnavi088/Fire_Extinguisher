@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  overflow-x: hidden;
+}
+
+.login-container {
+  min-height: 100vh;
+  background-color: #f4f6f9;
+  display: flex;
+  flex-direction: column;
+}
+
+.login-header {
+  height: 300px;
+  width: 100%;
+  background: linear-gradient(135deg, #d50000, #8e0000);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  position: relative;
+  /* clip-path: ellipse(100% 70% at 50% 30%); Simplified wave-like effect */
+  margin-bottom: -40px;
+}
+
+/* More precise wave using clip-path polygon/path if needed, but ellipse is cleaner for now */
+.login-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: transparent;
+}
+
+.header-icon {
+  font-size: 80px;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+}
+
+.header-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.header-subtitle {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 5px;
+}
+
+.login-card-wrapper {
+  padding: 0 20px;
+  max-width: 450px;
+  width: 100%;
+  margin: 0 auto;
+  z-index: 10;
+  animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.login-card {
+  background: white;
+  padding: 40px 30px;
+  border-radius: 25px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.login-card h2 {
+  color: #d50000;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 30px;
+  letter-spacing: 1px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.input-field-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 15px;
+  color: #d50000;
+  font-size: 20px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 16px 15px 16px 50px;
+  border-radius: 15px;
+  border: none;
+  background-color: #f1f5f9;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.login-input:focus {
+  background-color: #e2e8f0;
+  box-shadow: 0 0 0 2px rgba(213, 0, 0, 0.1);
+}
+
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 18px;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 16px;
+  background-color: #d50000;
+  color: white;
+  border: none;
+  border-radius: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.login-btn:hover {
+  background-color: #b70000;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(213, 0, 0, 0.3);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+.auth-notice {
+  margin-top: 20px;
+  font-size: 11px;
+  color: #94a3b8;
+  display: block;
+}
+
+.loader {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
