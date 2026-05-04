@@ -1,45 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
-const isExpired   = (d) => d && new Date(d) < new Date();
-const scoreColor  = (s) => {
+const isExpired = (d) => d && new Date(d) < new Date();
+const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
   return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
 };
-const condColor   = (v) =>
+const condColor = (v) =>
   v === 'OK' ? '#28a745'
-  : (v === 'LOW' || v === 'SCRATCHED') ? '#FF9800'
-  : (v === 'MISSING' || v === 'DAMAGED') ? '#dc3545'
-  : '#666';
+    : (v === 'LOW' || v === 'SCRATCHED') ? '#FF9800'
+      : (v === 'MISSING' || v === 'DAMAGED') ? '#dc3545'
+        : '#666';
 
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all',            label: 'Total Fleet',    icon: '🧯', color: '#3b82f6', key: 'total'        },
-  { type: 'active',         label: 'Active',         icon: '✅', color: '#28a745', key: 'active'       },
-  { type: 'upcoming',       label: 'Due < 30 Days',  icon: '📅', color: '#FF9800', key: 'upcoming'     },
-  { type: 'needs-service',  label: 'Needs Service',  icon: '🔧', color: '#f59e0b', key: 'needs_service' },
-  { type: 'expired',        label: 'Expired',        icon: '⌛', color: '#8b5cf6', key: 'expired'      },
+  { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#3b82f6', key: 'total' },
+  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#FF9800', key: 'upcoming' },
+  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
+  { type: 'expired', label: 'Expired', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
 const fetchByType = (type) => {
   switch (type) {
-    case 'all':            return ApiService.getAllExtinguishers();
-    case 'active':         return ApiService.getActiveUnits();
-    case 'upcoming':       return ApiService.getUpcomingInspections();
-    case 'needs-service':  return ApiService.getNeedsService();
-    case 'expired':        return ApiService.getExpired();
+    case 'all': return ApiService.getAllExtinguishers();
+    case 'active': return ApiService.getActiveUnits();
+    case 'upcoming': return ApiService.getUpcomingInspections();
+    case 'needs-service': return ApiService.getNeedsService();
+    case 'expired': return ApiService.getExpired();
     case 'due-inspection': return ApiService.getDueInspections();
-    default:               return Promise.resolve({ items: [], total: 0 });
+    default: return Promise.resolve({ items: [], total: 0 });
   }
 };
 
@@ -61,7 +62,7 @@ const BackBtn = ({ onClick, children }) => (
 const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
   if (totalPages <= 1) return null;
   const start = (page - 1) * pageSize + 1;
-  const end   = Math.min(page * pageSize, total);
+  const end = Math.min(page * pageSize, total);
 
   const pages = [];
   if (totalPages <= 7) {
@@ -87,12 +88,12 @@ const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
           p === '…'
             ? <span key={`e${i}`} className="fe-page-ellipsis">…</span>
             : <button
-                key={p}
-                className={`fe-page-btn fe-page-num${p === page ? ' fe-page-active' : ''}`}
-                onClick={() => onPage(p)}
-              >
-                {p}
-              </button>
+              key={p}
+              className={`fe-page-btn fe-page-num${p === page ? ' fe-page-active' : ''}`}
+              onClick={() => onPage(p)}
+            >
+              {p}
+            </button>
         )}
         <button className="fe-page-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>
           Next →
@@ -117,7 +118,7 @@ const InfoRow = ({ label, val, color }) => (
 
 const ReadinessBar = ({ score }) => {
   const pct = parseFloat(score) || 0;
-  const c   = scoreColor(pct);
+  const c = scoreColor(pct);
   return (
     <>
       <div className="fe-readiness-label">Readiness Score</div>
@@ -133,22 +134,23 @@ const ReadinessBar = ({ score }) => {
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 const FireExtinguisherStats = ({ onBack }) => {
-  const [loading,       setLoading]       = useState(true);
-  const [summary,       setSummary]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
-  const [topAlerts,     setTopAlerts]     = useState([]);
-  const [error,         setError]         = useState(null);
+  const [topAlerts, setTopAlerts] = useState([]);
+  const [error, setError] = useState(null);
 
-  const [view,          setView]          = useState('overview');
-  const [listCfg,       setListCfg]       = useState({ title: '', type: '', color: '' });
-  const [listItems,     setListItems]     = useState([]);
-  const [listTotal,     setListTotal]     = useState(0);
-  const [listLoading,   setListLoading]   = useState(false);
+  const [view, setView] = useState('overview');
+  const [listCfg, setListCfg] = useState({ title: '', type: '', color: '' });
+  const [listItems, setListItems] = useState([]);
+  const [listTotal, setListTotal] = useState(0);
+  const [listLoading, setListLoading] = useState(false);
 
-  const [currentPage,   setCurrentPage]   = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const [selectedUnit,  setSelectedUnit]  = useState(null);
+  const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -227,15 +229,23 @@ const FireExtinguisherStats = ({ onBack }) => {
         {/* Header */}
         <div className="fe-header">
           <BackBtn onClick={onBack}>Back</BackBtn>
-          <span className="fe-header-icon">🧯</span>
           <div className="fe-header-info">
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
-            <div className="fe-header-sub">Click any card to drill into that status group</div>
           </div>
-          <div className="fe-header-right">
-            <div className="fe-live-badge">
-              <span className="fe-live-dot" />
-              Live · ehs.garrev.com
+
+          <div className="fe-header-search">
+            <div className="fe-search-box">
+              <span className="fe-search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search SOS Code, location, or building..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="fe-search-input"
+              />
+              {searchQuery && (
+                <button className="fe-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+              )}
             </div>
           </div>
         </div>
@@ -287,29 +297,41 @@ const FireExtinguisherStats = ({ onBack }) => {
               <span className="fe-panel-title-count">{totalAlerts}</span>
             </div>
             <div className="fe-alert-list">
-              {topAlerts.length === 0 && (
-                <div className="fe-empty">No alerts at this time.</div>
-              )}
-              {topAlerts.slice(0, 10).map((a, i) => {
-                const c = ALERT_COLOR[a.alert_level] || '#888';
-                return (
-                  <div key={a.id || i} className="fe-alert-row" style={{ '--alert-color': c }}>
-                    <div className="fe-alert-body">
-                      <div className="fe-alert-code">{a.sos_code || a.barcode}</div>
-                      <div className="fe-alert-loc">{[a.location_name, a.building_name].filter(Boolean).join(' · ')}</div>
-                      <div className="fe-alert-reason" style={{ color: c }}>
-                        {a.alert_label} · {(a.alert_reason || '').replace(/_/g, ' ')}
+              {(() => {
+                const filtered = topAlerts.filter(a => {
+                  const q = searchQuery.toLowerCase();
+                  return !q ||
+                    (a.sos_code || '').toLowerCase().includes(q) ||
+                    (a.barcode || '').toLowerCase().includes(q) ||
+                    (a.location_name || '').toLowerCase().includes(q) ||
+                    (a.building_name || '').toLowerCase().includes(q);
+                });
+
+                if (filtered.length === 0) {
+                  return <div className="fe-empty">No matching alerts found.</div>;
+                }
+
+                return filtered.slice(0, 10).map((a, i) => {
+                  const c = ALERT_COLOR[a.alert_level] || '#888';
+                  return (
+                    <div key={a.id || i} className="fe-alert-row" style={{ '--alert-color': c }}>
+                      <div className="fe-alert-body">
+                        <div className="fe-alert-code">{a.sos_code || a.barcode}</div>
+                        <div className="fe-alert-loc">{[a.location_name, a.building_name].filter(Boolean).join(' · ')}</div>
+                        <div className="fe-alert-reason">
+                          {a.alert_label} · {(a.alert_reason || '').replace(/_/g, ' ')}
+                        </div>
+                      </div>
+                      <div className="fe-alert-meta">
+                        {a.days_overdue > 0 && (
+                          <span className="fe-overdue-chip">{a.days_overdue}d overdue</span>
+                        )}
+                        <div className="fe-alert-type">{a.extinguisher_type}</div>
                       </div>
                     </div>
-                    <div className="fe-alert-meta">
-                      {a.days_overdue > 0 && (
-                        <span className="fe-overdue-chip">{a.days_overdue}d overdue</span>
-                      )}
-                      <div className="fe-alert-type">{a.extinguisher_type}</div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -318,27 +340,58 @@ const FireExtinguisherStats = ({ onBack }) => {
             <div className="fe-panel-title">📊 Fleet Health Breakdown</div>
             {summary && (
               <>
-                <div className="fe-fleet-bar">
-                  {[
-                    { key: 'active',        color: '#28a745' },
-                    { key: 'upcoming',      color: '#FF9800' },
-                    { key: 'needs_service', color: '#f59e0b' },
-                    { key: 'expired',       color: '#8b5cf6' },
-                    { key: 'due_inspection',color: '#dc3545' },
-                  ].map(s => (
-                    <div key={s.key} className="fe-fleet-seg"
-                      style={{ width: `${(summary[s.key] / summary.total) * 100}%`, background: s.color }}
-                      title={`${s.key}: ${summary[s.key]}`}
-                    />
-                  ))}
+                <div style={{ height: 160, width: '100%', marginTop: 5 }}>
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={[
+                        { name: 'Active', val: summary.active, color: '#28a745' },
+                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
+                        { name: 'Expired', val: summary.expired, color: '#8b5cf6' },
+                        { name: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'var(--text3)', fontSize: 10, fontWeight: 600 }}
+                        interval={0}
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        cursor={false}
+                        contentStyle={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          color: 'var(--text)'
+                        }}
+                      />
+                      <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
+                        {[
+                          { color: '#28a745' }, // Active
+                          { color: '#FF9800' }, // Upcoming
+                          { color: '#f59e0b' }, // Needs Service
+                          { color: '#8b5cf6' }, // Expired
+                          { color: '#dc3545' }, // Due Inspection
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="fe-fleet-legend">
+                <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active',         val: summary.active,         color: '#28a745' },
-                    { label: 'Upcoming (30d)', val: summary.upcoming,        color: '#FF9800' },
-                    { label: 'Needs Service',  val: summary.needs_service,   color: '#f59e0b' },
-                    { label: 'Expired',        val: summary.expired,         color: '#8b5cf6' },
-                    { label: 'Due Inspection', val: summary.due_inspection,  color: '#dc3545' },
+                    { label: 'Active', val: summary.active, color: '#28a745' },
+                    { label: 'Upcoming (30d)', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
+                    { label: 'Expired', val: summary.expired, color: '#8b5cf6' },
+                    { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
                       <div className="fe-legend-dot" style={{ background: row.color }} />
@@ -375,14 +428,42 @@ const FireExtinguisherStats = ({ onBack }) => {
               {listLoading ? 'Fetching units…' : `${listTotal} units — click a row to view full details`}
             </div>
           </div>
-          {!listLoading && (
-            <span className="fe-count-badge" style={{ color: listCfg.color }}>{listTotal}</span>
-          )}
+
+          <div className="fe-header-search">
+            <div className="fe-search-box">
+              <span className="fe-search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search within this list..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="fe-search-input"
+              />
+              {searchQuery && (
+                <button className="fe-search-clear" onClick={() => setSearchQuery('')}>✕</button>
+              )}
+            </div>
+          </div>
+
+
         </div>
 
         {listLoading ? <Spinner /> : (() => {
-          const totalPages  = Math.ceil(listItems.length / PAGE_SIZE);
-          const pageSlice   = listItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+          const q = searchQuery.toLowerCase();
+          const filteredItems = listItems.filter(item => {
+            if (!q) return true;
+            return (item.sos_code || '').toLowerCase().includes(q) ||
+              (item.equipment_code || '').toLowerCase().includes(q) ||
+              (item.location_name || '').toLowerCase().includes(q) ||
+              (item.building_name || '').toLowerCase().includes(q) ||
+              (item.extinguisher_type || '').toLowerCase().includes(q);
+          });
+
+          const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+          const pageSlice = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
           return (
             <div className="fe-list-body">
               <div className="fe-table">
@@ -392,7 +473,7 @@ const FireExtinguisherStats = ({ onBack }) => {
                   ))}
                 </div>
                 {pageSlice.map((item, i) => {
-                  const sc  = parseFloat(item.readiness_score) || 0;
+                  const sc = parseFloat(item.readiness_score) || 0;
                   const col = scoreColor(sc);
                   return (
                     <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
@@ -412,13 +493,13 @@ const FireExtinguisherStats = ({ onBack }) => {
                     </div>
                   );
                 })}
-                {listItems.length === 0 && (
-                  <div className="fe-table-empty">No records found for this status.</div>
+                {filteredItems.length === 0 && (
+                  <div className="fe-table-empty">No matching records found.</div>
                 )}
                 <Pagination
                   page={currentPage}
                   totalPages={totalPages}
-                  total={listItems.length}
+                  total={filteredItems.length}
                   pageSize={PAGE_SIZE}
                   onPage={(p) => { setCurrentPage(p); }}
                 />
@@ -433,9 +514,9 @@ const FireExtinguisherStats = ({ onBack }) => {
   /* ══════════════════════════════════════════════════════════════════════
      DETAIL VIEW
      ══════════════════════════════════════════════════════════════════════ */
-  const u  = selectedUnit || {};
+  const u = selectedUnit || {};
   const sc = parseFloat(u.readiness_score) || 0;
-  const c  = scoreColor(sc);
+  const c = scoreColor(sc);
 
   return (
     <div className="fe-page">
@@ -465,14 +546,14 @@ const FireExtinguisherStats = ({ onBack }) => {
             <SectionTitle>Unit Identity</SectionTitle>
             <div className="fe-identity-grid">
               {[
-                { label: 'SOS Code',       val: u.sos_code,          mono: true },
-                { label: 'Barcode',        val: u.barcode,           mono: true },
-                { label: 'Equipment Code', val: u.equipment_code,    mono: true },
-                { label: 'Serial Number',  val: u.serial_number,     mono: true },
-                { label: 'Type',           val: u.extinguisher_type             },
-                { label: 'Capacity',       val: u.capacity_kg ? `${u.capacity_kg} kg` : u.capacity_text },
-                { label: 'Manufacturer',   val: u.manufacturer_name             },
-                { label: 'Status',         val: u.operational_status            },
+                { label: 'SOS Code', val: u.sos_code, mono: true },
+                { label: 'Barcode', val: u.barcode, mono: true },
+                { label: 'Equipment Code', val: u.equipment_code, mono: true },
+                { label: 'Serial Number', val: u.serial_number, mono: true },
+                { label: 'Type', val: u.extinguisher_type },
+                { label: 'Capacity', val: u.capacity_kg ? `${u.capacity_kg} kg` : u.capacity_text },
+                { label: 'Manufacturer', val: u.manufacturer_name },
+                { label: 'Status', val: u.operational_status },
               ].map(f => (
                 <div key={f.label} className="fe-field">
                   <div className="fe-field-label">{f.label}</div>
@@ -485,19 +566,19 @@ const FireExtinguisherStats = ({ onBack }) => {
           {/* Location */}
           <div className="fe-detail-card">
             <SectionTitle>📍 Location</SectionTitle>
-            <InfoRow label="Location"   val={u.location_name} />
-            <InfoRow label="Building"   val={u.building_name} />
-            <InfoRow label="Floor"      val={u.floor_name} />
-            <InfoRow label="Zone"       val={u.zone_name} />
+            <InfoRow label="Location" val={u.location_name} />
+            <InfoRow label="Building" val={u.building_name} />
+            <InfoRow label="Floor" val={u.floor_name} />
+            <InfoRow label="Zone" val={u.zone_name} />
             <InfoRow label="Department" val={u.department_name} />
           </div>
 
           {/* Key Dates */}
           <div className="fe-detail-card">
             <SectionTitle>📅 Key Dates</SectionTitle>
-            <InfoRow label="Installed On"    val={fmt(u.installed_on)} />
-            <InfoRow label="Last Service"    val={fmt(u.last_service_on)} />
-            <InfoRow label="Serviced By"     val={u.serviced_by} />
+            <InfoRow label="Installed On" val={fmt(u.installed_on)} />
+            <InfoRow label="Last Service" val={fmt(u.last_service_on)} />
+            <InfoRow label="Serviced By" val={u.serviced_by} />
             <InfoRow label="Next Inspection" val={fmt(u.next_inspection_due)} color="#FF9800" />
             <InfoRow
               label="Expiry Date"
@@ -511,10 +592,10 @@ const FireExtinguisherStats = ({ onBack }) => {
             <SectionTitle>🔧 Physical Condition</SectionTitle>
             <div className="fe-condition-pills">
               {[
-                { label: 'Pressure',  val: u.pressure_status  },
-                { label: 'Hose',      val: u.hose_status      },
-                { label: 'Pin & Seal',val: u.pin_seal_status  },
-                { label: 'Body',      val: u.body_status      },
+                { label: 'Pressure', val: u.pressure_status },
+                { label: 'Hose', val: u.hose_status },
+                { label: 'Pin & Seal', val: u.pin_seal_status },
+                { label: 'Body', val: u.body_status },
               ].map(pill => {
                 const pc = condColor(pill.val);
                 return (
@@ -542,9 +623,9 @@ const FireExtinguisherStats = ({ onBack }) => {
             <SectionTitle>📊 Status Classification</SectionTitle>
             <div className="fe-status-chips">
               {[
-                { label: 'Operational',   val: u.operational_status, color: u.operational_status === 'active' ? '#28a745' : '#dc3545' },
-                { label: 'Status Bucket', val: u.status_bucket,      color: '#3b82f6' },
-                { label: 'Overall',       val: u.status,             color: '#FF9800' },
+                { label: 'Operational', val: u.operational_status, color: u.operational_status === 'active' ? '#28a745' : '#dc3545' },
+                { label: 'Status Bucket', val: u.status_bucket, color: '#3b82f6' },
+                { label: 'Overall', val: u.status, color: '#FF9800' },
               ].map(s => (
                 <div
                   key={s.label}

@@ -8,7 +8,7 @@
   --bg: linear-gradient(135deg, #0f1e2b 0%, #0a141c 100%);
   --surface: #045A97;
   --surface2: #09538F;
-  --header-bg: #09538F;
+  --header-bg: #045A97;
   --header-accent: #2ECC71;
   --panel-bg: #045A97;
   --border: rgba(255, 255, 255, 0.16);
@@ -22,11 +22,26 @@
   --blue: #5fd3f3;
   --red-bg: rgba(220, 53, 69, 0.1);
   --red-border: rgba(220, 53, 69, 0.3);
-  --card-bg: rgba(255, 255, 255, 0.78);
-  --card-text: #000000;
   --font: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   --font-head: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+.dash.light-mode {
+  --bg: #f1f5f9;
+  --surface: #045A97;
+  --surface2: #09538F;
+  --header-bg: #045A97;
+  --header-accent: #2ECC71;
+  --panel-bg: #045A97;
+  --border: rgba(255, 255, 255, 0.16);
+  --border2: rgba(255, 255, 255, 0.25);
+  --text: #ffffff;
+  --text2: rgba(255, 255, 255, 0.7);
+  --text3: rgba(255, 255, 255, 0.6);
+  --blue: #5fd3f3;
+  --red-bg: rgba(220, 53, 69, 0.1);
+  --red-border: rgba(220, 53, 69, 0.3);
 }
 
 @keyframes blinkAmber {
