@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SOS Emergency Platform - Login System
 
 This project is a React-based Login System for the SOS Emergency Platform.
@@ -35,3 +36,6 @@ This project is a React-based Login System for the SOS Emergency Platform.
 - `src/components/Login.jsx`: Main login component.
 - `src/components/Login.css`: Component-specific styling.
 - `src/App.jsx`: Root component rendering the Login page.
+=======
+# Fire_Extinguisher
+>>>>>>> 5ad71414c8a097588e69bc2ad94196a4b3034ae2

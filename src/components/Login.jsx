@@ -93,9 +93,6 @@ const Login = ({ onLogin }) => {
               )}
             </button>
 
-            <div style={{ marginTop: '20px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                <strong>Demo Roles:</strong> superadmin, admin, user
-            </div>
           </form>
 
           <span className="auth-notice">Authorized Access Only</span>
