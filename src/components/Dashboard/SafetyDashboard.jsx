@@ -352,8 +352,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
-          </button>
-          <div className="bell-wrap">
+          </button>          <div className="bell-wrap">
             <span className="bell-icon">🔔</span>
             <span className="bell-badge">{alertCount > 99 ? '99+' : alertCount || 0}</span>
           </div>

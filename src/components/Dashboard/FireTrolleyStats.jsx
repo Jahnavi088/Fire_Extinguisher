@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './FireExtinguisherStats.css'; 
+import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
@@ -141,7 +141,7 @@ const FireTrolleyStats = ({ onBack }) => {
           <div className="fe-header-search">
             <div className="fe-search-box">
               <span className="fe-search-icon">🔍</span>
-              <input type="text" placeholder="Search trolley code..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="fe-search-input" />
+              <input type="text" placeholder="Search trolley code..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
             </div>
           </div>
         </div>

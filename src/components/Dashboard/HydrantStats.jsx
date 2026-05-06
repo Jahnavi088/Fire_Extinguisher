@@ -380,7 +380,7 @@ const HydrantStats = ({ onBack }) => {
                         dataKey="name"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: 'var(--text3)', fontSize: 10, fontWeight: 600 }}
+                        tick={{ fill: 'var(--text3)', fontSize: 13, fontWeight: 700 }}
                         interval={0}
                       />
                       <YAxis hide />
@@ -390,17 +390,17 @@ const HydrantStats = ({ onBack }) => {
                           background: 'var(--surface)',
                           border: '1px solid var(--border)',
                           borderRadius: '8px',
-                          fontSize: '12px',
+                          fontSize: '15px',
                           color: 'var(--text)'
                         }}
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
-                          { color: '#28a745' }, 
-                          { color: '#FF9800' }, 
-                          { color: '#f59e0b' }, 
-                          { color: '#8b5cf6' }, 
-                          { color: '#dc3545' }, 
+                          { color: '#28a745' },
+                          { color: '#FF9800' },
+                          { color: '#f59e0b' },
+                          { color: '#8b5cf6' },
+                          { color: '#dc3545' },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -542,20 +542,11 @@ const HydrantStats = ({ onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
-        <span className="fe-header-icon">🚒</span>
+        <BackBtn onClick={goBack}>Back</BackBtn>
+        <span className="fe-header-icon">🚰</span>
         <div className="fe-header-info">
-          <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>
-            {u.sos_code || u.equipment_code || '…'}
-          </div>
-          <div className="fe-header-sub">{u.equipment_type || 'Hydrant Point'} · {u.location_name}</div>
+          <div className="fe-header-title">Equipment Details</div>
         </div>
-        <span
-          className="fe-score-badge"
-          style={{ color: c, borderColor: c + '66', background: c + '18' }}
-        >
-          {sc}%
-        </span>
       </div>
 
       {detailLoading ? <Spinner /> : (

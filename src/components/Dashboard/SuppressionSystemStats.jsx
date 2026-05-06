@@ -185,7 +185,7 @@ const SuppressionSystemStats = ({ onBack }) => {
           <div className="fe-header-search">
             <div className="fe-search-box">
               <span className="fe-search-icon">🔍</span>
-              <input type="text" placeholder="Search system code or location..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="fe-search-input" />
+              <input type="text" placeholder="Search system code or location..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
             </div>
           </div>
         </div>
@@ -277,7 +277,7 @@ const SuppressionSystemStats = ({ onBack }) => {
         <div className="fe-header">
           <BackBtn onClick={goBack}>Back</BackBtn>
           <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} systems — click to view</div></div>
-          <div className="fe-header-search"><div className="fe-search-box"><span className="fe-search-icon">🔍</span><input type="text" placeholder="Search..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="fe-search-input" /></div></div>
+          <div className="fe-header-search"><div className="fe-search-box"><span className="fe-search-icon">🔍</span><input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" /></div></div>
         </div>
         {listLoading ? <Spinner /> : (
           <div className="fe-table">
@@ -294,7 +294,7 @@ const SuppressionSystemStats = ({ onBack }) => {
                 </div>
               );
             })}
-            <Pagination page={currentPage} totalPages={Math.ceil(listTotal/PAGE_SIZE)} total={listTotal} pageSize={PAGE_SIZE} onPage={setCurrentPage} />
+            <Pagination page={currentPage} totalPages={Math.ceil(listTotal / PAGE_SIZE)} total={listTotal} pageSize={PAGE_SIZE} onPage={setCurrentPage} />
           </div>
         )}
       </div>

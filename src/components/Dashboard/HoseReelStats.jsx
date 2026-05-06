@@ -194,7 +194,7 @@ const HoseReelStats = ({ onBack }) => {
       const data = await fetchByType(card.type);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
-      
+
       // If no items returned, add some mock items for demo
       if (!data.items || data.items.length === 0) {
         const mockItems = Array.from({ length: 5 }).map((_, i) => ({
@@ -396,11 +396,11 @@ const HoseReelStats = ({ onBack }) => {
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
-                          { color: '#28a745' }, 
-                          { color: '#FF9800' }, 
-                          { color: '#f59e0b' }, 
-                          { color: '#8b5cf6' }, 
-                          { color: '#dc3545' }, 
+                          { color: '#28a745' },
+                          { color: '#FF9800' },
+                          { color: '#f59e0b' },
+                          { color: '#8b5cf6' },
+                          { color: '#dc3545' },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}

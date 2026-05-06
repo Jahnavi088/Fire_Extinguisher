@@ -364,11 +364,11 @@ const SprinklerStats = ({ onBack }) => {
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
-                          { color: '#28a745' }, 
-                          { color: '#FF9800' }, 
-                          { color: '#f59e0b' }, 
-                          { color: '#8b5cf6' }, 
-                          { color: '#dc3545' }, 
+                          { color: '#28a745' },
+                          { color: '#FF9800' },
+                          { color: '#f59e0b' },
+                          { color: '#8b5cf6' },
+                          { color: '#dc3545' },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}

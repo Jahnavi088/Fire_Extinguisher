@@ -803,102 +803,108 @@
 
   /* ── LIGHT MODE OVERRIDES ── */
   .dash.light-mode {
-    --bg: #f1f5f9;
-    --surface: #f8fafc;
-    --surface2: #e2e8f0;
+    --bg: #eef2f7;
+    --surface: #ffffff;
+    --surface2: #f3f6fb;
+    --header-bg: #ffffff;
+    --header-accent: #cbd5e1;
+    --panel-bg: #ffffff;
     --border: #cbd5e1;
-    --text: #000000;
-    --text2: #000000;
-    --text3: #000000;
+    --border2: #dbe4ee;
+    --text: #111827;
+    --text2: #334155;
+    --text3: #64748b;
+    --blue: #5fd3f3;
     font-weight: 700;
     font-size: 14px;
   }
 
   .dash.light-mode .sidebar {
-    background: var(--surface);
+    background: #ffffff;
     border-right: 1px solid var(--border);
   }
 
   .dash.light-mode .sb-header {
-    background: var(--surface);
+    background: #ffffff;
   }
 
   .dash.light-mode .topbar {
-    background: var(--header-bg);
-    border-bottom: 3px solid var(--header-accent);
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
   }
 
   .dash.light-mode .tb-subtitle {
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--text3);
   }
 
   .dash.light-mode .search-group {
-    background: rgba(0, 0, 0, 0.18);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: #ffffff;
+    border-color: var(--border);
   }
 
   .dash.light-mode .search-input {
-    color: #fff;
+    color: var(--text);
   }
 
   .dash.light-mode .search-input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text3);
   }
 
   .dash.light-mode .custom-select-trigger {
-    color: rgba(255, 255, 255, 0.9);
-    border-right-color: rgba(255, 255, 255, 0.2);
+    color: var(--text);
+    border-right-color: var(--border);
   }
 
   .dash.light-mode .tb-clock {
-    background: rgba(0, 0, 0, 0.18);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: #ffffff;
+    border-color: var(--border);
+    color: var(--text);
   }
 
   .dash.light-mode .theme-toggle-btn {
-    background: rgba(0, 0, 0, 0.18);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.9);
+    background: #ffffff;
+    border-color: var(--border);
+    color: var(--text);
   }
 
   .dash.light-mode .theme-toggle-btn:hover {
-    background: rgba(0, 0, 0, 0.28);
+    background: var(--surface2);
   }
 
   .dash.light-mode .right-panel {
     background: #ffffff;
-    border-left: 1px solid #e2e8f0;
+    border-left: 1px solid var(--border);
   }
 
   .dash.light-mode .cat-header {
-    color: #334155;
+    color: var(--text);
   }
 
   .dash.light-mode .cat-header:hover {
-    background: #f1f5f9;
+    background: var(--surface2);
   }
 
   .dash.light-mode .cat-header.active {
-    background: rgba(4, 90, 151, 0.08);
-    border-left-color: #045A97;
+    background: rgba(37, 99, 235, 0.08);
+    border-left-color: #2563eb;
   }
 
   .dash.light-mode .cat-header.active .cat-name {
-    color: #045A97;
+    color: #111827;
   }
 
   .dash.light-mode .sb-user-row {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: #cbd5e1;
+    background: #f8fafc;
+    border-color: var(--border);
   }
 
   .dash.light-mode .sb-avatar {
-    background: #045A97;
-    color: #fff;
+    background: #dbeafe;
+    color: #111827;
   }
 
   .dash.light-mode .eq-btn:hover {
-    background: #f1f5f9;
+    background: var(--surface2);
     font-weight: 800;
   }
 
@@ -907,14 +913,112 @@
   }
 
   .dash.light-mode .panel-btn-icon {
-    background: rgba(0, 0, 0, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.85);
+    background: #ffffff;
+    border-color: var(--border);
+    color: var(--text);
   }
 
   .dash.light-mode .panel-btn-icon:hover {
-    background: rgba(0, 0, 0, 0.2);
-    color: #fff;
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  .dash.light-mode .topbar,
+  .dash.light-mode .model-sidebar,
+  .dash.light-mode .right-panel,
+  .dash.light-mode .cl-header,
+  .dash.light-mode .sb-footer,
+  .dash.light-mode .sb-user-section {
+    background: #045A97 !important;
+  }
+
+  .dash.light-mode .topbar *,
+  .dash.light-mode .model-sidebar *,
+  .dash.light-mode .right-panel *,
+  .dash.light-mode .cl-header *,
+  .dash.light-mode .sb-footer *,
+  .dash.light-mode .sb-user-section * {
+    color: #ffffff !important;
+  }
+
+  .dash.light-mode .tb-title,
+  .dash.light-mode .tb-subtitle,
+  .dash.light-mode .tb-time-bold,
+  .dash.light-mode .status-badge,
+  .dash.light-mode .bell-icon,
+  .dash.light-mode .bell-badge,
+  .dash.light-mode .custom-select-trigger,
+  .dash.light-mode .search-input,
+  .dash.light-mode .search-icon,
+  .dash.light-mode .theme-toggle-btn,
+  .dash.light-mode .panel-toggle-topbar-btn,
+  .dash.light-mode .nav-section-label,
+  .dash.light-mode .nav-label,
+  .dash.light-mode .nav-badge,
+  .dash.light-mode .sb-user-name,
+  .dash.light-mode .sb-user-role,
+  .dash.light-mode .logout-btn,
+  .dash.light-mode .cl-title,
+  .dash.light-mode .cl-subtitle,
+  .dash.light-mode .cl-back-btn,
+  .dash.light-mode .cl-sec-head,
+  .dash.light-mode .cl-item-text,
+  .dash.light-mode .rp-label,
+  .dash.light-mode .export-btn {
+    color: var(--text) !important;
+  }
+
+  .dash.light-mode .topbar-search .search-group,
+  .dash.light-mode .topbar-search .custom-select-trigger,
+  .dash.light-mode .topbar-search .search-input,
+  .dash.light-mode .topbar-search .search-box,
+  .dash.light-mode .tb-clock,
+  .dash.light-mode .theme-toggle-btn,
+  .dash.light-mode .panel-toggle-topbar-btn,
+  .dash.light-mode .sidebar-toggle-btn,
+  .dash.light-mode .logout-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff !important;
+  }
+
+  .dash.light-mode .topbar-search .search-input::placeholder,
+  .dash.light-mode .custom-option,
+  .dash.light-mode .fe-spinner,
+  .dash.light-mode .fe-error,
+  .dash.light-mode .fe-empty,
+  .dash.light-mode .fe-alert-type,
+  .dash.light-mode .fe-alert-level-desc,
+  .dash.light-mode .fe-table-head-cell,
+  .dash.light-mode .fe-table-type,
+  .dash.light-mode .fe-table-bldg,
+  .dash.light-mode .fe-table-date,
+  .dash.light-mode .fe-detail-val,
+  .dash.light-mode .fe-detail-label,
+  .dash.light-mode .fe-info-label,
+  .dash.light-mode .fe-info-value,
+  .dash.light-mode .fe-readiness-label,
+  .dash.light-mode .fe-spinner-text {
+    color: var(--text2) !important;
+  }
+
+  .dash.light-mode .status-badge {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .dash.light-mode .bell-badge {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #111827;
+  }
+
+  .dash.light-mode .tb-clock-icon,
+  .dash.light-mode .topbar-search .search-icon,
+  .dash.light-mode .sidebar-toggle-btn svg {
+    stroke: var(--text3);
+    fill: var(--text3);
   }
 
   /* ── CONTENT ── */
@@ -2084,15 +2188,15 @@
   }
 
   .dash.light-mode .topbar {
-    background: linear-gradient(90deg, #0d5d98 0%, #0d5f99 100%);
+    background: #045A97 !important;
   }
 
   .dash.light-mode .model-sidebar {
-    background: #0d5d98;
+    background: #045A97 !important;
   }
 
   .dash.light-mode .right-panel {
-    background: #0f5f97;
+    background: #045A97 !important;
   }
 
   /* ── TOPBAR SEARCH ── */
