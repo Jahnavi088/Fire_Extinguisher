@@ -6,6 +6,8 @@ import SprinklerStats from './SprinklerStats';
 import HoseReelStats from './HoseReelStats';
 import DrumHoseStats from './DrumHoseStats';
 import HydrantStats from './HydrantStats';
+import FireTrolleyStats from './FireTrolleyStats';
+import SuppressionSystemStats from './SuppressionSystemStats';
 import RightPanel from './RightPanel';
 
 const STATIC_MODULES = [
@@ -39,6 +41,29 @@ const STATIC_MODULES = [
   { module_id: 28, name: 'Muster point signs', code: 'muster_point', health_score: 100, category: 'permit' },
   { module_id: 29, name: 'Fire NOC', code: 'fire_noc', health_score: 100, category: 'permit' },
   { module_id: 30, name: 'Fire suppress. CO2', code: 'suppression_system', health_score: 100, category: 'fire' },
+];
+
+const CHECKLIST_MODULES = [
+  { id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher', icon: '🧯' },
+  { id: 31, name: 'Sprinkler System', code: 'sprinkler', icon: '🚿' },
+  { id: 32, name: 'FPCA', code: 'fpca', icon: '🔔' },
+  { id: 33, name: 'Hose Reel', code: 'hose_reel', icon: '🧵' },
+  { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: '🚒' },
+  { id: 35, name: 'Fire Alarm Panel', code: 'fire_alarm_panel', icon: '🚨' },
+  { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: '🌫️' },
+  { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: '🔥' },
+  { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: '🔦' },
+  { id: 39, name: 'Exit Sign', code: 'exit_sign', icon: '🚪' },
+  { id: 40, name: 'CO Detector', code: 'co_detector', icon: '⚠️' },
+  { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: '🧲' },
+  { id: 42, name: 'Suppression System', code: 'suppression_system', icon: '💨' },
+  { id: 43, name: 'Fire Door', code: 'fire_door', icon: '🚪' },
+  { id: 44, name: 'PA System', code: 'pa_system', icon: '📢' },
+  { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: '🏥' },
+  { id: 46, name: 'Eyewash Station', code: 'eyewash_station', icon: '👀' },
+  { id: 47, name: 'Safety Shower', code: 'safety_shower', icon: '🚿' },
+  { id: 48, name: 'Chemical Spill Kit', code: 'spill_kit', icon: '⚗️' },
+  { id: 49, name: 'PPE Station', code: 'ppe_station', icon: '🦺' },
 ];
 
 const MODULE_EMOJI = {
@@ -89,17 +114,37 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [alertCount, setAlertCount] = useState(0);
   const [searchFilter, setSearchFilter] = useState('All');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [checklists, setChecklists] = useState([]);
+  const [activeChecklistItems, setActiveChecklistItems] = useState([]);
+  const [clLoading, setClLoading] = useState(false);
+  const [checklistsDropdownOpen, setChecklistsDropdownOpen] = useState(false);
+  const [topbarVisible, setTopbarVisible] = useState(true);
+  const lastScrollY = React.useRef(0);
 
   const filterOptions = [
-    { label: 'All',      icon: '🔍' },
-    { label: 'Fire',     icon: '🔥' },
+    { label: 'All', icon: '🔍' },
+    { label: 'Fire', icon: '🔥' },
     { label: 'Chemical', icon: '⚗️' },
-    { label: 'Medical',  icon: '🏥' },
-    { label: 'Permits',  icon: '📋' },
+    { label: 'Medical', icon: '🏥' },
+    { label: 'Permits', icon: '📋' },
   ];
 
   const modules = STATIC_MODULES;
   const preparednessScore = 92;
+
+  useEffect(() => {
+    // Dynamic checklist loading when a module is selected for the checklist page
+    if (activePage === 'checklist' && selectedEq?.id) {
+      setClLoading(true);
+      ApiService.getModuleChecklists(selectedEq.id)
+        .then(d => {
+          const list = Array.isArray(d) ? d : (d?.items || d?.data || d?.checklists || []);
+          setActiveChecklistItems(list);
+        })
+        .catch(() => setActiveChecklistItems([]))
+        .finally(() => setClLoading(false));
+    }
+  }, [activePage, selectedEq]);
 
   useEffect(() => {
     ApiService.getAlertsSummary()
@@ -158,8 +203,14 @@ const SafetyDashboard = ({ user, onLogout }) => {
     { sec: 'Operational Readiness', items: ['Safety pin and seal intact', 'Nozzle/hose clear of blockages', 'Instruction label legible'] },
   ];
 
-  const totalItems = checklistData.reduce((acc, sec) => acc + sec.items.length, 0);
-  const checkedCount = Object.values(checkedItems).filter(Boolean).length;
+  const totalItems = useMemo(() => {
+    return activeChecklistItems.length;
+  }, [activeChecklistItems]);
+
+  const checkedCount = useMemo(() => {
+    return Object.values(checkedItems).filter(Boolean).length;
+  }, [checkedItems]);
+  
   const progressPct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
   const getStatus = (score) => (score >= 90 ? 'healthy' : score >= 70 ? 'warning' : 'critical');
@@ -174,7 +225,19 @@ const SafetyDashboard = ({ user, onLogout }) => {
     else if (mod.code === 'hose_reel') setActivePage('hose-stats');
     else if (mod.code === 'drum_hose') setActivePage('drum-stats');
     else if (mod.code === 'hydrant') setActivePage('hydrant-stats');
+    else if (mod.code === 'fire_trolley') setActivePage('fire-trolley-stats');
+    else if (mod.code === 'suppression_system') setActivePage('suppression-system-stats');
     else setActivePage('checklist');
+  };
+
+  const handleScroll = (e) => {
+    const currentScrollY = e.target.scrollTop;
+    if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+      setTopbarVisible(false);
+    } else {
+      setTopbarVisible(true);
+    }
+    lastScrollY.current = currentScrollY;
   };
 
   const handleLogout = async () => {
@@ -192,7 +255,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
       label: 'MAIN',
       items: [
         { icon: '📊', label: 'Overview', active: activePage === 'grid', onClick: () => setActivePage('grid') },
-        { icon: '📋', label: 'Reports' },
+        { icon: '📁', label: 'Reports' },
       ],
     },
     {
@@ -215,7 +278,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
   ];
 
   return (
-    <div className={`dash ${navCollapsed ? 'sidebar-collapsed' : ''} ${!isDarkMode ? 'light-mode' : ''}`}>
+    <div className={`dash ${navCollapsed ? 'sidebar-collapsed' : ''} ${!isDarkMode ? 'light-mode' : ''} ${!topbarVisible ? 'topbar-hidden' : ''}`}>
       {/* ── TOPBAR (HEADER AT TOP) ────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar-left">
@@ -224,7 +287,11 @@ const SafetyDashboard = ({ user, onLogout }) => {
               <img src="/apitoria-logo.png" alt="Apitoria" className="topbar-logo" />
             </div>
             <div className="topbar-copy">
-              <div className="tb-title">Emergency Safety Dashboard</div>
+              <div className="tb-title">
+                <span className="tb-brand-icon">🚨
+</span>
+                Emergency Safety Dashboard
+              </div>
               <div className="tb-subtitle">Real-time fire &amp; safety monitoring</div>
             </div>
           </div>
@@ -332,6 +399,52 @@ const SafetyDashboard = ({ user, onLogout }) => {
               </React.Fragment>
             ))}
 
+            {/* CHECKLISTS DROPDOWN */}
+            <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
+              <div className="nav-left">
+                <span className="nav-icon">📝</span>
+                {!navCollapsed && <span className="nav-label">Checklists</span>}
+              </div>
+              {!navCollapsed && (
+                <svg className="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              )}
+            </div>
+
+            {checklistsDropdownOpen && !navCollapsed && (
+              <div className="nav-submenu">
+                {/* Module-based Checklist Dashboards */}
+                {!navCollapsed && <div className="nav-submenu-label">EQUIPMENT DASHBOARDS</div>}
+                {CHECKLIST_MODULES.map((mod) => (
+                  <div 
+                    key={mod.id} 
+                    className={`nav-submenu-item ${selectedEq?.id === mod.id && activePage === 'checklist' ? 'active' : ''}`} 
+                    onClick={() => { setSelectedEq(mod); setActivePage('checklist'); }}
+                  >
+                    <span className="nav-icon-small">{mod.icon}</span>
+                    <span className="nav-label-small">{mod.name}</span>
+                  </div>
+                ))}
+                {checklists.length > 0 && (
+                  <>
+                    <div className="nav-divider-small"></div>
+
+                    {!navCollapsed && <div className="nav-submenu-label">GENERAL CHECKLISTS</div>}
+                    {checklists.map((cl) => (
+                      <div key={cl.id} className="nav-submenu-item" onClick={() => { setSelectedEq(cl); setActivePage('checklist'); }}>
+                        <span className="nav-icon-small">📄</span>
+                        <span className="nav-label-small">{cl.name || cl.title || 'Checklist'}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {checklists.length === 0 && (
+                  <div className="nav-submenu-empty">No additional checklists</div>
+                )}
+              </div>
+            )}
+
             {isSuperAdmin && (
               <>
                 {!navCollapsed && <div className="nav-section-label">ADMINISTRATION</div>}
@@ -385,7 +498,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
           {/* MIDDLE COLUMN: PAGES */}
           <div className="content-area">
             <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
-              <div className="grid-scroll">
+              <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
                 <div className="eq-grid">
                   {filteredModules.map((mod) => (
                     <div key={mod.module_id} className={`eq-card ${getStatus(mod.health_score)}`} onClick={() => handleOpenModule(mod)}>
@@ -408,39 +521,84 @@ const SafetyDashboard = ({ user, onLogout }) => {
                     <div className="cl-prog-txt">{checkedCount} / {totalItems}</div>
                   </div>
                 </div>
-                <div className="cl-body">
-                  {checklistData.map((sec, si) => (
-                    <div key={si} className="cl-section">
-                      <div className="cl-sec-head">{sec.sec}</div>
-                      {sec.items.map((txt, ii) => {
-                        const id = `cb_${si}_${ii}`;
-                        return (
-                          <div key={id} className={`cl-item ${checkedItems[id] ? 'done' : ''}`}>
-                            <input type="checkbox" className="cl-cb" id={id} checked={!!checkedItems[id]} onChange={() => toggleCheck(id)} />
-                            <label className="cl-item-text" htmlFor={id}>{txt}</label>
-                          </div>
-                        );
-                      })}
+                <div className="cl-body" onScroll={handleScroll}>
+                  {clLoading ? (
+                    <div className="cl-loading">
+                      <div className="cl-spinner" />
+                      <span>Loading checklist items...</span>
                     </div>
-                  ))}
+                  ) : activeChecklistItems.length > 0 ? (
+                    <div className="cl-items-list">
+                      {(() => {
+                        // Sort by item_order first
+                        const sorted = [...activeChecklistItems].sort((a, b) => (a.item_order || 0) - (b.item_order || 0));
+                        
+                        // Group by category
+                        const groups = sorted.reduce((acc, item) => {
+                          const cat = item.category || 'General Inspection';
+                          if (!acc[cat]) acc[cat] = [];
+                          acc[cat].push(item);
+                          return acc;
+                        }, {});
+                        
+                        return Object.entries(groups).map(([cat, items], gi) => (
+                          <div key={gi} className="cl-section">
+                            <div className="cl-sec-head">{cat}</div>
+                            {items.map((item, idx) => {
+                              const itemId = item.id || `item_${gi}_${idx}`;
+                              return (
+                                <div key={itemId} className={`cl-item ${checkedItems[itemId] ? 'done' : ''} ${item.is_critical ? 'is-critical' : ''}`}>
+                                  <div className="cl-item-main">
+                                    <input 
+                                      type="checkbox" 
+                                      className="cl-cb" 
+                                      id={`cl_${itemId}`} 
+                                      checked={!!checkedItems[itemId]} 
+                                      onChange={() => toggleCheck(itemId)} 
+                                    />
+                                    <label className="cl-item-text" htmlFor={`cl_${itemId}`}>
+                                      {item.item_text || item.checklist_name || item.name || 'Checklist Item'}
+                                      {item.is_critical && <span className="cl-critical-badge">CRITICAL</span>}
+                                    </label>
+                                  </div>
+                                  {item.hints && <div className="cl-item-hint">{item.hints}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="cl-empty">
+                      <span className="cl-empty-icon">📝</span>
+                      <p>No checklist items found for this module.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
 
             <section className={`page ${activePage === 'fire-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-stats' && <FireExtinguisherStats onBack={() => setActivePage('grid')} />}
+              {activePage === 'fire-stats' && <FireExtinguisherStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
-              {activePage === 'sprinkler-stats' && <SprinklerStats onBack={() => setActivePage('grid')} />}
+              {activePage === 'sprinkler-stats' && <SprinklerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hose-stats' ? 'active' : ''}`}>
-              {activePage === 'hose-stats' && <HoseReelStats onBack={() => setActivePage('grid')} />}
+              {activePage === 'hose-stats' && <HoseReelStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'drum-stats' ? 'active' : ''}`}>
-              {activePage === 'drum-stats' && <DrumHoseStats onBack={() => setActivePage('grid')} />}
+              {activePage === 'drum-stats' && <DrumHoseStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hydrant-stats' ? 'active' : ''}`}>
-              {activePage === 'hydrant-stats' && <HydrantStats onBack={() => setActivePage('grid')} />}
+              {activePage === 'hydrant-stats' && <HydrantStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'fire-trolley-stats' ? 'active' : ''}`}>
+              {activePage === 'fire-trolley-stats' && <FireTrolleyStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
+              {activePage === 'suppression-system-stats' && <SuppressionSystemStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
 
             <section className={`page ${activePage === 'admin-companies' ? 'active' : ''}`}>
