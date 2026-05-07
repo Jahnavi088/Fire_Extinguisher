@@ -22,18 +22,18 @@ const condColor = (v) =>
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
-  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#FF9800', key: 'upcoming' },
-  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
-  { type: 'expired', label: 'Expired', icon: '⌛', color: '#8b5cf6', key: 'expired' },
-  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
+  { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#045A97', key: 'total' },
+  { type: 'active', label: 'Active', icon: '✅', color: '#045A97', key: 'active' },
+  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#045A97', key: 'upcoming' },
+  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#045A97', key: 'needs_service' },
+  { type: 'expired', label: 'Expired', icon: '⌛', color: '#045A97', key: 'expired' },
+  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#045A97', key: 'due_inspection' },
 ];
 
 const PAGE_SIZE = 15;
 
 const fetchByType = (type) => {
-  const params = { module_id: 30, limit: 200 };
+  const params = { module_id: 1, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -48,7 +48,6 @@ const Spinner = () => (
 
 const BackBtn = ({ onClick, children }) => (
   <button className="fe-back-btn" onClick={onClick}>
-    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
     {children}
   </button>
 );
@@ -127,6 +126,14 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
+const loadHistory = () => {
+  try { return JSON.parse(localStorage.getItem('fe_inspection_history') || '[]'); }
+  catch { return []; }
+};
+
+const ANSWER_COLOR = { True: '#28a745', False: '#dc3545', NA: '#888' };
+const ANSWER_LABEL = { True: 'True', False: 'False', NA: 'NA' };
+
 const FireExtinguisherStats = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
@@ -146,15 +153,24 @@ const FireExtinguisherStats = ({ onBack }) => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [inspectionHistory, setInspectionHistory] = useState(loadHistory);
+  const [expandedRecord, setExpandedRecord] = useState(null);
+
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const handler = () => setInspectionHistory(loadHistory());
+    window.addEventListener('fe-inspection-saved', handler);
+    return () => window.removeEventListener('fe-inspection-saved', handler);
+  }, []);
 
   const load = async () => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getSummary(),                               // /modules/30/summary
+        ApiService.getModuleSummary(1),                        // /modules/1/summary
         ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 30, limit: 100 }),   // /alerts?module_id=30
+        ApiService.getAlerts({ module_id: 1, limit: 100 }),    // /alerts?module_id=1
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -226,13 +242,9 @@ const FireExtinguisherStats = ({ onBack }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
           </div>
-          <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
-            {summary?.readiness_score}%
-          </span>
 
           <div className="fe-header-search">
             <div className="fe-search-box">
-              <span className="fe-search-icon">🔍</span>
               <input
                 type="text"
                 placeholder="Search SOS Code, location, or building..."
@@ -404,6 +416,149 @@ const FireExtinguisherStats = ({ onBack }) => {
             )}
           </div>
         </div>
+
+        {/* ── Inspection History ─────────────────────────────────────── */}
+        <div className="fe-ih-section">
+          <div className="fe-ih-header">
+            <div className="fe-ih-title">
+              <span className="fe-ih-title-icon">📋</span>
+              Inspection History
+              <span className="fe-ih-count">{inspectionHistory.length}</span>
+            </div>
+            {inspectionHistory.length > 0 && (
+              <button
+                className="fe-ih-clear-btn"
+                onClick={() => {
+                  if (!window.confirm('Clear all inspection records?')) return;
+                  localStorage.removeItem('fe_inspection_history');
+                  setInspectionHistory([]);
+                  setExpandedRecord(null);
+                }}
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          {inspectionHistory.length === 0 ? (
+            <div className="fe-ih-empty">
+              <span className="fe-ih-empty-icon">📝</span>
+              <p>No inspections submitted yet.</p>
+              <span>Complete a checklist inspection and submit it — the record will appear here.</span>
+            </div>
+          ) : (
+            <div className="fe-ih-list">
+              {/* Table header */}
+              <div className="fe-ih-row fe-ih-row-head">
+                <div className="fe-ih-col fe-ih-col-date">Date &amp; Time</div>
+                <div className="fe-ih-col fe-ih-col-stat">✅ Passed</div>
+                <div className="fe-ih-col fe-ih-col-stat">❌ Failed</div>
+                <div className="fe-ih-col fe-ih-col-stat">➖ N/A</div>
+                <div className="fe-ih-col fe-ih-col-crit">Critical Failures</div>
+                <div className="fe-ih-col fe-ih-col-status">Result</div>
+                <div className="fe-ih-col fe-ih-col-action"></div>
+              </div>
+
+              {inspectionHistory.map((rec) => {
+                const isExpanded = expandedRecord === rec.id;
+                const hasIssues  = rec.failed > 0 || rec.criticalFailed > 0;
+                const date       = new Date(rec.submittedAt);
+                const dateStr    = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                const timeStr    = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+                return (
+                  <React.Fragment key={rec.id}>
+                    <div className={`fe-ih-row fe-ih-row-data ${isExpanded ? 'fe-ih-row-expanded' : ''}`}>
+                      <div className="fe-ih-col fe-ih-col-date">
+                        <span className="fe-ih-date">{dateStr}</span>
+                        <span className="fe-ih-time">{timeStr}</span>
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-stat">
+                        <span className="fe-ih-num fe-ih-pass">{rec.passed}</span>
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-stat">
+                        <span className="fe-ih-num fe-ih-fail">{rec.failed}</span>
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-stat">
+                        <span className="fe-ih-num fe-ih-na">{rec.na}</span>
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-crit">
+                        {rec.criticalFailed > 0
+                          ? <span className="fe-ih-crit-badge">{rec.criticalFailed} critical ⚠</span>
+                          : <span className="fe-ih-crit-ok">None</span>}
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-status">
+                        <span className={`fe-ih-result ${hasIssues ? 'fe-ih-result-issues' : 'fe-ih-result-pass'}`}>
+                          {hasIssues ? 'Has Issues' : 'Passed'}
+                        </span>
+                      </div>
+                      <div className="fe-ih-col fe-ih-col-action">
+                        <button
+                          className={`fe-ih-expand-btn ${isExpanded ? 'open' : ''}`}
+                          onClick={() => setExpandedRecord(isExpanded ? null : rec.id)}
+                        >
+                          {isExpanded ? 'Hide' : 'View'}
+                          <svg viewBox="0 0 24 24">
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div className="fe-ih-detail">
+                        <table className="fe-ih-detail-table">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Inspection Question</th>
+                              <th>Answer</th>
+                              <th>Critical</th>
+                              <th>Remark</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rec.items.map((item, idx) => {
+                              const isSection = idx === 0 || item.category !== rec.items[idx - 1].category;
+                              return (
+                                <React.Fragment key={item.id}>
+                                  {isSection && (
+                                    <tr className="fe-ih-cat-row">
+                                      <td colSpan={5}>{item.category.toUpperCase()}</td>
+                                    </tr>
+                                  )}
+                                  <tr className={`fe-ih-item-row ${item.answer === 'False' ? 'fe-ih-item-fail' : item.answer === 'True' ? 'fe-ih-item-pass' : 'fe-ih-item-na'}`}>
+                                    <td className="fe-ih-item-num">{item.id}</td>
+                                    <td className="fe-ih-item-q">{item.question}</td>
+                                    <td className="fe-ih-item-ans">
+                                      <span
+                                        className="fe-ih-ans-pill"
+                                        style={{ background: ANSWER_COLOR[item.answer], color: '#fff' }}
+                                      >
+                                        {ANSWER_LABEL[item.answer]}
+                                      </span>
+                                    </td>
+                                    <td className="fe-ih-item-crit">
+                                      {item.critical
+                                        ? <span className="fe-ih-crit-dot">YES ⚠</span>
+                                        : <span className="fe-ih-no-dot">No</span>}
+                                    </td>
+                                    <td className="fe-ih-item-remark">{item.remark || '—'}</td>
+                                  </tr>
+                                </React.Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -428,7 +583,6 @@ const FireExtinguisherStats = ({ onBack }) => {
 
           <div className="fe-header-search">
             <div className="fe-search-box">
-              <span className="fe-search-icon">🔍</span>
               <input
                 type="text"
                 placeholder="Search within this list..."
@@ -519,7 +673,7 @@ const FireExtinguisherStats = ({ onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack}>Back</BackBtn>
         <span className="fe-header-icon">🧯</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>

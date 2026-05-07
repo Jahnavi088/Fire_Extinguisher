@@ -41,8 +41,8 @@ function App() {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh', 
-        background: '#0a0a0c',
-        color: '#fff' 
+        background: 'rgb(144,194,244)',
+        color: '#045A97'
       }}>
         <div className="loader"></div>
       </div>

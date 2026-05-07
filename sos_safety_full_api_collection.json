@@ -1,0 +1,263 @@
+{
+	"info": {
+		"_postman_id": "f2a8b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+		"name": "SOS Enterprise Safety API - Full Collection",
+		"description": "Comprehensive API collection for the SOS Emergency Safety Platform. Includes all equipment modules, administrative tools, reporting, and authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/auth/login"
+					}
+				},
+				{
+					"name": "Get Profile (Me)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/auth/me"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/auth/logout"
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Global Dashboard",
+			"item": [
+				{
+					"name": "Dashboard Overview",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/dashboard"
+					}
+				},
+				{
+					"name": "System Health",
+					"request": {
+						"method": "GET",
+						"url": "{{baseUrl}}/health"
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Modules & KPIs",
+			"item": [
+				{
+					"name": "Module Summary (KPIs)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": {
+							"raw": "{{baseUrl}}/modules/:moduleId/summary",
+							"variable": [ { "key": "moduleId", "value": "1", "description": "1:Extinguishers, 3:Sprinklers, 20:Brigade, 23:Training, 29:NOC, 30:Suppression, 31:Volunteers" } ]
+						}
+					}
+				},
+				{
+					"name": "Module Equipment List",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": {
+							"raw": "{{baseUrl}}/modules/:moduleId/equipment?page=1&limit=20",
+							"query": [ { "key": "page", "value": "1" }, { "key": "limit", "value": "20" } ],
+							"variable": [ { "key": "moduleId", "value": "1" } ]
+						}
+					}
+				},
+				{
+					"name": "Module Checklists",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/modules/:moduleId/checklists",
+						"variable": [ { "key": "moduleId", "value": "30" } ]
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Equipment Management",
+			"item": [
+				{
+					"name": "Global Equipment Search",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": {
+							"raw": "{{baseUrl}}/equipment?module_id=1&status=active&limit=10",
+							"query": [ { "key": "module_id", "value": "1" }, { "key": "status", "value": "active" }, { "key": "limit", "value": "10" } ]
+						}
+					}
+				},
+				{
+					"name": "Get Equipment by SOS Code",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/equipment/:sosCode",
+						"variable": [ { "key": "sosCode", "value": "FE-001" } ]
+					}
+				},
+				{
+					"name": "Get Equipment Inspections",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/equipment/:sosCode/inspections",
+						"variable": [ { "key": "sosCode", "value": "FE-001" } ]
+					}
+				},
+				{
+					"name": "Submit New Inspection",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"inspection_date\": \"2024-05-07\",\n    \"status\": \"OK\",\n    \"remarks\": \"System check complete\",\n    \"items\": [\n        { \"checklist_id\": 101, \"value\": \"YES\" }\n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": "{{baseUrl}}/equipment/:sosCode/inspections",
+						"variable": [ { "key": "sosCode", "value": "FE-001" } ]
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Alerts & Notifications",
+			"item": [
+				{
+					"name": "Alerts Summary (L1/L2/L3 Counts)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/alerts/summary"
+					}
+				},
+				{
+					"name": "List Active Alerts",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": {
+							"raw": "{{baseUrl}}/alerts?level=3&limit=20",
+							"query": [ { "key": "level", "value": "3", "description": "1:Low, 2:Medium, 3:High" }, { "key": "limit", "value": "20" } ]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Reports",
+			"item": [
+				{
+					"name": "Inspection History Report",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/reports/inspections"
+					}
+				},
+				{
+					"name": "Fleet Status Report",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+						"url": "{{baseUrl}}/reports/equipment-status"
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Administration",
+			"item": [
+				{
+					"name": "User Management",
+					"item": [
+						{
+							"name": "List All Users",
+							"request": {
+								"method": "GET",
+								"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+								"url": "{{baseUrl}}/admin/users"
+							}
+						},
+						{
+							"name": "Create User",
+							"request": {
+								"method": "POST",
+								"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"username\": \"jdoe\",\n    \"name\": \"John Doe\",\n    \"role\": \"admin\",\n    \"password\": \"secret123\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": "{{baseUrl}}/admin/users"
+							}
+						}
+					]
+				},
+				{
+					"name": "Module Config",
+					"item": [
+						{
+							"name": "List Admin Modules",
+							"request": {
+								"method": "GET",
+								"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+								"url": "{{baseUrl}}/admin/modules"
+							}
+						},
+						{
+							"name": "Update Module Settings",
+							"request": {
+								"method": "PATCH",
+								"header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Fire Protection System\",\n    \"health_threshold\": 85\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": "{{baseUrl}}/admin/modules/:id",
+								"variable": [ { "key": "id", "value": "1" } ]
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://ehs.garrev.com/app1/v1",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "PASTE_YOUR_JWT_HERE",
+			"type": "string"
+		}
+	]
+}

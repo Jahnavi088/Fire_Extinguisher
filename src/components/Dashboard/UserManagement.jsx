@@ -11,29 +11,32 @@ const MODULE_EMOJI = {
 };
 
 const ROLE_CONFIG = {
-  superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.15)' },
-  admin: { label: 'Admin', color: '#FFD700', bg: 'rgba(255,215,0,0.15)' },
-  inspector: { label: 'Inspector', color: '#FF9800', bg: 'rgba(255,152,0,0.15)' },
-  user: { label: 'User', color: '#aaaaaa', bg: 'rgba(170,170,170,0.12)' },
+  superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
+  admin: { label: 'Admin', color: '#FFD700', bg: 'rgba(255,215,0,0.18)' },
+  inspector: { label: 'Inspector', color: '#FF9800', bg: 'rgba(255,152,0,0.18)' },
+  user: { label: 'User', color: '#a0cfe8', bg: 'rgba(160,207,232,0.14)' },
 };
 
 const getRoleConf = (role) => ROLE_CONFIG[(role || '').toLowerCase()] || ROLE_CONFIG.user;
 
 const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active' };
+const PAGE_SIZE = 10;
 
 function fetchReducer(state, action) {
   switch (action.type) {
+    case 'loading': return { ...state, loading: true, error: null };
     case 'success': return { loading: false, error: null, users: action.users };
     case 'error': return { loading: false, error: action.error, users: [] };
     default: return state;
   }
 }
 
-const UserManagement = ({ onBack, onScroll }) => {
+const UserManagement = ({ onBack }) => {
   const [fetchState, dispatch] = useReducer(fetchReducer, { loading: true, error: null, users: [] });
   const { loading, error, users } = fetchState;
 
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -46,6 +49,7 @@ const UserManagement = ({ onBack, onScroll }) => {
 
   useEffect(() => {
     let active = true;
+    dispatch({ type: 'loading' });
     ApiService.getAdminUsers()
       .then(data => {
         if (!active) return;
@@ -60,8 +64,8 @@ const UserManagement = ({ onBack, onScroll }) => {
   }, [refreshKey]);
 
   const filteredUsers = useMemo(() => {
-    if (!search.trim()) return users;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
     return users.filter(u =>
       (u.name || '').toLowerCase().includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
@@ -70,21 +74,18 @@ const UserManagement = ({ onBack, onScroll }) => {
     );
   }, [users, search]);
 
+  useEffect(() => { setPage(1); }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const stats = useMemo(() => {
     const c = { total: users.length, superadmin: 0, admin: 0, inspector: 0, user: 0 };
-    users.forEach(u => {
-      const r = (u.role || 'user').toLowerCase();
-      if (r in c) c[r]++;
-    });
+    users.forEach(u => { const r = (u.role || 'user').toLowerCase(); if (r in c) c[r]++; });
     return c;
   }, [users]);
 
-  const openAdd = () => {
-    setEditUser(null);
-    setForm(EMPTY_FORM);
-    setFormError('');
-    setShowForm(true);
-  };
+  const openAdd = () => { setEditUser(null); setForm(EMPTY_FORM); setFormError(''); setShowForm(true); };
 
   const openEdit = (u) => {
     setEditUser(u);
@@ -98,19 +99,15 @@ const UserManagement = ({ onBack, onScroll }) => {
     setUserModules([]);
     setModLoading(true);
     ApiService.getAdminUserModules(u.id)
-      .then(data => {
-        const list = Array.isArray(data) ? data : (data?.modules || data?.data || []);
-        setUserModules(list);
-      })
+      .then(data => setUserModules(Array.isArray(data) ? data : (data?.modules || data?.data || [])))
       .catch(() => setUserModules([]))
       .finally(() => setModLoading(false));
   };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.username.trim()) { setFormError('Name and Username are required.'); return; }
-    if (!editUser && !form.password.trim()) { setFormError('Password is required.'); return; }
-    setSaving(true);
-    setFormError('');
+    if (!editUser && !form.password.trim()) { setFormError('Password is required for new users.'); return; }
+    setSaving(true); setFormError('');
     try {
       if (editUser) {
         const payload = { name: form.name, email: form.email, role: form.role, status: form.status };
@@ -129,15 +126,15 @@ const UserManagement = ({ onBack, onScroll }) => {
   };
 
   return (
-    <div className="um-page">
+    <div className="setup-page">
       {/* Header */}
-      <div className="um-header">
-        <button className="um-back-btn" onClick={onBack}>← Back</button>
-        <div className="um-header-info">
-          <div className="um-header-icon">👥</div>
+      <div className="setup-header">
+        <button className="setup-back-btn" onClick={onBack}>← Back</button>
+        <div className="setup-header-info" style={{ flex: 1 }}>
+          <div className="setup-header-icon">👥</div>
           <div>
-            <div className="um-title">User Management</div>
-
+            <div className="setup-title">User Management</div>
+            <div className="setup-subtitle">Manage system users and role-based access</div>
           </div>
         </div>
         <button className="um-add-btn" onClick={openAdd}>
@@ -149,22 +146,21 @@ const UserManagement = ({ onBack, onScroll }) => {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — role distribution summary, relevant at-a-glance info */}
       <div className="um-stats-row">
         {[
-          { key: 'total', label: 'Total Users', colorClass: '' },
-          { key: 'superadmin', label: 'Superadmin', colorClass: 'cyan' },
-          { key: 'admin', label: 'Admin', colorClass: 'gold' },
-          { key: 'inspector', label: 'Inspector', colorClass: 'orange' },
-          { key: 'user', label: 'User', colorClass: 'gray' },
+          { key: 'total', label: 'Total Users', accent: '#5fd3f3' },
+          { key: 'superadmin', label: 'Superadmin', accent: '#5fd3f3' },
+          { key: 'admin', label: 'Admin', accent: '#FFD700' },
+          { key: 'inspector', label: 'Inspector', accent: '#FF9800' },
+          { key: 'user', label: 'User', accent: '#a0cfe8' },
         ].map(s => (
-          <div key={s.key} className={`um-stat-card ${s.colorClass}`}>
-            <div className="um-stat-val">{stats[s.key]}</div>
+          <div key={s.key} className="um-stat-card">
+            <div className="um-stat-val" style={{ color: s.accent }}>{stats[s.key]}</div>
             <div className="um-stat-label">{s.label}</div>
           </div>
         ))}
       </div>
-
       {/* Toolbar */}
       <div className="um-toolbar">
         <div className="um-search-wrap">
@@ -179,87 +175,97 @@ const UserManagement = ({ onBack, onScroll }) => {
           />
           {search && <button className="um-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
-        <div className="um-count">{filteredUsers.length} / {users.length} users</div>
+        <div className="um-count">{filteredUsers.length} of {users.length} users</div>
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="um-state-block">
-          <div className="um-spinner" />
-          <span>Loading users...</span>
-        </div>
-      ) : error ? (
-        <div className="um-state-block um-error-block">
-          <span>⚠️ {error}</span>
-          <button className="um-retry-btn" onClick={() => setRefreshKey(k => k + 1)}>Retry</button>
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <div className="um-state-block">
-          <span className="um-empty-icon">👤</span>
-          <p>{search ? 'No users match your search.' : 'No users found. Click "Add User" to get started.'}</p>
-        </div>
-      ) : (
-        <div className="um-table-wrap" onScroll={onScroll}>
-          <table className="um-table">
-            <thead>
-              <tr>
-                <th className="um-th-num">#</th>
-                <th>User</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th className="um-th-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((u, idx) => {
-                const rc = getRoleConf(u.role);
-                return (
-                  <tr key={u.id || idx}>
-                    <td className="um-td-num">{idx + 1}</td>
-                    <td>
-                      <div className="um-user-cell">
-                        <div className="um-avatar" style={{ background: rc.bg, color: rc.color }}>
-                          {(u.name || u.username || '?').charAt(0).toUpperCase()}
+      <div className="um-content-wrap">
+        {loading ? (
+          <div className="um-state-block"><div className="um-spinner" /><span>Loading users...</span></div>
+        ) : error ? (
+          <div className="um-state-block um-error-block">
+            <span>⚠️ {error}</span>
+            <button className="um-retry-btn" onClick={() => setRefreshKey(k => k + 1)}>Retry</button>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="um-state-block">
+            <span className="um-empty-icon">👤</span>
+            <p>{search ? 'No users match your search.' : 'No users found. Click "Add User" to get started.'}</p>
+          </div>
+        ) : (
+          <>
+            <table className="um-table">
+              <thead>
+                <tr>
+                  <th className="um-th-num">#</th>
+                  <th>User</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th className="um-th-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedUsers.map((u, idx) => {
+                  const rc = getRoleConf(u.role);
+                  return (
+                    <tr key={u.id || idx}>
+                      <td className="um-td-num">{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                      <td>
+                        <div className="um-user-cell">
+                          <div className="um-avatar" style={{ background: rc.bg, color: rc.color }}>
+                            {(u.name || u.username || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <span className="um-name">{u.name || u.username || 'Unknown'}</span>
                         </div>
-                        <span className="um-name">{u.name || u.username || 'Unknown'}</span>
-                      </div>
-                    </td>
-                    <td className="um-mono">{u.username || '—'}</td>
-                    <td className="um-email">{u.email || '—'}</td>
-                    <td>
-                      <span className="um-role-badge" style={{ color: rc.color, background: rc.bg }}>{rc.label}</span>
-                    </td>
-                    <td>
-                      <span className={`um-status ${u.status === 'inactive' ? 'inactive' : 'active'}`}>
-                        <span className="um-status-dot" />
-                        {u.status === 'inactive' ? 'Inactive' : 'Active'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="um-actions">
-                        <button className="um-action-btn edit" onClick={() => openEdit(u)} title="Edit user">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </button>
-                        <button className="um-action-btn modules" onClick={() => openViewModules(u)} title="View assigned modules">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="11" width="18" height="11" rx="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      </td>
+                      <td className="um-mono">{u.username || '—'}</td>
+                      <td className="um-email">{u.email || '—'}</td>
+                      <td>
+                        <span className="um-role-badge" style={{ color: rc.color, background: rc.bg, borderColor: rc.color + '44' }}>
+                          {rc.label}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`um-status ${u.status === 'inactive' ? 'inactive' : 'active'}`}>
+                          <span className="um-status-dot" />
+                          {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="um-actions">
+                          <button className="um-action-btn edit" onClick={() => openEdit(u)} title="Edit user">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          <button className="um-action-btn modules" onClick={() => openViewModules(u)} title="View assigned modules">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {totalPages > 1 && (
+              <div className="um-pagination">
+                <button className="um-pg-btn" onClick={() => setPage(1)} disabled={page === 1}>«</button>
+                <button className="um-pg-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
+                <span className="um-pg-info">Page {page} of {totalPages}</span>
+                <button className="um-pg-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
+                <button className="um-pg-btn" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Add / Edit Modal */}
       {showForm && (
@@ -274,9 +280,7 @@ const UserManagement = ({ onBack, onScroll }) => {
                     </div>
                     Edit User
                   </>
-                ) : (
-                  <><span style={{ fontSize: 20 }}>👤+</span> Add New User</>
-                )}
+                ) : <><span style={{ fontSize: 20 }}>👤</span> Add New User</>}
               </div>
               <button className="um-modal-close" onClick={() => setShowForm(false)}>×</button>
             </div>
@@ -285,11 +289,11 @@ const UserManagement = ({ onBack, onScroll }) => {
               <div className="um-form-grid">
                 <div className="um-form-field">
                   <label>Full Name <span className="um-req">*</span></label>
-                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="John Doe" />
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. John Doe" />
                 </div>
                 <div className="um-form-field">
                   <label>Username <span className="um-req">*</span></label>
-                  <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="johndoe" disabled={!!editUser} style={editUser ? { opacity: 0.5, cursor: 'not-allowed' } : {}} />
+                  <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="e.g. johndoe" disabled={!!editUser} style={editUser ? { opacity: 0.5, cursor: 'not-allowed' } : {}} />
                 </div>
                 <div className="um-form-field">
                   <label>Email Address</label>

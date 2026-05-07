@@ -19,11 +19,11 @@
 
 body {
   font-family: 'Outfit', sans-serif;
-  background-color: var(--bg-dark);
+  background-color: rgb(144,194,244);
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
-  background: radial-gradient(circle at 50% -20%, #1e293b, #0f172a);
+  background: rgb(144,194,244);
 }
 
 .app-container {

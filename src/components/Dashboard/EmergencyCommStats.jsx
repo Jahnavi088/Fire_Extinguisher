@@ -8,32 +8,29 @@ const fmt = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
-const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
   return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'GOOD' ? '#28a745'
-    : (v === 'DIRTY' || v === 'WORN') ? '#FF9800'
-      : (v === 'MISSING' || v === 'DAMAGED' || v === 'USED') ? '#dc3545'
+  v === 'OK' || v === 'ONLINE' || v === 'GOOD' ? '#28a745'
+    : (v === 'INTERMITTENT' || v === 'LOW_BATTERY' || v === 'STAINED') ? '#FF9800'
+      : (v === 'OFFLINE' || v === 'DAMAGED' || v === 'FAULTY') ? '#dc3545'
         : '#666';
 
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Fleet', icon: '🧲', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'all', label: 'Total Devices', icon: '📞', color: '#3b82f6', key: 'total' },
+  { type: 'active', label: 'Online', icon: '✅', color: '#28a745', key: 'active' },
   { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#FF9800', key: 'upcoming' },
-  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
-  { type: 'expired', label: 'Damaged/Used', icon: '⌛', color: '#8b5cf6', key: 'expired' },
+  { type: 'needs-service', label: 'Maintenance', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
+  { type: 'expired', label: 'Offline/Faulty', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const PAGE_SIZE = 15;
-
 const fetchByType = (type) => {
-  const params = { module_id: 8, limit: 200 };
+  const params = { module_id: 21, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -42,7 +39,7 @@ const fetchByType = (type) => {
 const Spinner = () => (
   <div className="fe-spinner">
     <div className="fe-spinner-ring" />
-    <span className="fe-spinner-text">Loading fire blanket data…</span>
+    <span className="fe-spinner-text">Loading emergency comms data…</span>
   </div>
 );
 
@@ -52,50 +49,6 @@ const BackBtn = ({ onClick, children }) => (
     {children}
   </button>
 );
-
-const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
-  if (totalPages <= 1) return null;
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
-
-  const pages = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 3) pages.push('…');
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
-    if (page < totalPages - 2) pages.push('…');
-    pages.push(totalPages);
-  }
-
-  return (
-    <div className="fe-pagination">
-      <span className="fe-page-info">
-        Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> fire blankets
-      </span>
-      <div className="fe-page-controls">
-        <button className="fe-page-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>
-          ← Prev
-        </button>
-        {pages.map((p, i) =>
-          p === '…'
-            ? <span key={`e${i}`} className="fe-page-ellipsis">…</span>
-            : <button
-              key={p}
-              className={`fe-page-btn fe-page-num${p === page ? ' fe-page-active' : ''}`}
-              onClick={() => onPage(p)}
-            >
-              {p}
-            </button>
-        )}
-        <button className="fe-page-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>
-          Next →
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const SectionTitle = ({ children }) => (
   <div className="fe-section-title">{children}</div>
@@ -115,7 +68,7 @@ const ReadinessBar = ({ score }) => {
   const c = scoreColor(pct);
   return (
     <>
-      <div className="fe-readiness-label">Fleet Readiness Score</div>
+      <div className="fe-readiness-label">Connectivity Score</div>
       <div className="fe-readiness-bar">
         <div className="fe-readiness-track">
           <div className="fe-readiness-fill" style={{ width: `${pct}%`, background: c }} />
@@ -127,21 +80,16 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const FireBlanketStats = ({ onBack }) => {
+const EmergencyCommStats = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
   const [topAlerts, setTopAlerts] = useState([]);
-  const [error, setError] = useState(null);
-
   const [view, setView] = useState('overview');
   const [listCfg, setListCfg] = useState({ title: '', type: '', color: '' });
   const [listItems, setListItems] = useState([]);
   const [listTotal, setListTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
-
-  const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,18 +100,17 @@ const FireBlanketStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(8),                       // /modules/8/summary
+        ApiService.getModuleSummary(21),                       // /modules/21/summary
         ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 8, limit: 100 }),    // /alerts?module_id=8
+        ApiService.getAlerts({ module_id: 21, limit: 100 }),    // /alerts?module_id=21
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Fire Blankets, using fallback:', err);
-      // Fallback Demo Data
-      setSummary({ total: 24, active: 22, upcoming: 1, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 95 });
-      setAlertsSummary({ total_alerts: 1, level_1: { count: 1, label: 'Low', description: 'Minor' }, level_2: { count: 0, label: 'Med', description: 'Action' }, level_3: { count: 0, label: 'High', description: 'Critical' } });
+      console.error('API Load failed for Emergency Comms, using fallback:', err);
+      setSummary({ total: 15, active: 14, upcoming: 1, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 96 });
+      setAlertsSummary({ total_alerts: 1, level_1: { count: 1, label: 'Low', description: 'Signal test' }, level_2: { count: 0, label: 'Med', description: 'Action' }, level_3: { count: 0, label: 'High', description: 'Critical' } });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -174,7 +121,6 @@ const FireBlanketStats = ({ onBack }) => {
     setListCfg({ title: card.label, type: card.type, color: card.color });
     setListItems([]);
     setListTotal(0);
-    setCurrentPage(1);
     setView('list');
     setListLoading(true);
     try {
@@ -183,15 +129,14 @@ const FireBlanketStats = ({ onBack }) => {
       setListTotal(data.total || 0);
 
       if (!data.items || data.items.length === 0) {
-        // Mock data if API returns empty
         const mock = Array.from({ length: 5 }).map((_, i) => ({
-          id: `fb_${i}`,
-          sos_code: `FB-${2000 + i}`,
-          equipment_type: 'Fire Blanket',
-          location_name: `Floor ${i + 1} Lobby`,
+          id: `comm_${i}`,
+          sos_code: `COMM-${6000 + i}`,
+          equipment_type: 'Emergency Phone/Intercom',
+          location_name: `Elevator Lobby ${i + 1}`,
           building_name: 'Main Block',
           readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 60).toISOString()
+          next_inspection_due: new Date(Date.now() + 86400000 * 30).toISOString()
         }));
         setListItems(mock);
         setListTotal(mock.length);
@@ -222,7 +167,6 @@ const FireBlanketStats = ({ onBack }) => {
 
   if (loading) return <Spinner />;
 
-  /* ── OVERVIEW ─────────────────────────────────────────────────────────── */
   if (view === 'overview') {
     const totalAlerts = alertsSummary?.total_alerts || 0;
     return (
@@ -230,7 +174,7 @@ const FireBlanketStats = ({ onBack }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack}>Back</BackBtn>
           <div className="fe-header-info">
-            <div className="fe-header-title">Fire Blanket Fleet Monitor</div>
+            <div className="fe-header-title">Emergency Communication Monitor</div>
           </div>
           <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
             {summary?.readiness_score}%
@@ -280,9 +224,9 @@ const FireBlanketStats = ({ onBack }) => {
 
         <div className="fe-panels">
           <div className="fe-panel">
-            <div className="fe-panel-title">🔔 Active Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
+            <div className="fe-panel-title">🔔 Connectivity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
-              {topAlerts.length === 0 ? <div className="fe-empty">No active blanket alerts.</div> : topAlerts.map((a, i) => (
+              {topAlerts.length === 0 ? <div className="fe-empty">No active comms alerts.</div> : topAlerts.map((a, i) => (
                 <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
@@ -295,16 +239,16 @@ const FireBlanketStats = ({ onBack }) => {
           </div>
 
           <div className="fe-panel">
-            <div className="fe-panel-title">📊 Fleet Health Breakdown</div>
+            <div className="fe-panel-title">📊 Network Health Breakdown</div>
             {summary && (
               <>
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Active', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
-                        { name: 'Damaged', val: summary.expired, color: '#dc3545' },
+                        { name: 'Online', val: summary.active, color: '#28a745' },
+                        { name: 'Due Test', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Offline', val: summary.expired, color: '#dc3545' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
@@ -322,9 +266,9 @@ const FireBlanketStats = ({ onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
-                    { label: 'Damaged/Used', val: summary.expired, color: '#dc3545' },
+                    { label: 'Online', val: summary.active, color: '#28a745' },
+                    { label: 'Upcoming Test', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Offline/Faulty', val: summary.expired, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
                       <div className="fe-legend-dot" style={{ background: row.color }} />
@@ -341,7 +285,6 @@ const FireBlanketStats = ({ onBack }) => {
     );
   }
 
-  /* ── LIST VIEW ────────────────────────────────────────────────────────── */
   if (view === 'list') {
     return (
       <div className="fe-page">
@@ -353,54 +296,34 @@ const FireBlanketStats = ({ onBack }) => {
           </div>
         </div>
 
-        {listLoading ? <Spinner /> : (() => {
-          const q = searchQuery.toLowerCase();
-          const filteredItems = listItems.filter(item => {
-            if (!q) return true;
-            return (item.sos_code || '').toLowerCase().includes(q) ||
-              (item.location_name || '').toLowerCase().includes(q) ||
-              (item.building_name || '').toLowerCase().includes(q);
-          });
-          const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
-          const pageSlice = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-          return (
-            <div className="fe-list-body">
-              <div className="fe-table">
-                <div className="fe-table-head">
-                  {['SOS Code', 'Location', 'Building', 'Readiness', 'Next Inspection'].map(h => (
-                    <span key={h} className="fe-table-head-cell">{h}</span>
-                  ))}
-                </div>
-                {pageSlice.map((item, i) => {
-                  const sc = parseFloat(item.readiness_score) || 0;
-                  const col = scoreColor(sc);
-                  return (
-                    <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
-                      <span className="fe-table-sos">{item.sos_code}</span>
-                      <span className="fe-table-loc">{item.location_name}</span>
-                      <span className="fe-table-bldg">{item.building_name}</span>
-                      <span className="fe-score-chip" style={{ color: col, borderColor: col + '55', background: col + '14' }}>{sc}%</span>
-                      <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
-                    </div>
-                  );
-                })}
+        {listLoading ? <Spinner /> : (
+          <div className="fe-list-body">
+            <div className="fe-table">
+              <div className="fe-table-head">
+                {['SOS Code', 'Location', 'Building', 'Status', 'Next Test'].map(h => (
+                  <span key={h} className="fe-table-head-cell">{h}</span>
+                ))}
               </div>
-              <Pagination
-                page={currentPage}
-                totalPages={totalPages}
-                total={filteredItems.length}
-                pageSize={PAGE_SIZE}
-                onPage={(p) => setCurrentPage(p)}
-              />
+              {listItems.map((item, i) => {
+                const sc = parseFloat(item.readiness_score) || 0;
+                const col = scoreColor(sc);
+                return (
+                  <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
+                    <span className="fe-table-sos">{item.sos_code}</span>
+                    <span className="fe-table-loc">{item.location_name}</span>
+                    <span className="fe-table-bldg">{item.building_name}</span>
+                    <span className="fe-score-chip" style={{ color: col, borderColor: col + '55', background: col + '14' }}>{sc}%</span>
+                    <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     );
   }
 
-  /* ── DETAIL VIEW ──────────────────────────────────────────────────────── */
   const u = selectedUnit || {};
   const sc = parseFloat(u.readiness_score) || 0;
   const c = scoreColor(sc);
@@ -409,10 +332,10 @@ const FireBlanketStats = ({ onBack }) => {
     <div className="fe-page">
       <div className="fe-header">
         <BackBtn onClick={goBack}>Back to list</BackBtn>
-        <span className="fe-header-icon">🧲</span>
+        <span className="fe-header-icon">📞</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>
-          <div className="fe-header-sub">{u.equipment_type || 'Fire Blanket'} · {u.location_name}</div>
+          <div className="fe-header-sub">{u.equipment_type || 'Emergency Comm Unit'} · {u.location_name}</div>
         </div>
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
@@ -425,28 +348,28 @@ const FireBlanketStats = ({ onBack }) => {
               <InfoRow label="SOS Code" val={u.sos_code} />
               <InfoRow label="Location" val={u.location_name} />
               <InfoRow label="Building" val={u.building_name} />
-              <InfoRow label="Manufacturer" val={u.manufacturer_name} />
+              <InfoRow label="Manufacturer" val={u.manufacturer_name || 'Standard Comms'} />
               <InfoRow label="Status" val={u.operational_status} />
             </div>
           </div>
 
           <div className="fe-detail-card">
-            <SectionTitle>📅 Key Dates</SectionTitle>
+            <SectionTitle>📅 Service Cycle</SectionTitle>
             <InfoRow label="Installed On" val={fmt(u.installed_on)} />
-            <InfoRow label="Last Inspection" val={fmt(u.last_inspection_date)} />
-            <InfoRow label="Next Due" val={fmt(u.next_inspection_due)} color="#FF9800" />
+            <InfoRow label="Last Signal Test" val={fmt(u.last_inspection_date)} />
+            <InfoRow label="Next Test Due" val={fmt(u.next_inspection_due)} color="#FF9800" />
           </div>
 
           <div className="fe-detail-card">
-            <SectionTitle>🔧 Physical State</SectionTitle>
+            <SectionTitle>🔧 System Integrity</SectionTitle>
             <div className="fe-condition-pills">
-              <div className="fe-condition-pill" style={{ borderColor: condColor(u.casing_status) + '44', background: condColor(u.casing_status) + '12' }}>
-                <span className="fe-condition-pill-label">Casing</span>
-                <span className="fe-condition-pill-value" style={{ color: condColor(u.casing_status) }}>{u.casing_status || 'OK'}</span>
+              <div className="fe-condition-pill" style={{ borderColor: condColor(u.casing_status || 'OK') + '44', background: condColor(u.casing_status || 'OK') + '12' }}>
+                <span className="fe-condition-pill-label">Line State</span>
+                <span className="fe-condition-pill-value" style={{ color: condColor(u.casing_status || 'OK') }}>{u.casing_status || 'ONLINE'}</span>
               </div>
-              <div className="fe-condition-pill" style={{ borderColor: condColor(u.blanket_status) + '44', background: condColor(u.blanket_status) + '12' }}>
-                <span className="fe-condition-pill-label">Blanket</span>
-                <span className="fe-condition-pill-value" style={{ color: condColor(u.blanket_status) }}>{u.blanket_status || 'OK'}</span>
+              <div className="fe-condition-pill" style={{ borderColor: condColor(u.structure_status || 'OK') + '44', background: condColor(u.structure_status || 'OK') + '12' }}>
+                <span className="fe-condition-pill-label">Audio Quality</span>
+                <span className="fe-condition-pill-value" style={{ color: condColor(u.structure_status || 'OK') }}>{u.structure_status || 'GOOD'}</span>
               </div>
             </div>
             <ReadinessBar score={u.readiness_score} />
@@ -457,4 +380,4 @@ const FireBlanketStats = ({ onBack }) => {
   );
 };
 
-export default FireBlanketStats;
+export default EmergencyCommStats;

@@ -1,0 +1,264 @@
+import React, { useState, useRef } from 'react';
+import './CompanyManagement.css';
+
+const initialCompanies = [
+  { id: 1, name: 'Garrev Industries Ltd.', logo: null },
+  { id: 2, name: 'SafeGuard Corp.', logo: null },
+];
+
+const CompanyManagement = ({ onBack }) => {
+  const [companies, setCompanies] = useState(initialCompanies);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [addForm, setAddForm] = useState({ name: '', logo: null, logoPreview: null });
+  const [editForm, setEditForm] = useState({ name: '', logo: null, logoPreview: null });
+  const addFileRef = useRef();
+  const editFileRef = useRef();
+
+  const nextId = () => Math.max(0, ...companies.map((c) => c.id)) + 1;
+
+  const handleLogoChange = (e, isEdit) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (isEdit) {
+        setEditForm((f) => ({ ...f, logo: file, logoPreview: ev.target.result }));
+      } else {
+        setAddForm((f) => ({ ...f, logo: file, logoPreview: ev.target.result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openAdd = () => {
+    setAddForm({ name: '', logo: null, logoPreview: null });
+    setShowAddModal(true);
+  };
+
+  const closeAdd = () => {
+    setShowAddModal(false);
+    setAddForm({ name: '', logo: null, logoPreview: null });
+  };
+
+  const saveAdd = () => {
+    if (!addForm.name.trim()) return;
+    setCompanies((prev) => [
+      ...prev,
+      { id: nextId(), name: addForm.name.trim(), logo: addForm.logoPreview },
+    ]);
+    closeAdd();
+  };
+
+  const openEdit = (company) => {
+    setEditTarget(company);
+    setEditForm({ name: company.name, logo: null, logoPreview: company.logo });
+    setShowEditModal(true);
+  };
+
+  const closeEdit = () => {
+    setShowEditModal(false);
+    setEditTarget(null);
+    setEditForm({ name: '', logo: null, logoPreview: null });
+  };
+
+  const saveEdit = () => {
+    if (!editForm.name.trim()) return;
+    setCompanies((prev) =>
+      prev.map((c) =>
+        c.id === editTarget.id
+          ? { ...c, name: editForm.name.trim(), logo: editForm.logoPreview }
+          : c
+      )
+    );
+    closeEdit();
+  };
+
+  const handleDelete = (id) => {
+    if (!window.confirm('Delete this company?')) return;
+    setCompanies((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  return (
+    <div className="cm-page">
+      <div className="cm-header">
+        <button className="cm-back-btn" onClick={onBack}>← Back</button>
+        <div className="cm-header-info">
+          <span className="cm-header-icon">🏢</span>
+          <div>
+            <div className="cm-title">Company Management</div>
+            <div className="cm-subtitle">Manage registered companies on the platform</div>
+          </div>
+        </div>
+        <button className="cm-add-btn" onClick={openAdd}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add Company
+        </button>
+      </div>
+
+      <div className="cm-body">
+        <div className="cm-table-wrap">
+          <table className="cm-table">
+            <thead>
+              <tr>
+                <th className="cm-th cm-th-id">ID</th>
+                <th className="cm-th">Company</th>
+                <th className="cm-th cm-th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {companies.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="cm-empty-row">No companies found. Click "Add Company" to get started.</td>
+                </tr>
+              ) : (
+                companies.map((company) => (
+                  <tr key={company.id} className="cm-tr">
+                    <td className="cm-td cm-td-id">{company.id}</td>
+                    <td className="cm-td">
+                      <div className="cm-company-cell">
+                        <div className="cm-logo-thumb">
+                          {company.logo ? (
+                            <img src={company.logo} alt={company.name} />
+                          ) : (
+                            <span className="cm-logo-placeholder">🏢</span>
+                          )}
+                        </div>
+                        <span className="cm-company-name">{company.name}</span>
+                      </div>
+                    </td>
+                    <td className="cm-td cm-td-actions">
+                      <button className="cm-action-btn cm-edit-btn" title="Edit" onClick={() => openEdit(company)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button className="cm-action-btn cm-delete-btn" title="Delete" onClick={() => handleDelete(company.id)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6" /><path d="M14 11v6" />
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ADD COMPANY MODAL */}
+      {showAddModal && (
+        <div className="cm-modal-overlay" onClick={closeAdd}>
+          <div className="cm-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="cm-modal-header">
+              <span className="cm-modal-icon">🏢</span>
+              <span className="cm-modal-title">Add Company</span>
+            </div>
+            <div className="cm-modal-body">
+              <div className="cm-field">
+                <label className="cm-label">Company Name <span className="cm-required">*</span></label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. Garrev Industries Ltd."
+                  value={addForm.name}
+                  onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Logo</label>
+                <div className="cm-logo-upload" onClick={() => addFileRef.current.click()}>
+                  {addForm.logoPreview ? (
+                    <img src={addForm.logoPreview} alt="Preview" className="cm-logo-preview-img" />
+                  ) : (
+                    <div className="cm-logo-upload-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                      <span>Click to upload logo</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={addFileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleLogoChange(e, false)}
+                />
+              </div>
+            </div>
+            <div className="cm-modal-actions">
+              <button className="cm-cancel-btn" onClick={closeAdd}>Cancel</button>
+              <button className="cm-save-btn" onClick={saveAdd}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT COMPANY MODAL */}
+      {showEditModal && (
+        <div className="cm-modal-overlay" onClick={closeEdit}>
+          <div className="cm-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="cm-modal-header">
+              <span className="cm-modal-icon">✏️</span>
+              <span className="cm-modal-title">Edit Company</span>
+            </div>
+            <div className="cm-modal-body">
+              <div className="cm-field">
+                <label className="cm-label">Company Name <span className="cm-required">*</span></label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. Garrev Industries Ltd."
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Logo</label>
+                <div className="cm-logo-upload" onClick={() => editFileRef.current.click()}>
+                  {editForm.logoPreview ? (
+                    <img src={editForm.logoPreview} alt="Preview" className="cm-logo-preview-img" />
+                  ) : (
+                    <div className="cm-logo-upload-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                      <span>Click to upload logo</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={editFileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleLogoChange(e, true)}
+                />
+              </div>
+            </div>
+            <div className="cm-modal-actions">
+              <button className="cm-cancel-btn" onClick={closeEdit}>Cancel</button>
+              <button className="cm-save-btn" onClick={saveEdit}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CompanyManagement;
