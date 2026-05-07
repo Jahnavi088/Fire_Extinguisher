@@ -5,7 +5,7 @@ import { ApiService } from './services/apiService';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !!localStorage.getItem('auth_token'));
 
   useEffect(() => {
     const checkAuth = async () => {
