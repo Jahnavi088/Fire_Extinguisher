@@ -182,6 +182,9 @@ const SuppressionSystemStats = ({ onBack }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack}>Back</BackBtn>
           <div className="fe-header-info"><div className="fe-header-title">CO2 Fire Suppression Monitor</div></div>
+          <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
+            {summary?.readiness_score}%
+          </span>
           <div className="fe-header-search">
             <div className="fe-search-box">
               <span className="fe-search-icon">🔍</span>
@@ -262,7 +265,6 @@ const SuppressionSystemStats = ({ onBack }) => {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <ReadinessBar score={summary.readiness_score} />
               </>
             )}
           </div>

@@ -226,6 +226,9 @@ const FireExtinguisherStats = ({ onBack }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
           </div>
+          <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
+            {summary?.readiness_score}%
+          </span>
 
           <div className="fe-header-search">
             <div className="fe-search-box">

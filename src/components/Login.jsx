@@ -18,11 +18,11 @@ const Login = ({ onLogin }) => {
     }
 
     setIsLoading(true);
-    
+
     try {
       const result = await ApiService.login(username, password);
       setIsLoading(false);
-      
+
       if (result && result.success) {
         onLogin(result.user);
       } else {
@@ -48,14 +48,14 @@ const Login = ({ onLogin }) => {
       <div className="login-card-wrapper">
         <div className="login-card">
           <h2>SYSTEM LOGIN</h2>
-          
+
           <form onSubmit={handleLogin}>
             <div className="input-group">
               <div className="input-field-wrapper">
                 <User className="input-icon" size={20} />
-                <input 
-                  type="text" 
-                  className="login-input" 
+                <input
+                  type="text"
+                  className="login-input"
                   placeholder="Enter Username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -66,14 +66,14 @@ const Login = ({ onLogin }) => {
             <div className="input-group">
               <div className="input-field-wrapper">
                 <Key className="input-icon" size={20} />
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  className="login-input" 
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="login-input"
                   placeholder="Enter Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <div 
+                <div
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
                 >

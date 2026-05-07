@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import './SafetyDashboard.css';
 import { ApiService } from '../../services/apiService';
 import FireExtinguisherStats from './FireExtinguisherStats';
@@ -8,6 +8,19 @@ import DrumHoseStats from './DrumHoseStats';
 import HydrantStats from './HydrantStats';
 import FireTrolleyStats from './FireTrolleyStats';
 import SuppressionSystemStats from './SuppressionSystemStats';
+import FireBlanketStats from './FireBlanketStats';
+import FireAlarmPanelStats from './FireAlarmPanelStats';
+import SmokeDetectorStats from './SmokeDetectorStats';
+import PASirenStats from './PASirenStats';
+import WindSockStats from './WindSockStats';
+import SCBAStats from './SCBAStats';
+import AmbulanceStats from './AmbulanceStats';
+import FirstAidBoxStats from './FirstAidBoxStats';
+import EmergencyShowerStats from './EmergencyShowerStats';
+import EyewashStationStats from './EyewashStationStats';
+import ChemicalShowerStats from './ChemicalShowerStats';
+import EquipmentAccess from './EquipmentAccess';
+import UserManagement from './UserManagement';
 import RightPanel from './RightPanel';
 
 const STATIC_MODULES = [
@@ -43,27 +56,29 @@ const STATIC_MODULES = [
   { module_id: 30, name: 'Fire suppress. CO2', code: 'suppression_system', health_score: 100, category: 'fire' },
 ];
 
+const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
+
 const CHECKLIST_MODULES = [
-  { id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher', icon: '🧯' },
-  { id: 31, name: 'Sprinkler System', code: 'sprinkler', icon: '🚿' },
-  { id: 32, name: 'FPCA', code: 'fpca', icon: '🔔' },
-  { id: 33, name: 'Hose Reel', code: 'hose_reel', icon: '🧵' },
-  { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: '🚒' },
-  { id: 35, name: 'Fire Alarm Panel', code: 'fire_alarm_panel', icon: '🚨' },
-  { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: '🌫️' },
-  { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: '🔥' },
-  { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: '🔦' },
-  { id: 39, name: 'Exit Sign', code: 'exit_sign', icon: '🚪' },
-  { id: 40, name: 'CO Detector', code: 'co_detector', icon: '⚠️' },
-  { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: '🧲' },
-  { id: 42, name: 'Suppression System', code: 'suppression_system', icon: '💨' },
-  { id: 43, name: 'Fire Door', code: 'fire_door', icon: '🚪' },
-  { id: 44, name: 'PA System', code: 'pa_system', icon: '📢' },
-  { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: '🏥' },
-  { id: 46, name: 'Eyewash Station', code: 'eyewash_station', icon: '👀' },
-  { id: 47, name: 'Safety Shower', code: 'safety_shower', icon: '🚿' },
-  { id: 48, name: 'Chemical Spill Kit', code: 'spill_kit', icon: '⚗️' },
-  { id: 49, name: 'PPE Station', code: 'ppe_station', icon: '🦺' },
+  { id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2" /><path d="M15 7v2" /><path d="M8 10h8" /><path d="M8 14h8" /><path d="M7 18h10" /><path d="M9 2v3" /><path d="M11 2v3" /><rect x="5" y="5" width="14" height="17" rx="2" /></svg> },
+  { id: 31, name: 'Sprinkler System', code: 'sprinkler', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4" /><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /><path d="M12 16v6" /><path d="M8 12H2" /><path d="M22 12h-6" /></svg> },
+  { id: 32, name: 'FPCA', code: 'fpca', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
+  { id: 33, name: 'Hose Reel', code: 'hose_reel', icon: CHECKLIST_GENERIC_ICON },
+  { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
+  { id: 35, name: 'Fire Alarm Panel', code: 'fire_alarm_panel', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg> },
+  { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
+  { id: 39, name: 'Exit Sign', code: 'exit_sign', icon: CHECKLIST_GENERIC_ICON },
+  { id: 40, name: 'CO Detector', code: 'co_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
+  { id: 42, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 43, name: 'Fire Door', code: 'fire_door', icon: CHECKLIST_GENERIC_ICON },
+  { id: 44, name: 'PA System', code: 'pa_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><line x1="12" y1="9" x2="12" y2="15" /><line x1="9" y1="12" x2="15" y2="12" /></svg> },
+  { id: 46, name: 'Eyewash Station', code: 'eyewash_station', icon: CHECKLIST_GENERIC_ICON },
+  { id: 47, name: 'Safety Shower', code: 'safety_shower', icon: CHECKLIST_GENERIC_ICON },
+  { id: 48, name: 'Chemical Spill Kit', code: 'spill_kit', icon: CHECKLIST_GENERIC_ICON },
+  { id: 49, name: 'PPE Station', code: 'ppe_station', icon: CHECKLIST_GENERIC_ICON },
 ];
 
 const MODULE_EMOJI = {
@@ -114,10 +129,21 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [alertCount, setAlertCount] = useState(0);
   const [searchFilter, setSearchFilter] = useState('All');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [checklists, setChecklists] = useState([]);
-  const [activeChecklistItems, setActiveChecklistItems] = useState([]);
-  const [clLoading, setClLoading] = useState(false);
+  const checklists = [];
+  const [clState, dispatchCl] = useReducer(
+    (s, a) => {
+      if (a.type === 'loading') return { loading: true,  items: s.items };
+      if (a.type === 'success') return { loading: false, items: a.items };
+      if (a.type === 'error')   return { loading: false, items: [] };
+      return s;
+    },
+    { loading: false, items: [] }
+  );
+  const activeChecklistItems = clState.items;
+  const clLoading = clState.loading;
   const [checklistsDropdownOpen, setChecklistsDropdownOpen] = useState(false);
+  const [setupDropdownOpen, setSetupDropdownOpen] = useState(false);
+  const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
   const [topbarVisible, setTopbarVisible] = useState(true);
   const lastScrollY = React.useRef(0);
 
@@ -133,17 +159,14 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const preparednessScore = 92;
 
   useEffect(() => {
-    // Dynamic checklist loading when a module is selected for the checklist page
-    if (activePage === 'checklist' && selectedEq?.id) {
-      setClLoading(true);
-      ApiService.getModuleChecklists(selectedEq.id)
-        .then(d => {
-          const list = Array.isArray(d) ? d : (d?.items || d?.data || d?.checklists || []);
-          setActiveChecklistItems(list);
-        })
-        .catch(() => setActiveChecklistItems([]))
-        .finally(() => setClLoading(false));
-    }
+    if (activePage !== 'checklist' || !selectedEq?.id) return;
+    ApiService.getModuleChecklists(selectedEq.id)
+      .then(d => {
+        const list = Array.isArray(d) ? d : (d?.items || d?.data || d?.checklists || []);
+        dispatchCl({ type: 'success', items: list });
+      })
+      .catch(() => dispatchCl({ type: 'error' }));
+    dispatchCl({ type: 'loading' });
   }, [activePage, selectedEq]);
 
   useEffect(() => {
@@ -198,11 +221,6 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
   const filteredModules = useMemo(() => modules, [modules]);
 
-  const checklistData = [
-    { sec: 'Physical Integrity', items: ['No visible corrosion or dents', 'Mounting brackets secure', 'Pressure gauge in green zone'] },
-    { sec: 'Operational Readiness', items: ['Safety pin and seal intact', 'Nozzle/hose clear of blockages', 'Instruction label legible'] },
-  ];
-
   const totalItems = useMemo(() => {
     return activeChecklistItems.length;
   }, [activeChecklistItems]);
@@ -210,11 +228,10 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const checkedCount = useMemo(() => {
     return Object.values(checkedItems).filter(Boolean).length;
   }, [checkedItems]);
-  
+
   const progressPct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
   const getStatus = (score) => (score >= 90 ? 'healthy' : score >= 70 ? 'warning' : 'critical');
-  const getStatusTxt = (score) => (score >= 90 ? 'HEALTHY' : score >= 70 ? 'WARNING' : 'CRITICAL');
 
   const toggleCheck = (id) => setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -227,6 +244,17 @@ const SafetyDashboard = ({ user, onLogout }) => {
     else if (mod.code === 'hydrant') setActivePage('hydrant-stats');
     else if (mod.code === 'fire_trolley') setActivePage('fire-trolley-stats');
     else if (mod.code === 'suppression_system') setActivePage('suppression-system-stats');
+    else if (mod.code === 'fire_blanket') setActivePage('fire-blanket-stats');
+    else if (mod.code === 'fpca') setActivePage('fire-alarm-panel-stats');
+    else if (mod.code === 'smoke_detector') setActivePage('smoke-detector-stats');
+    else if (mod.code === 'pa_system') setActivePage('pa-siren-stats');
+    else if (mod.code === 'wind_sock') setActivePage('wind-sock-stats');
+    else if (mod.code === 'scba') setActivePage('scba-stats');
+    else if (mod.code === 'ambulance') setActivePage('ambulance-stats');
+    else if (mod.code === 'first_aid_kit') setActivePage('first-aid-stats');
+    else if (mod.code === 'safety_shower') setActivePage('emergency-shower-stats');
+    else if (mod.code === 'eyewash_station') setActivePage('eyewash-station-stats');
+    else if (mod.code === 'chemical_shower') setActivePage('chemical-shower-stats');
     else setActivePage('checklist');
   };
 
@@ -242,37 +270,36 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
   const handleLogout = async () => {
     if (!window.confirm('Are you sure you want to logout?')) return;
-    try { await ApiService.logout(); } catch { }
+    try { await ApiService.logout(); } catch { /* logout failure is safe to ignore */ }
     onLogout();
   };
 
   const saveCo = () => alert(companyName.trim() ? `Company saved: ${companyName}` : 'Enter a company name first');
 
-  const isSuperAdmin = user?.role === 'superadmin';
-
   const navGroups = [
     {
       label: 'MAIN',
       items: [
-        { icon: '📊', label: 'Overview', active: activePage === 'grid', onClick: () => setActivePage('grid') },
-        { icon: '📁', label: 'Reports' },
+        {
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>,
+          label: 'Overview',
+          active: activePage === 'grid',
+          onClick: () => setActivePage('grid')
+        },
       ],
     },
     {
       label: 'OPERATIONS',
       items: [
-        { icon: '🚨', label: 'Incidents', badge: 'NEW' },
-        { icon: '🔎', label: 'Inspections' },
-        { icon: '🗓️', label: 'Planning' },
-        { icon: '📈', label: 'Analytics' },
-        { icon: '📚', label: 'Training', badge: 'NEW' },
-        { icon: '⚠️', label: 'Risk Register' },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, label: 'Incidents', badge: 'NEW' },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>, label: 'Inspections' },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>, label: 'Analytics' },
       ],
     },
     {
       label: 'SYSTEM',
       items: [
-        { icon: '⚙️', label: 'Settings' },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>, label: 'Settings' },
       ],
     },
   ];
@@ -289,7 +316,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <div className="topbar-copy">
               <div className="tb-title">
                 <span className="tb-brand-icon">🚨
-</span>
+                </span>
                 Emergency Safety Dashboard
               </div>
               <div className="tb-subtitle">Real-time fire &amp; safety monitoring</div>
@@ -353,7 +380,12 @@ const SafetyDashboard = ({ user, onLogout }) => {
               </svg>
             )}
           </button>          <div className="bell-wrap">
-            <span className="bell-icon">🔔</span>
+            <span className="bell-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </span>
             <span className="bell-badge">{alertCount > 99 ? '99+' : alertCount || 0}</span>
           </div>
           <div className="status-badge">❤️ {preparednessScore}%</div>
@@ -385,9 +417,8 @@ const SafetyDashboard = ({ user, onLogout }) => {
           <nav className="sb-scroll">
             {navGroups.map((group) => (
               <React.Fragment key={group.label}>
-                {!navCollapsed && <div className="nav-section-label">{group.label}</div>}
                 {group.items.map((item) => (
-                  <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => {})}>
+                  <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => { })}>
                     <div className="nav-left">
                       <span className="nav-icon">{item.icon}</span>
                       {!navCollapsed && <span className="nav-label">{item.label}</span>}
@@ -401,72 +432,104 @@ const SafetyDashboard = ({ user, onLogout }) => {
             {/* CHECKLISTS DROPDOWN */}
             <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
               <div className="nav-left">
-                <span className="nav-icon">📝</span>
+                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><path d="M9 14l2 2 4-4" /></svg></span>
                 {!navCollapsed && <span className="nav-label">Checklists</span>}
               </div>
               {!navCollapsed && (
-                <svg className="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className={`nav-chevron ${checklistsDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               )}
             </div>
 
-            {checklistsDropdownOpen && !navCollapsed && (
-              <div className="nav-submenu">
-                {/* Module-based Checklist Dashboards */}
-                {!navCollapsed && <div className="nav-submenu-label">EQUIPMENT DASHBOARDS</div>}
-                {CHECKLIST_MODULES.map((mod) => (
-                  <div 
-                    key={mod.id} 
-                    className={`nav-submenu-item ${selectedEq?.id === mod.id && activePage === 'checklist' ? 'active' : ''}`} 
-                    onClick={() => { setSelectedEq(mod); setActivePage('checklist'); }}
-                  >
-                    <span className="nav-icon-small">{mod.icon}</span>
-                    <span className="nav-label-small">{mod.name}</span>
-                  </div>
-                ))}
-                {checklists.length > 0 && (
-                  <>
-                    <div className="nav-divider-small"></div>
+            <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`}>
 
-                    {!navCollapsed && <div className="nav-submenu-label">GENERAL CHECKLISTS</div>}
-                    {checklists.map((cl) => (
-                      <div key={cl.id} className="nav-submenu-item" onClick={() => { setSelectedEq(cl); setActivePage('checklist'); }}>
-                        <span className="nav-icon-small">📄</span>
-                        <span className="nav-label-small">{cl.name || cl.title || 'Checklist'}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {checklists.length === 0 && (
-                  <div className="nav-submenu-empty">No additional checklists</div>
-                )}
+              {CHECKLIST_MODULES.map((mod) => (
+                <div
+                  key={mod.id}
+                  className={`nav-submenu-item ${selectedEq?.id === mod.id && activePage === 'checklist' ? 'active' : ''}`}
+                  onClick={() => { setSelectedEq(mod); setActivePage('checklist'); }}
+                >
+                  <span className="nav-icon-small">{mod.icon}</span>
+                  <span className="nav-label-small">{mod.name}</span>
+                </div>
+              ))}
+              {checklists.length > 0 && (
+                <>
+                  <div className="nav-divider-small" />
+                  <div className="nav-submenu-label">GENERAL CHECKLISTS</div>
+                  {checklists.map((cl) => (
+                    <div key={cl.id} className="nav-submenu-item" onClick={() => { setSelectedEq(cl); setActivePage('checklist'); }}>
+                      <span className="nav-icon-small">📄</span>
+                      <span className="nav-label-small">{cl.name || cl.title || 'Checklist'}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {checklists.length === 0 && (
+                <div className="nav-submenu-empty">No additional checklists</div>
+              )}
+            </div>
+
+            {/* SETUP DROPDOWN */}
+            <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
+              <div className="nav-left">
+                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
+                {!navCollapsed && <span className="nav-label">Setup</span>}
               </div>
-            )}
+              {!navCollapsed && (
+                <svg className={`nav-chevron ${setupDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              )}
+            </div>
 
-            {isSuperAdmin && (
-              <>
-                {!navCollapsed && <div className="nav-section-label">ADMINISTRATION</div>}
-                <div className={`nav-item ${activePage === 'admin-companies' ? 'active' : ''}`} onClick={() => setActivePage('admin-companies')}>
-                  <div className="nav-left">
-                    <span className="nav-icon">🏢</span>
-                    {!navCollapsed && <span className="nav-label">Companies</span>}
-                  </div>
-                </div>
-                <div className={`nav-item ${activePage === 'admin-users' ? 'active' : ''}`} onClick={() => setActivePage('admin-users')}>
-                  <div className="nav-left">
-                    <span className="nav-icon">👥</span>
-                    {!navCollapsed && <span className="nav-label">User Access</span>}
-                  </div>
-                </div>
-                <div className={`nav-item ${activePage === 'admin-modules' ? 'active' : ''}`} onClick={() => setActivePage('admin-modules')}>
-                  <div className="nav-left">
-                    <span className="nav-icon">🛠️</span>
-                    {!navCollapsed && <span className="nav-label">Card Config</span>}
-                  </div>
-                </div>
-              </>
-            )}
+            <div className={`nav-submenu ${setupDropdownOpen && !navCollapsed ? 'open' : ''}`}>
+              <div
+                className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`}
+                onClick={() => setActivePage('setup-company')}
+              >
+                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg></span>
+                <span className="nav-label-small">Add Company</span>
+              </div>
+              <div
+                className={`nav-submenu-item ${activePage === 'setup-equipment' ? 'active' : ''}`}
+                onClick={() => setActivePage('setup-equipment')}
+              >
+                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
+                <span className="nav-label-small">Add Equipment</span>
+              </div>
+            </div>
+
+            {/* USERS DROPDOWN */}
+            <div className={`nav-item dropdown-toggle ${usersDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setUsersDropdownOpen(!usersDropdownOpen); }}>
+              <div className="nav-left">
+                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></span>
+                {!navCollapsed && <span className="nav-label">Users</span>}
+              </div>
+              {!navCollapsed && (
+                <svg className={`nav-chevron ${usersDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              )}
+            </div>
+
+            <div className={`nav-submenu ${usersDropdownOpen && !navCollapsed ? 'open' : ''}`}>
+              <div
+                className={`nav-submenu-item ${activePage === 'users-manage' ? 'active' : ''}`}
+                onClick={() => setActivePage('users-manage')}
+              >
+                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" /></svg></span>
+                <span className="nav-label-small">Manage</span>
+              </div>
+              <div
+                className={`nav-submenu-item ${activePage === 'users-equipment-access' ? 'active' : ''}`}
+                onClick={() => setActivePage('users-equipment-access')}
+              >
+                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span>
+                <span className="nav-label-small">Equipment Access</span>
+              </div>
+            </div>
           </nav>
 
           <div className="sb-footer">
@@ -477,7 +540,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
               {!navCollapsed && (
                 <div className="sb-user-info">
                   <div className="sb-user-name">{user?.name || user?.username || 'Admin User'}</div>
-                  <div className="sb-user-role">{user?.role || 'Safety Officer'}</div>
+                  <div className="sb-user-role">{user?.role === 'superadmin' ? ' ' : (user?.role || 'Safety Officer')}</div>
                 </div>
               )}
             </div>
@@ -528,45 +591,28 @@ const SafetyDashboard = ({ user, onLogout }) => {
                     </div>
                   ) : activeChecklistItems.length > 0 ? (
                     <div className="cl-items-list">
-                      {(() => {
-                        // Sort by item_order first
-                        const sorted = [...activeChecklistItems].sort((a, b) => (a.item_order || 0) - (b.item_order || 0));
-                        
-                        // Group by category
-                        const groups = sorted.reduce((acc, item) => {
-                          const cat = item.category || 'General Inspection';
-                          if (!acc[cat]) acc[cat] = [];
-                          acc[cat].push(item);
-                          return acc;
-                        }, {});
-                        
-                        return Object.entries(groups).map(([cat, items], gi) => (
-                          <div key={gi} className="cl-section">
-                            <div className="cl-sec-head">{cat}</div>
-                            {items.map((item, idx) => {
-                              const itemId = item.id || `item_${gi}_${idx}`;
-                              return (
-                                <div key={itemId} className={`cl-item ${checkedItems[itemId] ? 'done' : ''} ${item.is_critical ? 'is-critical' : ''}`}>
-                                  <div className="cl-item-main">
-                                    <input 
-                                      type="checkbox" 
-                                      className="cl-cb" 
-                                      id={`cl_${itemId}`} 
-                                      checked={!!checkedItems[itemId]} 
-                                      onChange={() => toggleCheck(itemId)} 
-                                    />
-                                    <label className="cl-item-text" htmlFor={`cl_${itemId}`}>
-                                      {item.item_text || item.checklist_name || item.name || 'Checklist Item'}
-                                      {item.is_critical && <span className="cl-critical-badge">CRITICAL</span>}
-                                    </label>
-                                  </div>
-                                  {item.hints && <div className="cl-item-hint">{item.hints}</div>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ));
-                      })()}
+                      {[...activeChecklistItems]
+                        .sort((a, b) => (a.item_order || 0) - (b.item_order || 0))
+                        .map((item, idx) => {
+                          const itemId = item.id || `item_${idx}`;
+                          return (
+                            <div key={itemId} className={`cl-item ${checkedItems[itemId] ? 'done' : ''}`}>
+                              <div className="cl-item-main">
+                                <input
+                                  type="checkbox"
+                                  className="cl-cb"
+                                  id={`cl_${itemId}`}
+                                  checked={!!checkedItems[itemId]}
+                                  onChange={() => toggleCheck(itemId)}
+                                />
+                                <label className="cl-item-text" htmlFor={`cl_${itemId}`}>
+                                  {item.item_text || item.checklist_name || item.name || 'Checklist Item'}
+                                </label>
+                              </div>
+                              {item.hints && <div className="cl-item-hint">{item.hints}</div>}
+                            </div>
+                          );
+                        })}
                     </div>
                   ) : (
                     <div className="cl-empty">
@@ -599,17 +645,213 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
               {activePage === 'suppression-system-stats' && <SuppressionSystemStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
+            <section className={`page ${activePage === 'fire-blanket-stats' ? 'active' : ''}`}>
+              {activePage === 'fire-blanket-stats' && <FireBlanketStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'fire-alarm-panel-stats' ? 'active' : ''}`}>
+              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
+              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
+              {activePage === 'pa-siren-stats' && <PASirenStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'wind-sock-stats' ? 'active' : ''}`}>
+              {activePage === 'wind-sock-stats' && <WindSockStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'scba-stats' ? 'active' : ''}`}>
+              {activePage === 'scba-stats' && <SCBAStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'ambulance-stats' ? 'active' : ''}`}>
+              {activePage === 'ambulance-stats' && <AmbulanceStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'first-aid-stats' ? 'active' : ''}`}>
+              {activePage === 'first-aid-stats' && <FirstAidBoxStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'emergency-shower-stats' ? 'active' : ''}`}>
+              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'eyewash-station-stats' ? 'active' : ''}`}>
+              {activePage === 'eyewash-station-stats' && <EyewashStationStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'chemical-shower-stats' ? 'active' : ''}`}>
+              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
 
-            <section className={`page ${activePage === 'admin-companies' ? 'active' : ''}`}>
-              <div className="fe-page">
-                <div className="fe-header"><div className="fe-header-title">🏢 Company Management</div></div>
+            {/* ── SETUP: ADD COMPANY ── */}
+            <section className={`page ${activePage === 'setup-company' ? 'active' : ''}`}>
+              <div className="setup-page" onScroll={handleScroll}>
+                <div className="setup-header">
+                  <button className="setup-back-btn" onClick={() => setActivePage('grid')}>← Back</button>
+                  <div className="setup-header-info">
+                    <div className="setup-header-icon">🏢</div>
+                    <div>
+                      <div className="setup-title">Add Company</div>
+                      <div className="setup-subtitle">Register a new company or site to the platform</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="setup-body">
+                  <div className="setup-form-card">
+                    <div className="setup-form-section-label">Company Information</div>
+                    <div className="setup-form-grid">
+                      <div className="setup-field">
+                        <label className="setup-label">Company Name <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="e.g. Garrev Industries Ltd." />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Industry / Sector</label>
+                        <select className="setup-input setup-select">
+                          <option value="">Select industry</option>
+                          <option>Manufacturing</option>
+                          <option>Oil &amp; Gas</option>
+                          <option>Chemical</option>
+                          <option>Construction</option>
+                          <option>Healthcare</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Site / Location Name <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="e.g. Plant A – Sector 4" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Full Address</label>
+                        <input className="setup-input" type="text" placeholder="Street, City, State, PIN" />
+                      </div>
+                    </div>
+                    <div className="setup-form-section-label" style={{ marginTop: 24 }}>Contact Details</div>
+                    <div className="setup-form-grid">
+                      <div className="setup-field">
+                        <label className="setup-label">Contact Person <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="Safety Officer / Manager name" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Phone Number</label>
+                        <input className="setup-input" type="tel" placeholder="+91 00000 00000" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Email Address</label>
+                        <input className="setup-input" type="email" placeholder="contact@company.com" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Status</label>
+                        <select className="setup-input setup-select">
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="setup-form-actions">
+                      <button className="setup-cancel-btn" onClick={() => setActivePage('grid')}>Cancel</button>
+                      <button className="setup-save-btn">
+                        <span>💾</span> Save Company
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
-            <section className={`page ${activePage === 'admin-users' ? 'active' : ''}`}>
-              <div className="fe-page"><div className="fe-header-title">👥 User Access Control</div></div>
+
+            {/* ── SETUP: ADD EQUIPMENT ── */}
+            <section className={`page ${activePage === 'setup-equipment' ? 'active' : ''}`}>
+              <div className="setup-page" onScroll={handleScroll}>
+                <div className="setup-header">
+                  <button className="setup-back-btn" onClick={() => setActivePage('grid')}>← Back</button>
+                  <div className="setup-header-info">
+                    <div className="setup-header-icon">🔧</div>
+                    <div>
+                      <div className="setup-title">Add Equipment</div>
+                      <div className="setup-subtitle">Register new safety equipment to the monitoring system</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="setup-body">
+                  <div className="setup-form-card">
+                    <div className="setup-form-section-label">Equipment Details</div>
+                    <div className="setup-form-grid">
+                      <div className="setup-field">
+                        <label className="setup-label">Equipment Name <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="e.g. Fire Extinguisher – Unit 12" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Equipment Type <span className="setup-required">*</span></label>
+                        <select className="setup-input setup-select">
+                          <option value="">Select type</option>
+                          <option>Fire Extinguisher</option>
+                          <option>Hose Reel</option>
+                          <option>Sprinkler System</option>
+                          <option>Fire Hydrant</option>
+                          <option>Fire Alarm Panel</option>
+                          <option>Smoke Detector</option>
+                          <option>SCBA Unit</option>
+                          <option>First Aid Kit</option>
+                          <option>Emergency Shower</option>
+                          <option>Eye Wash Station</option>
+                          <option>Chemical Shower</option>
+                          <option>Ambulance</option>
+                          <option>Fire Blanket</option>
+                          <option>PA / Siren System</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Brand / Model</label>
+                        <input className="setup-input" type="text" placeholder="e.g. Amerex B500" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Serial Number</label>
+                        <input className="setup-input" type="text" placeholder="Manufacturer serial no." />
+                      </div>
+                    </div>
+                    <div className="setup-form-section-label" style={{ marginTop: 24 }}>Location &amp; Schedule</div>
+                    <div className="setup-form-grid">
+                      <div className="setup-field">
+                        <label className="setup-label">Zone / Location <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="e.g. Building A – Floor 2" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Company / Site</label>
+                        <select className="setup-input setup-select">
+                          <option value="">Select company</option>
+                        </select>
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Installation Date</label>
+                        <input className="setup-input" type="date" />
+                      </div>
+                      <div className="setup-field">
+                        <label className="setup-label">Next Inspection Date</label>
+                        <input className="setup-input" type="date" />
+                      </div>
+                    </div>
+                    <div className="setup-form-actions">
+                      <button className="setup-cancel-btn" onClick={() => setActivePage('grid')}>Cancel</button>
+                      <button className="setup-save-btn">
+                        <span>💾</span> Save Equipment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </section>
-            <section className={`page ${activePage === 'admin-modules' ? 'active' : ''}`}>
-              <div className="fe-page"><div className="fe-header-title">🛠️ Card Configuration</div></div>
+
+            {/* ── USERS: MANAGE ── */}
+            <section className={`page ${activePage === 'users-manage' ? 'active' : ''}`}>
+              {activePage === 'users-manage' && (
+                <UserManagement onBack={() => setActivePage('grid')} onScroll={handleScroll} />
+              )}
+            </section>
+
+            <section className={`page ${activePage === 'users-equipment-access' ? 'active' : ''}`}>
+              {activePage === 'users-equipment-access' && (
+                <EquipmentAccess
+                  onBack={() => setActivePage('grid')}
+                  onScroll={handleScroll}
+                  availableModules={STATIC_MODULES}
+                />
+              )}
             </section>
           </div>
 
