@@ -79,6 +79,16 @@ export default function FireExtinguisherChecklist({ onBack }) {
     return { total, critical, answered };
   }, [answers]);
 
+  const resultStats = useMemo(() => {
+    if (!submitted) return null;
+    const passed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'True').length;
+    const failed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'False').length;
+    const na            = CHECKLIST_DATA.filter(i => answers[i.id] === 'NA').length;
+    const criticalFailed = CHECKLIST_DATA.filter(i => i.critical && answers[i.id] === 'False').length;
+    const score = Math.round((passed / CHECKLIST_DATA.length) * 100);
+    return { passed, failed, na, criticalFailed, score };
+  }, [submitted, answers]);
+
   const grouped = useMemo(() =>
     CATEGORY_ORDER.map(cat => ({
       cat,
@@ -159,12 +169,72 @@ export default function FireExtinguisherChecklist({ onBack }) {
         </div>
       </div>
 
+      {/* Live progress stats bar */}
+      <div className="fec-stats-bar">
+        <div className="fec-stat-chip fec-stat-answered">
+          <span className="fec-stat-num">{stats.answered}</span>
+          <span className="fec-stat-sep">/</span>
+          <span className="fec-stat-denom">{stats.total}</span>
+          <span className="fec-stat-lbl">Answered</span>
+        </div>
+        <div className="fec-stat-chip fec-stat-critical">
+          <span className="fec-stat-num">{stats.critical}</span>
+          <span className="fec-stat-lbl">Critical Items</span>
+        </div>
+        <div className="fec-stat-chip fec-stat-remaining">
+          <span className="fec-stat-num">{stats.total - stats.answered}</span>
+          <span className="fec-stat-lbl">Remaining</span>
+        </div>
+        <div className="fec-progress-track">
+          <div className="fec-progress-label">
+            <span>Completion</span>
+            <span className="fec-progress-pct">{Math.round((stats.answered / stats.total) * 100)}%</span>
+          </div>
+          <div className="fec-progress-bar">
+            <div
+              className="fec-progress-fill"
+              style={{ width: `${(stats.answered / stats.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
       {submitted && (
         <div className="fec-success-banner">
           <span>✅</span> Inspection submitted successfully! Review the results below.
         </div>
       )}
 
+      {/* Result summary cards (shown after submit) */}
+      {submitted && resultStats && (
+        <div className="fec-result-cards">
+          <div className="fec-result-card fec-rc-pass">
+            <div className="fec-rc-icon">✅</div>
+            <div className="fec-rc-num">{resultStats.passed}</div>
+            <div className="fec-rc-label">Passed</div>
+          </div>
+          <div className="fec-result-card fec-rc-fail">
+            <div className="fec-rc-icon">❌</div>
+            <div className="fec-rc-num">{resultStats.failed}</div>
+            <div className="fec-rc-label">Failed</div>
+          </div>
+          <div className="fec-result-card fec-rc-na">
+            <div className="fec-rc-icon">➖</div>
+            <div className="fec-rc-num">{resultStats.na}</div>
+            <div className="fec-rc-label">Not Applicable</div>
+          </div>
+          <div className={`fec-result-card fec-rc-critical ${resultStats.criticalFailed > 0 ? 'fec-rc-alert' : 'fec-rc-safe'}`}>
+            <div className="fec-rc-icon">{resultStats.criticalFailed > 0 ? '⚠️' : '🛡️'}</div>
+            <div className="fec-rc-num">{resultStats.criticalFailed}</div>
+            <div className="fec-rc-label">Critical Fails</div>
+          </div>
+          <div className="fec-result-card fec-rc-score">
+            <div className="fec-rc-icon">📊</div>
+            <div className="fec-rc-num">{resultStats.score}<span className="fec-rc-pct">%</span></div>
+            <div className="fec-rc-label">Inspection Score</div>
+          </div>
+        </div>
+      )}
 
       {/* Checklist Table */}
       <div className="fec-table-wrap">

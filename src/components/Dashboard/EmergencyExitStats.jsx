@@ -14,26 +14,26 @@ const scoreColor = (s) => {
   return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'COMPLETE' || v === 'SEALED' ? '#28a745'
-    : (v === 'PARTIAL' || v === 'LOW_STOCK' || v === 'DIRTY') ? '#FF9800'
-      : (v === 'EMPTY' || v === 'EXPIRED' || v === 'OPEN') ? '#dc3545'
+  v === 'CLEAR' || v === 'OK' || v === 'HEALTHY' ? '#28a745'
+    : (v === 'PARTIAL' || v === 'DIRTY' || v === 'STIFF') ? '#FF9800'
+      : (v === 'BLOCKED' || v === 'FAILED' || v === 'JAMMED') ? '#dc3545'
         : '#666';
 
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Boxes', icon: '🏥', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Complete', icon: '✅', color: '#28a745', key: 'active' },
-  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#FF9800', key: 'upcoming' },
-  { type: 'needs-service', label: 'Needs Refill', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
-  { type: 'expired', label: 'Expired Items', icon: '⌛', color: '#8b5cf6', key: 'expired' },
-  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
+  { type: 'all', label: 'Total Exits', icon: '🚪', color: '#045A97', key: 'total' },
+  { type: 'active', label: 'Clear Routes', icon: '✅', color: '#045A97', key: 'active' },
+  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#045A97', key: 'upcoming' },
+  { type: 'needs-service', label: 'Needs Maintenance', icon: '🔧', color: '#045A97', key: 'needs_service' },
+  { type: 'expired', label: 'Blocked/Faulty', icon: '🚨', color: '#045A97', key: 'expired' },
+  { type: 'due-inspection', label: 'Due Inspection', icon: '📋', color: '#045A97', key: 'due_inspection' },
 ];
 
 const PAGE_SIZE = 15;
 
 const fetchByType = (type) => {
-  const params = { module_id: 15, limit: 200 };
+  const params = { module_id: 24, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -42,35 +42,9 @@ const fetchByType = (type) => {
 const Spinner = () => (
   <div className="fe-spinner">
     <div className="fe-spinner-ring" />
-    <span className="fe-spinner-text">Loading first aid data…</span>
+    <span className="fe-spinner-text">Loading Exit system data…</span>
   </div>
 );
-
-
-const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
-  if (totalPages <= 1) return null;
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
-  const pages = [];
-  if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
-  else {
-    pages.push(1);
-    if (page > 3) pages.push('…');
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
-    if (page < totalPages - 2) pages.push('…');
-    pages.push(totalPages);
-  }
-  return (
-    <div className="fe-pagination">
-      <span className="fe-page-info">Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> boxes</span>
-      <div className="fe-page-controls">
-        <button className="fe-page-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>← Prev</button>
-        {pages.map((p, i) => p === '…' ? <span key={i} className="fe-page-ellipsis">…</span> : <button key={p} className={`fe-page-btn fe-page-num${p === page ? ' fe-page-active' : ''}`} onClick={() => onPage(p)}>{p}</button>)}
-        <button className="fe-page-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>Next →</button>
-      </div>
-    </div>
-  );
-};
 
 const SectionTitle = ({ children }) => <div className="fe-section-title">{children}</div>;
 const InfoRow = ({ label, val, color }) => (
@@ -85,7 +59,7 @@ const ReadinessBar = ({ score }) => {
   const c = scoreColor(pct);
   return (
     <>
-      <div className="fe-readiness-label">Compliance Readiness Score</div>
+      <div className="fe-readiness-label">Exit Route Readiness</div>
       <div className="fe-readiness-bar">
         <div className="fe-readiness-track"><div className="fe-readiness-fill" style={{ width: `${pct}%`, background: c }} /></div>
         <span className="fe-readiness-pct" style={{ color: c }}>{pct}%</span>
@@ -95,7 +69,7 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const FirstAidBoxStats = ({ onBack }) => {
+const EmergencyExitStats = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -116,17 +90,17 @@ const FirstAidBoxStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(15),
+        ApiService.getModuleSummary(24),
         ApiService.getAlertsSummary(),
-        ApiService.getAlerts({ module_id: 15, limit: 100 }),
+        ApiService.getAlerts({ module_id: 24, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for First Aid, using fallback:', err);
-      setSummary({ total: 24, active: 22, upcoming: 1, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 93 });
-      setAlertsSummary({ total_alerts: 1, level_1: { count: 1, label: 'Low', description: 'Restock' }, level_2: { count: 0, label: 'Med', description: 'Expired' }, level_3: { count: 0, label: 'High', description: 'Empty' } });
+      console.error('API Load failed for Exits, using fallback:', err);
+      setSummary({ total: 24, active: 22, upcoming: 1, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 96 });
+      setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally { setLoading(false); }
   };
@@ -142,13 +116,13 @@ const FirstAidBoxStats = ({ onBack }) => {
       setListTotal(data.total || 0);
       if (!data.items || data.items.length === 0) {
         const mock = Array.from({ length: 6 }).map((_, i) => ({
-          id: `fab_${i}`,
-          sos_code: `FAB-100${i + 1}`,
-          equipment_type: 'Type A Box',
-          location_name: `Workshop Floor ${i + 1}`,
-          building_name: 'Production Wing',
+          id: `exit_${i}`,
+          sos_code: `EXT-0${i + 1}`,
+          equipment_type: i % 2 === 0 ? 'Emergency Exit Door' : 'Final Exit Point',
+          location_name: `Floor ${Math.floor(i/2) + 1} - Lobby ${i % 2 + 1}`,
+          building_name: 'Main Block',
           readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 15).toISOString()
+          next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
         }));
         setListItems(mock);
         setListTotal(mock.length);
@@ -182,16 +156,16 @@ const FirstAidBoxStats = ({ onBack }) => {
       <div className="fe-page">
         <div className="fe-header">
           <BackBtn onClick={onBack} />
-          <div className="fe-header-info"><div className="fe-header-title">First Aid Box Fleet Monitor</div></div>
+          <div className="fe-header-info"><div className="fe-header-title">Emergency Exits & Doors Monitor</div></div>
           <span className="fe-score-badge" 
-            title="Health Calculation: ((Total Kits - (Expired + Needs Service + Due Inspection)) / Total Kits) * 100"
+            title="Health Calculation: ((Total Routes - (Expired + Needs Service + Due Inspection)) / Total Routes) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
           </span>
           <div className="fe-header-search">
             <div className="fe-search-box">
               <span className="fe-search-icon">🔍</span>
-              <input type="text" placeholder="Search box code..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
+              <input type="text" placeholder="Search exit code..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
             </div>
           </div>
         </div>
@@ -207,29 +181,11 @@ const FirstAidBoxStats = ({ onBack }) => {
           ))}
         </div>
 
-        {alertsSummary && (
-          <div className="fe-alert-levels">
-            {[1, 2, 3].map(lvl => {
-              const d = alertsSummary[`level_${lvl}`];
-              const c = ALERT_COLOR[lvl];
-              return (
-                <div key={lvl} className="fe-alert-level-card" style={{ '--level-color': c }}>
-                  <div className="fe-alert-level-count">{d.count}</div>
-                  <div>
-                    <div className="fe-alert-level-name">Level {lvl} — {d.label}</div>
-                    <div className="fe-alert-level-desc">{d.description}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
         <div className="fe-panels">
           <div className="fe-panel">
-            <div className="fe-panel-title">🔔 Supply & Expiry Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
+            <div className="fe-panel-title">🔔 Route Integrity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
-              {topAlerts.length === 0 ? <div className="fe-empty">No active restocking alerts.</div> : topAlerts.map((a, i) => (
+              {topAlerts.length === 0 ? <div className="fe-empty">All emergency exit routes are currently clear.</div> : topAlerts.map((a, i) => (
                 <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
@@ -241,23 +197,22 @@ const FirstAidBoxStats = ({ onBack }) => {
             </div>
           </div>
           <div className="fe-panel">
-            <div className="fe-panel-title">📊 Fleet Readiness Breakdown</div>
+            <div className="fe-panel-title">📊 Pathway Status Breakdown</div>
             {summary && (
               <>
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart data={[
-                      { name: 'Complete', val: summary.active, color: '#28a745' },
+                      { name: 'Clear', val: summary.active, color: '#28a745' },
                       { name: 'Due', val: summary.upcoming, color: '#FF9800' },
-                      { name: 'Partial', val: summary.needs_service, color: '#f59e0b' },
-                      { name: 'Faulty', val: summary.expired, color: '#dc3545' },
+                      { name: 'Blocked', val: summary.expired, color: '#dc3545' },
                     ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text3)', fontSize: 10 }} />
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#FF9800' }, { color: '#f59e0b' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        {[{ color: '#28a745' }, { color: '#FF9800' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -275,11 +230,11 @@ const FirstAidBoxStats = ({ onBack }) => {
       <div className="fe-page">
         <div className="fe-header">
           <BackBtn onClick={goBack} />
-          <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} boxes found</div></div>
+          <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} exits found</div></div>
         </div>
         {listLoading ? <Spinner /> : (
           <div className="fe-table">
-            <div className="fe-table-head">{['SOS Code', 'Location', 'Building', 'Readiness', 'Next Check'].map(h => <span key={h} className="fe-table-head-cell">{h}</span>)}</div>
+            <div className="fe-table-head">{['SOS Code', 'Location', 'Building', 'Health', 'Next Inspection'].map(h => <span key={h} className="fe-table-head-cell">{h}</span>)}</div>
             {listItems.map((item, i) => {
               const sc = parseFloat(item.readiness_score) || 0;
               const col = scoreColor(sc);
@@ -307,35 +262,35 @@ const FirstAidBoxStats = ({ onBack }) => {
     <div className="fe-page">
       <div className="fe-header">
         <BackBtn onClick={goBack} />
-        <span className="fe-header-icon">🏥</span>
+        <span className="fe-header-icon">🚪</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>
-          <div className="fe-header-sub">{u.equipment_type || 'First Aid Box'} · {u.location_name}</div>
+          <div className="fe-header-sub">{u.equipment_type || 'Emergency Exit'} · {u.location_name}</div>
         </div>
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
-          <div className="fe-detail-card fe-full"><div className="fe-section-title">Unit Identity</div>
+          <div className="fe-detail-card fe-full"><div className="fe-section-title">Exit Specifications</div>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />
-              <InfoRow label="Location" val={u.location_name} />
-              <InfoRow label="Box Class" val={u.box_class || 'Type A'} />
-              <InfoRow label="Status" val={u.operational_status} />
+              <InfoRow label="Door Type" val={u.equipment_type || 'Single Fire Door'} />
+              <InfoRow label="Hardware" val={u.hardware_type || 'Panic Bar'} />
+              <InfoRow label="Operational Status" val={u.operational_status} />
             </div>
           </div>
-          <div className="fe-detail-card"><div className="fe-section-title">📅 Maintenance Cycles</div>
-            <InfoRow label="Last Refilled" val={fmt(u.last_refill_date)} />
-            <InfoRow label="Next Check Due" val={fmt(u.next_inspection_due)} color="#FF9800" />
-            <InfoRow label="Earliest Expiry" val={fmt(u.earliest_expiry)} color={u.earliest_expiry && new Date(u.earliest_expiry) < new Date() ? '#dc3545' : null} />
+          <div className="fe-detail-card"><div className="fe-section-title">📅 Compliance Dates</div>
+            <InfoRow label="Installed On" val={fmt(u.installed_on)} />
+            <InfoRow label="Last Inspection" val={fmt(u.last_inspection_on)} />
+            <InfoRow label="Next Due" val={fmt(u.next_inspection_due)} color="#FF9800" />
           </div>
-          <div className="fe-detail-card"><div className="fe-section-title">🔧 Inventory Status</div>
+          <div className="fe-detail-card"><div className="fe-section-title">🔧 Route Clearance</div>
             <div className="fe-condition-pills">
-              <div className="fe-condition-pill" style={{ borderColor: condColor(u.stock_status || 'OK') + '44', background: condColor(u.stock_status || 'OK') + '12' }}>
-                <span className="fe-condition-pill-label">Stock</span><span className="fe-condition-pill-value" style={{ color: condColor(u.stock_status || 'OK') }}>{u.stock_status || 'COMPLETE'}</span>
+              <div className="fe-condition-pill" style={{ borderColor: condColor(u.pathway_status || 'CLEAR') + '44', background: condColor(u.pathway_status || 'CLEAR') + '12' }}>
+                <span className="fe-condition-pill-label">Pathway</span><span className="fe-condition-pill-value" style={{ color: condColor(u.pathway_status || 'CLEAR') }}>{u.pathway_status || 'CLEAR'}</span>
               </div>
-              <div className="fe-condition-pill" style={{ borderColor: condColor(u.seal_status || 'OK') + '44', background: condColor(u.seal_status || 'OK') + '12' }}>
-                <span className="fe-condition-pill-label">Seal</span><span className="fe-condition-pill-value" style={{ color: condColor(u.seal_status || 'OK') }}>{u.seal_status || 'INTACT'}</span>
+              <div className="fe-condition-pill" style={{ borderColor: condColor(u.signage_status || 'OK') + '44', background: condColor(u.signage_status || 'OK') + '12' }}>
+                <span className="fe-condition-pill-label">Signage</span><span className="fe-condition-pill-value" style={{ color: condColor(u.signage_status || 'OK') }}>{u.signage_status || 'HEALTHY'}</span>
               </div>
             </div>
             <ReadinessBar score={u.readiness_score} />
@@ -346,4 +301,4 @@ const FirstAidBoxStats = ({ onBack }) => {
   );
 };
 
-export default FirstAidBoxStats;
+export default EmergencyExitStats;

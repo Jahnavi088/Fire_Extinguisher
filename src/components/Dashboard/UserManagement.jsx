@@ -19,7 +19,7 @@ const ROLE_CONFIG = {
 
 const getRoleConf = (role) => ROLE_CONFIG[(role || '').toLowerCase()] || ROLE_CONFIG.user;
 
-const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active' };
+const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active', company_id: '' };
 const PAGE_SIZE = 10;
 
 function fetchReducer(state, action) {
@@ -46,10 +46,18 @@ const UserManagement = ({ onBack }) => {
   const [userModules, setUserModules] = useState([]);
   const [modLoading, setModLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [companies, setCompanies] = useState([]);
 
   useEffect(() => {
     let active = true;
     dispatch({ type: 'loading' });
+
+    ApiService.getAdminCompanies()
+      .then(data => {
+        if (active) setCompanies(Array.isArray(data) ? data : (data?.companies || data?.data || []));
+      })
+      .catch(() => { if (active) setCompanies([]); });
+
     ApiService.getAdminUsers()
       .then(data => {
         if (!active) return;
@@ -89,7 +97,15 @@ const UserManagement = ({ onBack }) => {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ name: u.name || '', username: u.username || '', email: u.email || '', password: '', role: u.role || 'user', status: u.status || 'active' });
+    setForm({ 
+      name: u.name || '', 
+      username: u.username || '', 
+      email: u.email || '', 
+      password: '', 
+      role: u.role || 'user', 
+      status: u.status || 'active',
+      company_id: u.company_id || '' 
+    });
     setFormError('');
     setShowForm(true);
   };
@@ -110,11 +126,19 @@ const UserManagement = ({ onBack }) => {
     setSaving(true); setFormError('');
     try {
       if (editUser) {
-        const payload = { name: form.name, email: form.email, role: form.role, status: form.status };
+        const payload = { name: form.name, email: form.email, role: form.role, status: form.status, company_id: form.company_id };
         if (form.password.trim()) payload.password = form.password;
         await ApiService.updateAdminUser(editUser.id, payload);
       } else {
-        await ApiService.createAdminUser({ name: form.name, username: form.username, email: form.email, password: form.password, role: form.role, status: form.status });
+        await ApiService.createAdminUser({ 
+          name: form.name, 
+          username: form.username, 
+          email: form.email, 
+          password: form.password, 
+          role: form.role, 
+          status: form.status,
+          company_id: form.company_id
+        });
       }
       setShowForm(false);
       setRefreshKey(k => k + 1);
@@ -129,13 +153,29 @@ const UserManagement = ({ onBack }) => {
     <div className="setup-page">
       {/* Header */}
       <div className="setup-header">
-        <button className="setup-back-btn" onClick={onBack}>← Back</button>
+        <button className="setup-back-btn" onClick={onBack} title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
         <div className="setup-header-info" style={{ flex: 1 }}>
           <div className="setup-header-icon">👥</div>
           <div>
             <div className="setup-title">User Management</div>
             <div className="setup-subtitle">Manage system users and role-based access</div>
           </div>
+        </div>
+        <div className="um-search-wrap">
+          <svg className="um-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            className="um-search"
+            placeholder="Search by name, username, email..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && <button className="um-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
         <button className="um-add-btn" onClick={openAdd}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -146,37 +186,6 @@ const UserManagement = ({ onBack }) => {
         </button>
       </div>
 
-      {/* Stats — role distribution summary, relevant at-a-glance info */}
-      <div className="um-stats-row">
-        {[
-          { key: 'total', label: 'Total Users', accent: '#5fd3f3' },
-          { key: 'superadmin', label: 'Superadmin', accent: '#5fd3f3' },
-          { key: 'admin', label: 'Admin', accent: '#FFD700' },
-          { key: 'inspector', label: 'Inspector', accent: '#FF9800' },
-          { key: 'user', label: 'User', accent: '#a0cfe8' },
-        ].map(s => (
-          <div key={s.key} className="um-stat-card">
-            <div className="um-stat-val" style={{ color: s.accent }}>{stats[s.key]}</div>
-            <div className="um-stat-label">{s.label}</div>
-          </div>
-        ))}
-      </div>
-      {/* Toolbar */}
-      <div className="um-toolbar">
-        <div className="um-search-wrap">
-          <svg className="um-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            className="um-search"
-            placeholder="Search by name, username, email or role..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && <button className="um-search-clear" onClick={() => setSearch('')}>×</button>}
-        </div>
-        <div className="um-count">{filteredUsers.length} of {users.length} users</div>
-      </div>
 
       {/* Content */}
       <div className="um-content-wrap">
@@ -310,6 +319,15 @@ const UserManagement = ({ onBack }) => {
                     <option value="admin">Admin</option>
                     <option value="inspector">Inspector</option>
                     <option value="user">User</option>
+                  </select>
+                </div>
+                <div className="um-form-field">
+                  <label>Assign Company</label>
+                  <select value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))}>
+                    <option value="">No Company</option>
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="um-form-field">

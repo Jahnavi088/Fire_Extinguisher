@@ -44,6 +44,10 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
   });
   const { loading: usersLoading, error, users, assignments } = dataState;
 
+  const [view,               setView]               = useState('list'); // 'list' or 'form'
+  const [currentPage,        setCurrentPage]        = useState(1);
+  const itemsPerPage = 10;
+
   const [selectedUser,       setSelectedUser]       = useState(null);
   const [selectedModule,     setSelectedModule]     = useState(null);
   const [accessLevel,        setAccessLevel]        = useState('user');
@@ -127,6 +131,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
       setSelectedUser(null);
       setSelectedModule(null);
       setAccessLevel('user');
+      setView('list');
     } catch (err) {
       alert(err.message || 'Failed to assign access. Please try again.');
     } finally {
@@ -157,14 +162,30 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
   return (
     <div className="ea-page">
       <div className="setup-header">
-        <button className="setup-back-btn" onClick={onBack}>← Back</button>
-        <div className="setup-header-info">
+        <button className="setup-back-btn" onClick={view === 'list' ? onBack : () => setView('list')} title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <div className="setup-header-info" style={{ flex: 1 }}>
           <div className="setup-header-icon">🔐</div>
           <div>
-            <div className="setup-title">Equipment Access</div>
-            <div className="setup-subtitle">Assign users to equipment modules with access levels</div>
+            <div className="setup-title">{view === 'list' ? 'Equipment Access' : 'Assign New Access'}</div>
+            <div className="setup-subtitle">
+              {view === 'list' 
+                ? 'Superadmin Portal — Manage user permissions and equipment assignments'
+                : 'Link a user to a specific safety module and define their access level'}
+            </div>
           </div>
         </div>
+        {view === 'list' && (
+          <button className="ea-add-nav-btn" onClick={() => setView('form')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
+            </svg>
+            Assign Access
+          </button>
+        )}
       </div>
 
       {error && (
@@ -175,143 +196,14 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
       )}
 
       <div className="ea-body">
-        <div className="ea-grid">
-          {/* ── Left: Assignment form ─────────────────────────────────── */}
-          <div className="ea-card ea-form-card">
-            <div className="ea-card-header">
-              <span className="ea-card-icon">➕</span>
-              <div className="ea-card-title">Assign New Access</div>
-            </div>
-
-            <div className="ea-form">
-              {/* Select User */}
-              <div className="ea-field">
-                <label className="ea-label">Select User</label>
-                <div className="ea-dropdown-wrap">
-                  <div
-                    className={`ea-dropdown-trigger ${userDropdownOpen ? 'open' : ''}`}
-                    onClick={() => { setUserDropdownOpen(v => !v); setModuleDropdownOpen(false); setLevelDropdownOpen(false); }}
-                  >
-                    <span className="ea-trigger-text">
-                      {usersLoading ? (
-                        <span style={{ color: 'rgba(255,255,255,0.4)' }}>Loading users...</span>
-                      ) : selectedUser ? (
-                        <><span className="ea-trigger-icon">👤</span>{selectedUser.name || selectedUser.username}</>
-                      ) : 'Choose a user...'}
-                    </span>
-                    <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                  {userDropdownOpen && !usersLoading && (
-                    <div className="ea-dropdown-options">
-                      {users.length === 0 ? (
-                        <div className="ea-option-empty">No users found</div>
-                      ) : users.map(u => (
-                        <div
-                          key={u.id}
-                          className={`ea-option ${selectedUser?.id === u.id ? 'selected' : ''}`}
-                          onClick={() => { setSelectedUser(u); setUserDropdownOpen(false); }}
-                        >
-                          <div className="ea-option-main">
-                            <span className="ea-option-name">{u.name || u.username}</span>
-                            <span className="ea-option-sub">{u.role || 'User'}</span>
-                          </div>
-                          {selectedUser?.id === u.id && <span className="ea-check">✓</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Select Equipment */}
-              <div className="ea-field">
-                <label className="ea-label">Select Equipment Module</label>
-                <div className="ea-dropdown-wrap">
-                  <div
-                    className={`ea-dropdown-trigger ${moduleDropdownOpen ? 'open' : ''}`}
-                    onClick={() => { setModuleDropdownOpen(v => !v); setUserDropdownOpen(false); setLevelDropdownOpen(false); }}
-                  >
-                    <span className="ea-trigger-text">
-                      {selectedModule ? (
-                        <><span className="ea-trigger-icon">{MODULE_EMOJI[selectedModule.code] || '📦'}</span>{selectedModule.name}</>
-                      ) : 'Choose equipment...'}
-                    </span>
-                    <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                  {moduleDropdownOpen && (
-                    <div className="ea-dropdown-options">
-                      {modules.map(m => {
-                        const mId  = m.module_id || m.id;
-                        const selId = selectedModule?.module_id || selectedModule?.id;
-                        return (
-                          <div
-                            key={mId}
-                            className={`ea-option ${selId === mId ? 'selected' : ''}`}
-                            onClick={() => { setSelectedModule(m); setModuleDropdownOpen(false); }}
-                          >
-                            <div className="ea-option-main">
-                              <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
-                              <span className="ea-option-name">{m.name}</span>
-                            </div>
-                            {selId === mId && <span className="ea-check">✓</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Access Level */}
-              <div className="ea-field">
-                <label className="ea-label">Access Level</label>
-                <div className="ea-dropdown-wrap">
-                  <div
-                    className={`ea-dropdown-trigger ${levelDropdownOpen ? 'open' : ''}`}
-                    onClick={() => { setLevelDropdownOpen(v => !v); setUserDropdownOpen(false); setModuleDropdownOpen(false); }}
-                  >
-                    <span className="ea-trigger-text">{getLevelLabel(accessLevel)}</span>
-                    <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                  {levelDropdownOpen && (
-                    <div className="ea-dropdown-options">
-                      {ACCESS_LEVELS.map(level => (
-                        <div
-                          key={level.value}
-                          className={`ea-option ${accessLevel === level.value ? 'selected' : ''}`}
-                          onClick={() => { setAccessLevel(level.value); setLevelDropdownOpen(false); }}
-                        >
-                          <div className="ea-option-main">
-                            <span className="ea-option-name">{level.label}</span>
-                          </div>
-                          {accessLevel === level.value && <span className="ea-check">✓</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <button className="ea-submit-btn" onClick={handleAddAssignment} disabled={saving || usersLoading}>
-                {saving ? <><span className="ea-btn-spinner" /> Assigning...</> : <><span>🔗</span> Assign Access</>}
-              </button>
-            </div>
-          </div>
-
-          {/* ── Right: Current access list ────────────────────────────── */}
-          <div className="ea-card ea-list-card">
+        {view === 'list' ? (
+          <div className="ea-card ea-list-card full">
             <div className="ea-card-header">
               <span className="ea-card-icon">📋</span>
-              <div className="ea-card-title">Current Access List</div>
+              <div className="ea-card-title">Current Access Assignments</div>
               {usersLoading
                 ? <div className="ea-badge-spinner" />
-                : <div className="ea-badge">{assignments.length} Assignments</div>
+                : <div className="ea-badge">{assignments.length} Total</div>
               }
             </div>
 
@@ -321,61 +213,216 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
                 <span>Loading assignments...</span>
               </div>
             ) : (
-              <div className="ea-table-wrap" onScroll={onScroll}>
-                <table className="ea-table">
-                  <thead>
-                    <tr>
-                      <th>User</th>
-                      <th>Equipment</th>
-                      <th>Level</th>
-                      <th>Date</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assignments.length > 0 ? assignments.map(a => (
-                      <tr key={a.id}>
-                        <td>
-                          <div className="ea-user-cell">
-                            <div className="ea-user-avatar">{(a.userName || '?').charAt(0).toUpperCase()}</div>
-                            <span>{a.userName}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className="ea-module-tag">
-                            {MODULE_EMOJI[a.moduleCode] || '📦'} {a.moduleName}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`ea-level-tag ${(a.level || '').toLowerCase()}`}>
-                            {getLevelLabel(a.level)}
-                          </span>
-                        </td>
-                        <td>{a.date}</td>
-                        <td>
-                          <button
-                            className="ea-delete-btn"
-                            onClick={() => handleRemoveAssignment(a)}
-                            disabled={removing === a.id}
-                            title="Revoke Access"
-                          >
-                            {removing === a.id ? '⏳' : '🗑️'}
-                          </button>
-                        </td>
-                      </tr>
-                    )) : (
+              <>
+                <div className="ea-table-wrap" onScroll={onScroll}>
+                  <table className="ea-table">
+                    <thead>
                       <tr>
-                        <td colSpan="5" className="ea-empty">
-                          {error ? 'Could not load assignments.' : 'No access assignments found.'}
-                        </td>
+                        <th>User</th>
+                        <th>Equipment</th>
+                        <th>Level</th>
+                        <th>Assigned Date</th>
+                        <th style={{ textAlign: 'center' }}>Action</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {assignments.length > 0 ? assignments
+                        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                        .map(a => (
+                        <tr key={a.id}>
+                          <td>
+                            <div className="ea-user-cell">
+                              <div className="ea-user-avatar">{(a.userName || '?').charAt(0).toUpperCase()}</div>
+                              <span>{a.userName}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="ea-module-tag">
+                              {MODULE_EMOJI[a.moduleCode] || '📦'} {a.moduleName}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`ea-level-tag ${(a.level || '').toLowerCase()}`}>
+                              {getLevelLabel(a.level)}
+                            </span>
+                          </td>
+                          <td>{a.date}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="ea-delete-btn"
+                              onClick={() => handleRemoveAssignment(a)}
+                              disabled={removing === a.id}
+                              title="Revoke Access"
+                            >
+                              {removing === a.id ? '⏳' : '🗑️'}
+                            </button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="5" className="ea-empty">
+                            {error ? 'Could not load assignments.' : 'No access assignments found.'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {assignments.length > itemsPerPage && (
+                  <div className="ea-pagination">
+                    <button 
+                      className="ea-pg-btn" 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                    <span className="ea-pg-info">
+                      Page {currentPage} of {Math.ceil(assignments.length / itemsPerPage)}
+                    </span>
+                    <button 
+                      className="ea-pg-btn" 
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(assignments.length / itemsPerPage), p + 1))}
+                      disabled={currentPage === Math.ceil(assignments.length / itemsPerPage)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
-        </div>
+        ) : (
+          <div className="ea-form-page">
+            <div className="ea-card ea-form-card focused">
+              <div className="ea-card-header">
+                <span className="ea-card-icon">➕</span>
+                <div className="ea-card-title">Register Equipment Access</div>
+              </div>
+
+              <div className="ea-form">
+                <div className="ea-field">
+                  <label className="ea-label">Select User</label>
+                  <div className="ea-dropdown-wrap">
+                    <div
+                      className={`ea-dropdown-trigger ${userDropdownOpen ? 'open' : ''}`}
+                      onClick={() => { setUserDropdownOpen(v => !v); setModuleDropdownOpen(false); setLevelDropdownOpen(false); }}
+                    >
+                      <span className="ea-trigger-text">
+                        {usersLoading ? (
+                          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Loading users...</span>
+                        ) : selectedUser ? (
+                          <><span className="ea-trigger-icon">👤</span>{selectedUser.name || selectedUser.username}</>
+                        ) : 'Choose a user...'}
+                      </span>
+                      <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                    {userDropdownOpen && !usersLoading && (
+                      <div className="ea-dropdown-options">
+                        {users.length === 0 ? (
+                          <div className="ea-option-empty">No users found</div>
+                        ) : users.map(u => (
+                          <div
+                            key={u.id}
+                            className={`ea-option ${selectedUser?.id === u.id ? 'selected' : ''}`}
+                            onClick={() => { setSelectedUser(u); setUserDropdownOpen(false); }}
+                          >
+                            <div className="ea-option-main">
+                              <span className="ea-option-name">{u.name || u.username}</span>
+                              <span className="ea-option-sub">{u.role || 'User'}</span>
+                            </div>
+                            {selectedUser?.id === u.id && <span className="ea-check">✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="ea-field">
+                  <label className="ea-label">Select Equipment Module</label>
+                  <div className="ea-dropdown-wrap">
+                    <div
+                      className={`ea-dropdown-trigger ${moduleDropdownOpen ? 'open' : ''}`}
+                      onClick={() => { setModuleDropdownOpen(v => !v); setUserDropdownOpen(false); setLevelDropdownOpen(false); }}
+                    >
+                      <span className="ea-trigger-text">
+                        {selectedModule ? (
+                          <><span className="ea-trigger-icon">{MODULE_EMOJI[selectedModule.code] || '📦'}</span>{selectedModule.name}</>
+                        ) : 'Choose equipment...'}
+                      </span>
+                      <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                    {moduleDropdownOpen && (
+                      <div className="ea-dropdown-options">
+                        {modules.map(m => {
+                          const mId  = m.module_id || m.id;
+                          const selId = selectedModule?.module_id || selectedModule?.id;
+                          return (
+                            <div
+                              key={mId}
+                              className={`ea-option ${selId === mId ? 'selected' : ''}`}
+                              onClick={() => { setSelectedModule(m); setModuleDropdownOpen(false); }}
+                            >
+                              <div className="ea-option-main">
+                                <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
+                                <span className="ea-option-name">{m.name}</span>
+                              </div>
+                              {selId === mId && <span className="ea-check">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="ea-field">
+                  <label className="ea-label">Access Level</label>
+                  <div className="ea-dropdown-wrap">
+                    <div
+                      className={`ea-dropdown-trigger ${levelDropdownOpen ? 'open' : ''}`}
+                      onClick={() => { setLevelDropdownOpen(v => !v); setUserDropdownOpen(false); setModuleDropdownOpen(false); }}
+                    >
+                      <span className="ea-trigger-text">{getLevelLabel(accessLevel)}</span>
+                      <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                    {levelDropdownOpen && (
+                      <div className="ea-dropdown-options">
+                        {ACCESS_LEVELS.map(level => (
+                          <div
+                            key={level.value}
+                            className={`ea-option ${accessLevel === level.value ? 'selected' : ''}`}
+                            onClick={() => { setAccessLevel(level.value); setLevelDropdownOpen(false); }}
+                          >
+                            <div className="ea-option-main">
+                              <span className="ea-option-name">{level.label}</span>
+                            </div>
+                            {accessLevel === level.value && <span className="ea-check">✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="ea-form-footer">
+                  <button className="ea-cancel-btn" onClick={() => setView('list')}>Cancel</button>
+                  <button className="ea-submit-btn" onClick={handleAddAssignment} disabled={saving || usersLoading}>
+                    {saving ? <><span className="ea-btn-spinner" /> Assigning...</> : <><span>🔗</span> Assign Access</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {(userDropdownOpen || moduleDropdownOpen || levelDropdownOpen) && (

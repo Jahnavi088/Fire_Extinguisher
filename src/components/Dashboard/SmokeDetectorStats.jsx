@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import SortIndicator from './SortIndicator';
+import { sortItems } from '../../services/sorting';
+import BackBtn from './BackBtn';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -44,13 +47,6 @@ const Spinner = () => (
     <div className="fe-spinner-ring" />
     <span className="fe-spinner-text">Loading smoke detector data…</span>
   </div>
-);
-
-const BackBtn = ({ onClick, children }) => (
-  <button className="fe-back-btn" onClick={onClick}>
-    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-    {children}
-  </button>
 );
 
 const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
@@ -141,6 +137,7 @@ const SmokeDetectorStats = ({ onBack }) => {
   const [listLoading, setListLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -148,20 +145,43 @@ const SmokeDetectorStats = ({ onBack }) => {
 
   useEffect(() => { load(); }, []);
 
+  const onSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return listItems.filter(item => {
+      if (!q) return true;
+      return (item.sos_code || '').toLowerCase().includes(q) ||
+        (item.location_name || '').toLowerCase().includes(q) ||
+        (item.building_name || '').toLowerCase().includes(q) ||
+        (item.equipment_type || '').toLowerCase().includes(q);
+    });
+  }, [listItems, searchQuery]);
+
+  const sortedItems = useMemo(() => {
+    return sortItems(filteredItems, sortConfig);
+  }, [filteredItems, sortConfig]);
+
   const load = async () => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(10),                       // /modules/10/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 10, limit: 100 }),    // /alerts?module_id=10
+        ApiService.getModuleSummary(10),
+        ApiService.getAlertsSummary(),
+        ApiService.getAlerts({ module_id: 10, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
       console.error('API Load failed for Smoke Detectors, using fallback:', err);
-      // Fallback Demo Data
       setSummary({ total: 156, active: 148, upcoming: 4, needs_service: 2, expired: 2, due_inspection: 0, readiness_score: 95 });
       setAlertsSummary({ total_alerts: 4, level_1: { count: 3, label: 'Low', description: 'Cleaning' }, level_2: { count: 1, label: 'Med', description: 'Battery' }, level_3: { count: 0, label: 'High', description: 'Fault' } });
       setTopAlerts([]);
@@ -183,7 +203,6 @@ const SmokeDetectorStats = ({ onBack }) => {
       setListTotal(data.total || 0);
 
       if (!data.items || data.items.length === 0) {
-        // Mock data if API returns empty
         const mock = Array.from({ length: 10 }).map((_, i) => ({
           id: `sd_${i}`,
           sos_code: `SD-${3000 + i}`,
@@ -210,7 +229,7 @@ const SmokeDetectorStats = ({ onBack }) => {
     try {
       const data = await ApiService.getEquipmentBySosCode(item.sos_code || item.id);
       setSelectedUnit(data);
-    } catch { /* keep row data */ }
+    } catch { }
     finally { setDetailLoading(false); }
   };
 
@@ -228,12 +247,14 @@ const SmokeDetectorStats = ({ onBack }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">Smoke Detector Fleet Monitor</div>
           </div>
-          <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
-            {summary?.readiness_score}%
+          <span className="fe-score-badge" 
+            title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
           </span>
           <div className="fe-header-search">
             <div className="fe-search-box">
@@ -343,13 +364,16 @@ const SmokeDetectorStats = ({ onBack }) => {
 
   /* ── LIST VIEW ────────────────────────────────────────────────────────── */
   if (view === 'list') {
+    const totalPages = Math.ceil(sortedItems.length / PAGE_SIZE);
+    const pageSlice = sortedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">{listCfg.title}</div>
-            <div className="fe-header-sub">{listTotal} units found</div>
+            <div className="fe-header-sub">{listTotal} units found — click a row to view details</div>
           </div>
         </div>
 
@@ -357,11 +381,25 @@ const SmokeDetectorStats = ({ onBack }) => {
           <div className="fe-list-body">
             <div className="fe-table">
               <div className="fe-table-head">
-                {['SOS Code', 'Type', 'Location', 'Building', 'Readiness', 'Next Inspection'].map(h => (
-                  <span key={h} className="fe-table-head-cell">{h}</span>
+                {[
+                  { label: 'SOS Code', key: 'sos_code' },
+                  { label: 'Type', key: 'equipment_type' },
+                  { label: 'Location', key: 'location_name' },
+                  { label: 'Building', key: 'building_name' },
+                  { label: 'Readiness', key: 'readiness_score' },
+                  { label: 'Next Inspection', key: 'next_inspection_due' },
+                ].map(col => (
+                  <span
+                    key={col.key}
+                    className={`fe-table-head-cell ${sortConfig.key === col.key ? 'active' : ''}`}
+                    onClick={() => onSort(col.key)}
+                  >
+                    {col.label}
+                    <SortIndicator sortConfig={sortConfig} columnKey={col.key} />
+                  </span>
                 ))}
               </div>
-              {listItems.map((item, i) => {
+              {pageSlice.map((item, i) => {
                 const sc = parseFloat(item.readiness_score) || 0;
                 const col = scoreColor(sc);
                 return (
@@ -376,6 +414,13 @@ const SmokeDetectorStats = ({ onBack }) => {
                 );
               })}
             </div>
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              total={sortedItems.length}
+              pageSize={PAGE_SIZE}
+              onPage={(p) => setCurrentPage(p)}
+            />
           </div>
         )}
       </div>
@@ -390,7 +435,7 @@ const SmokeDetectorStats = ({ onBack }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🌫️</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>

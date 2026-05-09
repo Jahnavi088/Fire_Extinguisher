@@ -1,0 +1,197 @@
+/* Checklist.css - Professional Safety Inspection UI */
+
+.cl-page {
+  padding: 24px;
+  background: #f8fafc;
+  min-height: 100%;
+  color: #1e293b;
+}
+
+.cl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #045A97;
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.cl-header-info h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.cl-header-info p {
+  font-size: 13px;
+  opacity: 0.9;
+  margin: 4px 0 0;
+}
+
+.cl-stats-bar {
+  display: flex;
+  gap: 20px;
+  background: rgba(255,255,255,0.1);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cl-container {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cl-table-head {
+  background: #0f172a;
+  color: white;
+}
+
+.cl-table-head th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #334155;
+}
+
+.cl-category-row {
+  background: #f1f5f9;
+}
+
+.cl-category-row td {
+  padding: 10px 16px;
+  font-weight: 800;
+  color: #045A97;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.cl-row {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background 0.15s;
+}
+
+.cl-row:hover {
+  background: #f8fafc;
+}
+
+.cl-row td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+.cl-col-num { width: 40px; text-align: center; color: #64748b; font-weight: 600; }
+.cl-col-cat { width: 150px; color: #475569; font-style: italic; }
+.cl-col-q { min-width: 300px; font-weight: 500; line-height: 1.5; }
+.cl-col-ans { width: 180px; }
+.cl-col-crit { width: 100px; text-align: center; }
+.cl-col-notes { width: 250px; }
+
+.cl-ans-pill-group {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.cl-ans-pill {
+  flex: 1;
+  padding: 6px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  color: #64748b;
+}
+
+.cl-ans-pill:hover { background: rgba(0,0,0,0.05); }
+
+.cl-ans-pill.active.true { background: #22c55e; color: white; }
+.cl-ans-pill.active.false { background: #ef4444; color: white; }
+.cl-ans-pill.active.na { background: #94a3b8; color: white; }
+
+.cl-crit-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.cl-crit-badge.no {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.cl-notes-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.cl-notes-input:focus {
+  border-color: #045A97;
+  background: #fff;
+}
+
+.cl-footer {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.cl-submit-btn {
+  background: #045A97;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-submit-btn:hover {
+  background: #034a7c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(4, 90, 151, 0.3);
+}
+
+.cl-submit-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

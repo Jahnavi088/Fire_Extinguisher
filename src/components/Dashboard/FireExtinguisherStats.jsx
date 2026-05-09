@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import SortIndicator from './SortIndicator';
+import { sortItems } from '../../services/sorting';
+import BackBtn from './BackBtn';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -32,8 +35,8 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type) => {
-  const params = { module_id: 1, limit: 200 };
+const fetchByType = (type, moduleId = 30) => {
+  const params = { module_id: moduleId, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -44,12 +47,6 @@ const Spinner = () => (
     <div className="fe-spinner-ring" />
     <span className="fe-spinner-text">Loading data…</span>
   </div>
-);
-
-const BackBtn = ({ onClick, children }) => (
-  <button className="fe-back-btn" onClick={onClick}>
-    {children}
-  </button>
 );
 
 const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
@@ -134,7 +131,8 @@ const loadHistory = () => {
 const ANSWER_COLOR = { True: '#28a745', False: '#dc3545', NA: '#888' };
 const ANSWER_LABEL = { True: 'True', False: 'False', NA: 'NA' };
 
-const FireExtinguisherStats = ({ onBack }) => {
+const FireExtinguisherStats = ({ module, onBack }) => {
+  const modId = module?.module_id || 30;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -148,13 +146,13 @@ const FireExtinguisherStats = ({ onBack }) => {
   const [listLoading, setListLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
   const [inspectionHistory, setInspectionHistory] = useState(loadHistory);
   const [expandedRecord, setExpandedRecord] = useState(null);
+
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   useEffect(() => { load(); }, []);
 
@@ -168,9 +166,9 @@ const FireExtinguisherStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(1),                        // /modules/1/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 1, limit: 100 }),    // /alerts?module_id=1
+        ApiService.getModuleSummary(modId),
+        ApiService.getAlertsSummary(),
+        ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -190,7 +188,7 @@ const FireExtinguisherStats = ({ onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type);
+      const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
     } catch {
@@ -210,6 +208,31 @@ const FireExtinguisherStats = ({ onBack }) => {
     } catch { /* keep row data */ }
     finally { setDetailLoading(false); }
   };
+
+  const onSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return listItems.filter(item => {
+      if (!q) return true;
+      return (item.sos_code || '').toLowerCase().includes(q) ||
+        (item.equipment_code || '').toLowerCase().includes(q) ||
+        (item.location_name || '').toLowerCase().includes(q) ||
+        (item.building_name || '').toLowerCase().includes(q) ||
+        (item.extinguisher_type || '').toLowerCase().includes(q);
+    });
+  }, [listItems, searchQuery]);
+
+  const sortedItems = useMemo(() => {
+    return sortItems(filteredItems, sortConfig);
+  }, [filteredItems, sortConfig]);
 
   const goBack = () => {
     if (view === 'detail') setView('list');
@@ -238,10 +261,15 @@ const FireExtinguisherStats = ({ onBack }) => {
       <div className="fe-page">
         {/* Header */}
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
           </div>
+          <span className="fe-score-badge" 
+            title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
+          </span>
 
           <div className="fe-header-search">
             <div className="fe-search-box">
@@ -567,10 +595,13 @@ const FireExtinguisherStats = ({ onBack }) => {
      LIST VIEW
      ══════════════════════════════════════════════════════════════════════ */
   if (view === 'list') {
+    const totalPages = Math.ceil(sortedItems.length / PAGE_SIZE);
+    const pageSlice = sortedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div
             style={{ width: 11, height: 11, borderRadius: '50%', background: listCfg.color, flexShrink: 0, boxShadow: `0 0 8px ${listCfg.color}` }}
           />
@@ -598,66 +629,64 @@ const FireExtinguisherStats = ({ onBack }) => {
               )}
             </div>
           </div>
-
-
         </div>
 
-        {listLoading ? <Spinner /> : (() => {
-          const q = searchQuery.toLowerCase();
-          const filteredItems = listItems.filter(item => {
-            if (!q) return true;
-            return (item.sos_code || '').toLowerCase().includes(q) ||
-              (item.equipment_code || '').toLowerCase().includes(q) ||
-              (item.location_name || '').toLowerCase().includes(q) ||
-              (item.building_name || '').toLowerCase().includes(q) ||
-              (item.extinguisher_type || '').toLowerCase().includes(q);
-          });
-
-          const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
-          const pageSlice = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-          return (
-            <div className="fe-list-body">
-              <div className="fe-table">
-                <div className="fe-table-head">
-                  {['SOS Code', 'Type', 'Location', 'Building / Dept', 'Readiness', 'Next Inspection'].map(h => (
-                    <span key={h} className="fe-table-head-cell">{h}</span>
-                  ))}
-                </div>
-                {pageSlice.map((item, i) => {
-                  const sc = parseFloat(item.readiness_score) || 0;
-                  const col = scoreColor(sc);
-                  return (
-                    <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
-                      <span className="fe-table-sos">{item.sos_code || item.equipment_code}</span>
-                      <span className="fe-table-type">{item.extinguisher_type || '—'}</span>
-                      <span className="fe-table-loc">{item.location_name || '—'}</span>
-                      <span className="fe-table-bldg">
-                        {[item.building_name, item.department_name].filter(Boolean).join(' · ') || '—'}
-                      </span>
-                      <span
-                        className="fe-score-chip"
-                        style={{ color: col, borderColor: col + '55', background: col + '14' }}
-                      >
-                        {sc}%
-                      </span>
-                      <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
-                    </div>
-                  );
-                })}
-                {filteredItems.length === 0 && (
-                  <div className="fe-table-empty">No matching records found.</div>
-                )}
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  total={filteredItems.length}
-                  pageSize={PAGE_SIZE}
-                  onPage={(p) => { setCurrentPage(p); }}
-                />
+        {listLoading ? <Spinner /> : (
+          <div className="fe-list-body">
+            <div className="fe-table">
+              <div className="fe-table-head">
+                {[
+                  { label: 'SOS Code', key: 'sos_code' },
+                  { label: 'Type', key: 'extinguisher_type' },
+                  { label: 'Location', key: 'location_name' },
+                  { label: 'Building / Dept', key: 'building_dept' },
+                  { label: 'Readiness', key: 'readiness_score' },
+                  { label: 'Next Inspection', key: 'next_inspection_due' },
+                ].map(col => (
+                  <span
+                    key={col.key}
+                    className={`fe-table-head-cell ${sortConfig.key === col.key ? 'active' : ''}`}
+                    onClick={() => onSort(col.key)}
+                  >
+                    {col.label}
+                    <SortIndicator sortConfig={sortConfig} columnKey={col.key} />
+                  </span>
+                ))}
               </div>
+              {pageSlice.map((item, i) => {
+                const sc = parseFloat(item.readiness_score) || 0;
+                const col = scoreColor(sc);
+                return (
+                  <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
+                    <span className="fe-table-sos">{item.sos_code || item.equipment_code}</span>
+                    <span className="fe-table-type">{item.extinguisher_type || '—'}</span>
+                    <span className="fe-table-loc">{item.location_name || '—'}</span>
+                    <span className="fe-table-bldg">
+                      {[item.building_name, item.department_name].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                    <span
+                      className="fe-score-chip"
+                      style={{ color: col, borderColor: col + '55', background: col + '14' }}
+                    >
+                      {sc}%
+                    </span>
+                    <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
+                  </div>
+                );
+              })}
+              {sortedItems.length === 0 && (
+                <div className="fe-table-empty">No matching records found.</div>
+              )}
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={sortedItems.length}
+                pageSize={PAGE_SIZE}
+                onPage={(p) => { setCurrentPage(p); }}
+              />
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     );
   }
@@ -673,7 +702,7 @@ const FireExtinguisherStats = ({ onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🧯</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>

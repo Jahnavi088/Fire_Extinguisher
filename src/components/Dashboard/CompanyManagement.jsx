@@ -2,17 +2,19 @@ import React, { useState, useRef } from 'react';
 import './CompanyManagement.css';
 
 const initialCompanies = [
-  { id: 1, name: 'Garrev Industries Ltd.', logo: null },
-  { id: 2, name: 'SafeGuard Corp.', logo: null },
+  { id: 1, name: 'Garrev Industries Ltd.', logo: null, email: 'info@garrev.com', address: '123 Safety St, Industrial Zone', phone: '+1-555-0101' },
+  { id: 2, name: 'SafeGuard Corp.', logo: null, email: 'contact@safeguard.net', address: '456 Security Ave, Business District', phone: '+1-555-0202' },
 ];
 
 const CompanyManagement = ({ onBack }) => {
   const [companies, setCompanies] = useState(initialCompanies);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [addForm, setAddForm] = useState({ name: '', logo: null, logoPreview: null });
-  const [editForm, setEditForm] = useState({ name: '', logo: null, logoPreview: null });
+  const [addForm, setAddForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '' });
+  const [editForm, setEditForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '' });
   const addFileRef = useRef();
   const editFileRef = useRef();
 
@@ -33,34 +35,50 @@ const CompanyManagement = ({ onBack }) => {
   };
 
   const openAdd = () => {
-    setAddForm({ name: '', logo: null, logoPreview: null });
+    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '' });
     setShowAddModal(true);
   };
 
   const closeAdd = () => {
     setShowAddModal(false);
-    setAddForm({ name: '', logo: null, logoPreview: null });
+    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '' });
   };
 
   const saveAdd = () => {
     if (!addForm.name.trim()) return;
     setCompanies((prev) => [
       ...prev,
-      { id: nextId(), name: addForm.name.trim(), logo: addForm.logoPreview },
+      { 
+        id: nextId(), 
+        companyId: addForm.companyId.trim(),
+        name: addForm.name.trim(), 
+        logo: addForm.logoPreview,
+        email: addForm.email.trim(),
+        address: addForm.address.trim(),
+        phone: addForm.phone.trim()
+      },
     ]);
     closeAdd();
   };
 
   const openEdit = (company) => {
     setEditTarget(company);
-    setEditForm({ name: company.name, logo: null, logoPreview: company.logo });
+    setEditForm({ 
+      name: company.name, 
+      companyId: company.companyId || '',
+      logo: null, 
+      logoPreview: company.logo,
+      email: company.email || '',
+      address: company.address || '',
+      phone: company.phone || ''
+    });
     setShowEditModal(true);
   };
 
   const closeEdit = () => {
     setShowEditModal(false);
     setEditTarget(null);
-    setEditForm({ name: '', logo: null, logoPreview: null });
+    setEditForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '' });
   };
 
   const saveEdit = () => {
@@ -68,7 +86,15 @@ const CompanyManagement = ({ onBack }) => {
     setCompanies((prev) =>
       prev.map((c) =>
         c.id === editTarget.id
-          ? { ...c, name: editForm.name.trim(), logo: editForm.logoPreview }
+          ? { 
+              ...c, 
+              name: editForm.name.trim(), 
+              companyId: editForm.companyId.trim(),
+              logo: editForm.logoPreview,
+              email: editForm.email.trim(),
+              address: editForm.address.trim(),
+              phone: editForm.phone.trim()
+            }
           : c
       )
     );
@@ -83,7 +109,11 @@ const CompanyManagement = ({ onBack }) => {
   return (
     <div className="cm-page">
       <div className="cm-header">
-        <button className="cm-back-btn" onClick={onBack}>← Back</button>
+        <button className="cm-back-btn" onClick={onBack} title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
         <div className="cm-header-info">
           <span className="cm-header-icon">🏢</span>
           <div>
@@ -105,7 +135,8 @@ const CompanyManagement = ({ onBack }) => {
             <thead>
               <tr>
                 <th className="cm-th cm-th-id">ID</th>
-                <th className="cm-th">Company</th>
+                <th className="cm-th">Company Details</th>
+                <th className="cm-th">Email / Address</th>
                 <th className="cm-th cm-th-actions">Actions</th>
               </tr>
             </thead>
@@ -115,7 +146,9 @@ const CompanyManagement = ({ onBack }) => {
                   <td colSpan={3} className="cm-empty-row">No companies found. Click "Add Company" to get started.</td>
                 </tr>
               ) : (
-                companies.map((company) => (
+                companies
+                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                  .map((company) => (
                   <tr key={company.id} className="cm-tr">
                     <td className="cm-td cm-td-id">{company.id}</td>
                     <td className="cm-td">
@@ -127,8 +160,18 @@ const CompanyManagement = ({ onBack }) => {
                             <span className="cm-logo-placeholder">🏢</span>
                           )}
                         </div>
-                        <span className="cm-company-name">{company.name}</span>
+                        <div className="cm-info-cell">
+                          <div className="cm-company-name">{company.name}</div>
+                          <div className="cm-company-sub">
+                            {company.companyId && <span className="cm-id-badge">{company.companyId}</span>}
+                            {company.phone || 'No phone'}
+                          </div>
+                        </div>
                       </div>
+                    </td>
+                    <td className="cm-td">
+                      <div className="cm-email-text">{company.email || 'N/A'}</div>
+                      <div className="cm-address-text">{company.address || 'No address'}</div>
                     </td>
                     <td className="cm-td cm-td-actions">
                       <button className="cm-action-btn cm-edit-btn" title="Edit" onClick={() => openEdit(company)}>
@@ -152,6 +195,28 @@ const CompanyManagement = ({ onBack }) => {
             </tbody>
           </table>
         </div>
+
+        {companies.length > itemsPerPage && (
+          <div className="cm-pagination">
+            <button 
+              className="cm-pg-btn" 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <span className="cm-pg-info">
+              Page {currentPage} of {Math.ceil(companies.length / itemsPerPage)}
+            </span>
+            <button 
+              className="cm-pg-btn" 
+              onClick={() => setCurrentPage(p => Math.min(Math.ceil(companies.length / itemsPerPage), p + 1))}
+              disabled={currentPage === Math.ceil(companies.length / itemsPerPage)}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ADD COMPANY MODAL */}
@@ -162,7 +227,7 @@ const CompanyManagement = ({ onBack }) => {
               <span className="cm-modal-icon">🏢</span>
               <span className="cm-modal-title">Add Company</span>
             </div>
-            <div className="cm-modal-body">
+            <div className="cm-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               <div className="cm-field">
                 <label className="cm-label">Company Name <span className="cm-required">*</span></label>
                 <input
@@ -171,6 +236,46 @@ const CompanyManagement = ({ onBack }) => {
                   placeholder="e.g. Garrev Industries Ltd."
                   value={addForm.name}
                   onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company ID <span className="cm-required">*</span></label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. CH-2024-001"
+                  value={addForm.companyId}
+                  onChange={(e) => setAddForm((f) => ({ ...f, companyId: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Gmail</label>
+                <input
+                  className="cm-input"
+                  type="email"
+                  placeholder="e.g. contact@company.com"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Address</label>
+                <textarea
+                  className="cm-input cm-textarea"
+                  placeholder="Street, City, State, ZIP"
+                  value={addForm.address}
+                  onChange={(e) => setAddForm((f) => ({ ...f, address: e.target.value }))}
+                  style={{ minHeight: '60px', resize: 'vertical' }}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Contact Number</label>
+                <input
+                  className="cm-input"
+                  type="tel"
+                  placeholder="+1 234 567"
+                  value={addForm.phone}
+                  onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))}
                 />
               </div>
               <div className="cm-field">
@@ -214,7 +319,7 @@ const CompanyManagement = ({ onBack }) => {
               <span className="cm-modal-icon">✏️</span>
               <span className="cm-modal-title">Edit Company</span>
             </div>
-            <div className="cm-modal-body">
+            <div className="cm-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               <div className="cm-field">
                 <label className="cm-label">Company Name <span className="cm-required">*</span></label>
                 <input
@@ -223,6 +328,46 @@ const CompanyManagement = ({ onBack }) => {
                   placeholder="e.g. Garrev Industries Ltd."
                   value={editForm.name}
                   onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company ID <span className="cm-required">*</span></label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. CH-2024-001"
+                  value={editForm.companyId}
+                  onChange={(e) => setEditForm((f) => ({ ...f, companyId: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Gmail</label>
+                <input
+                  className="cm-input"
+                  type="email"
+                  placeholder="e.g. contact@company.com"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Company Address</label>
+                <textarea
+                  className="cm-input cm-textarea"
+                  placeholder="Street, City, State, ZIP"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                  style={{ minHeight: '60px', resize: 'vertical' }}
+                />
+              </div>
+              <div className="cm-field">
+                <label className="cm-label">Contact Number</label>
+                <input
+                  className="cm-input"
+                  type="tel"
+                  placeholder="+1 234 567"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
                 />
               </div>
               <div className="cm-field">

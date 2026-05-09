@@ -147,6 +147,13 @@ export const ApiService = {
     return await request(`/checklists/${type}`);
   },
 
+  submitInspection: async (data) => {
+    return await request('/inspections/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- ALERTS (PUBLIC) ---
   getAlerts: async (params = {}) => {
     return await request(`/alerts${qs(params)}`);
@@ -392,6 +399,31 @@ export const ApiService = {
 
   removeAdminUserModule: async (userId, moduleId) => {
     return await request(`/admin/users/${userId}/modules/${moduleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- ADMIN COMPANIES ---
+  getAdminCompanies: async () => {
+    return await request('/admin/companies');
+  },
+
+  createAdminCompany: async (data) => {
+    return await request('/admin/companies', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateAdminCompany: async (id, data) => {
+    return await request(`/admin/companies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAdminCompany: async (id) => {
+    return await request(`/admin/companies/${id}`, {
       method: 'DELETE',
     });
   },

@@ -34,20 +34,16 @@ import VolunteerStats from './VolunteerStats';
 import ShiftVolunteerStats from './ShiftVolunteerStats';
 import TrainedShiftStats from './TrainedShiftStats';
 import FireNocStats from './FireNocStats';
+import EmergencyExitStats from './EmergencyExitStats';
+import EmergencyLightingStats from './EmergencyLightingStats';
 import Reports from './Reports';
-
-
-
-
-
-
-
-
+import ChecklistConfig from './ChecklistConfig';
+import SystemDiagnostics from './SystemDiagnostics';
 
 
 
 const STATIC_MODULES = [
-  { module_id: 1, name: 'Extinguishers', code: 'fire_extinguisher', health_score: 100, category: 'fire', image: '/images/fire_extinguisher.png' },
+  { module_id: 30, name: 'Extinguishers', code: 'fire_extinguisher', health_score: 100, category: 'fire', image: '/images/fire_extinguisher.png' },
   { module_id: 2, name: 'Hose Reels', code: 'hose_reel', health_score: 92, category: 'fire', image: '/images/hose_reel.png' },
   { module_id: 3, name: 'Sprinklers', code: 'sprinkler', health_score: 93, category: 'fire', image: '/images/sprinkler.png' },
   { module_id: 4, name: 'Hydrants', code: 'hydrant', health_score: 92, category: 'fire', image: '/images/hydrant.png' },
@@ -76,41 +72,40 @@ const STATIC_MODULES = [
   { module_id: 22, name: 'Shift Vol.', code: 'shift_volunteers', health_score: 72, category: 'permit' },
   { module_id: 23, name: 'Trained/Shift', code: 'trained_shift', health_score: 85, category: 'permit' },
   { module_id: 29, name: 'Fire NOC', code: 'fire_noc', health_score: 100, category: 'permit' },
-  { module_id: 30, name: 'Suppression', code: 'suppression_system', health_score: 100, category: 'fire' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
 
 const CHECKLIST_MODULES = [
   { id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2" /><path d="M15 7v2" /><path d="M8 10h8" /><path d="M8 14h8" /><path d="M7 18h10" /><path d="M9 2v3" /><path d="M11 2v3" /><rect x="5" y="5" width="14" height="17" rx="2" /></svg> },
-  { id: 31, name: 'Sprinkler System', code: 'sprinkler', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4" /><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /><path d="M12 16v6" /><path d="M8 12H2" /><path d="M22 12h-6" /></svg> },
-  { id: 32, name: 'FPCA', code: 'fpca', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
-  { id: 33, name: 'Hose Reel', code: 'hose_reel', icon: CHECKLIST_GENERIC_ICON },
-  { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
-  { id: 35, name: 'Fire Alarm Panel', code: 'fire_alarm_panel', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg> },
-  { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
-  { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: CHECKLIST_GENERIC_ICON },
-  { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
-  { id: 39, name: 'Exit Sign', code: 'exit_sign', icon: CHECKLIST_GENERIC_ICON },
-  { id: 40, name: 'CO Detector', code: 'co_detector', icon: CHECKLIST_GENERIC_ICON },
-  { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
-  { id: 42, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
-  { id: 43, name: 'Fire Door', code: 'fire_door', icon: CHECKLIST_GENERIC_ICON },
-  { id: 44, name: 'PA System', code: 'pa_system', icon: CHECKLIST_GENERIC_ICON },
-  { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><line x1="12" y1="9" x2="12" y2="15" /><line x1="9" y1="12" x2="15" y2="12" /></svg> },
-  { id: 46, name: 'Eyewash Station', code: 'eyewash_station', icon: CHECKLIST_GENERIC_ICON },
-  { id: 47, name: 'Safety Shower', code: 'safety_shower', icon: CHECKLIST_GENERIC_ICON },
-  { id: 48, name: 'Chemical Spill Kit', code: 'spill_kit', icon: CHECKLIST_GENERIC_ICON },
-  { id: 49, name: 'PPE Station', code: 'ppe_station', icon: CHECKLIST_GENERIC_ICON },
-  { id: 50, name: 'Chemical Shower', code: 'chemical_shower', icon: CHECKLIST_GENERIC_ICON },
-  { id: 51, name: 'Safety Signage', code: 'safety_signage', icon: CHECKLIST_GENERIC_ICON },
-  { id: 52, name: 'Emergency Comm.', code: 'emergency_comm', icon: CHECKLIST_GENERIC_ICON },
-  { id: 53, name: 'Muster Point', code: 'muster_point', icon: CHECKLIST_GENERIC_ICON },
-  { id: 54, name: 'Fire Brigade', code: 'fire_brigade', icon: CHECKLIST_GENERIC_ICON },
-  { id: 55, name: 'Volunteers', code: 'volunteers', icon: CHECKLIST_GENERIC_ICON },
-  { id: 56, name: 'Shift Vol.', code: 'shift_volunteers', icon: CHECKLIST_GENERIC_ICON },
-  { id: 57, name: 'Trained/Shift', code: 'trained_shift', icon: CHECKLIST_GENERIC_ICON },
-  { id: 58, name: 'Fire NOC', code: 'fire_noc', icon: CHECKLIST_GENERIC_ICON },
+  { id: 3, name: 'Sprinkler System', code: 'sprinkler', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4" /><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /><path d="M12 16v6" /><path d="M8 12H2" /><path d="M22 12h-6" /></svg> },
+  { id: 9, name: 'FPCA / Alarm Panel', code: 'fpca', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
+  { id: 2, name: 'Hose Reel', code: 'hose_reel', icon: CHECKLIST_GENERIC_ICON },
+  { id: 4, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
+  { id: 10, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 13, name: 'SCBA Units', code: 'scba', icon: CHECKLIST_GENERIC_ICON },
+  { id: 25, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
+  { id: 24, name: 'Exit Sign', code: 'emergency_door', icon: CHECKLIST_GENERIC_ICON },
+  { id: 8, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
+  { id: 7, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 15, name: 'First Aid Kit', code: 'first_aid_kit', icon: CHECKLIST_GENERIC_ICON },
+  { id: 26, name: 'Spill Kit', code: 'spill_kit', icon: CHECKLIST_GENERIC_ICON },
+  { id: 6, name: 'Fire Trolley', code: 'fire_trolley', icon: CHECKLIST_GENERIC_ICON },
+  { id: 11, name: 'PA System', code: 'pa_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 12, name: 'Wind Sock', code: 'wind_sock', icon: CHECKLIST_GENERIC_ICON },
+  { id: 14, name: 'Ambulance', code: 'ambulance', icon: CHECKLIST_GENERIC_ICON },
+  { id: 16, name: 'Safety Shower', code: 'safety_shower', icon: CHECKLIST_GENERIC_ICON },
+  { id: 17, name: 'Eye Wash', code: 'eyewash_station', icon: CHECKLIST_GENERIC_ICON },
+  { id: 18, name: 'Chemical Shower', code: 'chemical_shower', icon: CHECKLIST_GENERIC_ICON },
+  { id: 19, name: 'PPE Station', code: 'ppe_station', icon: CHECKLIST_GENERIC_ICON },
+  { id: 27, name: 'Safety Signage', code: 'safety_signage', icon: CHECKLIST_GENERIC_ICON },
+  { id: 21, name: 'Emergency Comm', code: 'emergency_comm', icon: CHECKLIST_GENERIC_ICON },
+  { id: 28, name: 'Muster Point', code: 'muster_point', icon: CHECKLIST_GENERIC_ICON },
+  { id: 20, name: 'Fire Brigade', code: 'fire_brigade', icon: CHECKLIST_GENERIC_ICON },
+  { id: 31, name: 'Volunteers', code: 'volunteers', icon: CHECKLIST_GENERIC_ICON },
+  { id: 22, name: 'Shift Volunteers', code: 'shift_volunteers', icon: CHECKLIST_GENERIC_ICON },
+  { id: 23, name: 'Trained/Shift', code: 'trained_shift', icon: CHECKLIST_GENERIC_ICON },
+  { id: 29, name: 'Fire NOC', code: 'fire_noc', icon: CHECKLIST_GENERIC_ICON },
 ];
 
 const MODULE_EMOJI = {
@@ -161,6 +156,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [alertCount, setAlertCount] = useState(0);
   const [searchFilter, setSearchFilter] = useState('All');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [modules, setModules] = useState(STATIC_MODULES);
   const checklists = [];
   const [clState, dispatchCl] = useReducer(
     (s, a) => {
@@ -177,6 +173,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [setupDropdownOpen, setSetupDropdownOpen] = useState(false);
   const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
   const [topbarVisible, setTopbarVisible] = useState(true);
+  const [adminCompanies, setAdminCompanies] = useState([]);
   const lastScrollY = React.useRef(0);
 
   const filterOptions = [
@@ -187,8 +184,10 @@ const SafetyDashboard = ({ user, onLogout }) => {
     { label: 'Permits', icon: '📋' },
   ];
 
-  const modules = STATIC_MODULES;
-  const preparednessScore = 92;
+  const preparednessScore = useMemo(() => {
+    const total = modules.reduce((sum, m) => sum + (m.health_score || 0), 0);
+    return modules.length > 0 ? Math.round(total / modules.length) : 0;
+  }, [modules]);
 
   useEffect(() => {
     if (activePage !== 'checklist' || !selectedEq?.id) return;
@@ -205,6 +204,41 @@ const SafetyDashboard = ({ user, onLogout }) => {
     ApiService.getAlertsSummary()
       .then((d) => setAlertCount(d.total_alerts || 0))
       .catch(() => setAlertCount(0));
+
+    ApiService.getAdminCompanies()
+      .then(d => {
+        const list = Array.isArray(d) ? d : (d?.companies || d?.data || []);
+        setAdminCompanies(list);
+      })
+      .catch(() => setAdminCompanies([]));
+
+    // Fetch real-time health scores for all modules
+    const fetchSummaries = async () => {
+      try {
+        const results = await Promise.allSettled(
+          STATIC_MODULES.map(m => ApiService.getModuleSummary(m.module_id).then(res => {
+            let score = res.health_score ?? res.score;
+
+            // If the backend didn't calculate it, we do it here:
+            if (score === undefined || score === null) {
+              const total = res.total_units ?? res.total ?? 0;
+              const active = res.active_units ?? res.active ?? 0;
+              score = total > 0 ? Math.round((active / total) * 100) : 100;
+            }
+
+            return { id: m.module_id, score };
+          }))
+        );
+
+        setModules(current => current.map(m => {
+          const match = results.find(r => r.status === 'fulfilled' && r.value.id === m.module_id);
+          return match ? { ...m, health_score: match.value.score } : m;
+        }));
+      } catch (err) {
+        console.error('Failed to fetch module summaries:', err);
+      }
+    };
+    fetchSummaries();
   }, []);
 
   useEffect(() => {
@@ -279,6 +313,8 @@ const SafetyDashboard = ({ user, onLogout }) => {
     else if (mod.code === 'fire_blanket') setActivePage('fire-blanket-stats');
     else if (mod.code === 'fpca') setActivePage('fire-alarm-panel-stats');
     else if (mod.code === 'smoke_detector') setActivePage('smoke-detector-stats');
+    else if (mod.code === 'emergency_door') setActivePage('emergency-exit-stats');
+    else if (mod.code === 'emergency_light') setActivePage('emergency-lighting-stats');
     else if (mod.code === 'pa_system') setActivePage('pa-siren-stats');
     else if (mod.code === 'wind_sock') setActivePage('wind-sock-stats');
     else if (mod.code === 'scba') setActivePage('scba-stats');
@@ -311,8 +347,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
   };
 
   const handleLogout = async () => {
-    if (!window.confirm('Are you sure you want to logout?')) return;
-    try { await ApiService.logout(); } catch { /* logout failure is safe to ignore */ }
+    console.log('Logout initiated');
+    try {
+      await ApiService.logout();
+      console.log('Logout successful');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     onLogout();
   };
 
@@ -333,16 +374,19 @@ const SafetyDashboard = ({ user, onLogout }) => {
     {
       label: 'OPERATIONS',
       items: [
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>, label: 'Incidents', badge: 'NEW' },
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>, label: 'Inspections' },
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>, label: 'Analytics' },
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>, label: 'Reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
       ],
     },
     {
       label: 'SYSTEM',
       items: [
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>, label: 'Settings' },
+        {
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
+          label: 'Diagnostics',
+          active: activePage === 'diagnostics',
+          onClick: () => setActivePage('diagnostics')
+        },
       ],
     },
   ];
@@ -358,11 +402,15 @@ const SafetyDashboard = ({ user, onLogout }) => {
             </div>
             <div className="topbar-copy">
               <div className="tb-title">
-                <span className="tb-brand-icon">🚨
-                </span>
+                <span className="tb-brand-icon">🚨</span>
                 Emergency Safety Dashboard
               </div>
-              <div className="tb-subtitle">  Real-time fire &amp; safety monitoring</div>
+              <div className="tb-subtitle">
+                Real-time fire &amp; safety monitoring 
+                <span className="health-info-link" title="Health Calculation: ((Total Assets - (Expired + Needs Service + Due Inspection)) / Total Assets) * 100" style={{ marginLeft: '8px', opacity: 0.7, cursor: 'help', fontSize: '9px', textDecoration: 'underline' }}>
+                  Health Logic ⓘ
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -421,7 +469,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <span className="bell-badge">{alertCount > 99 ? '99+' : alertCount || 0}</span>
           </div>
           <div className="status-badge">❤️ {preparednessScore}%</div>
-<button className="panel-toggle-topbar-btn" onClick={() => setPanelVisible(!panelVisible)} title="Toggle info panel">
+          <button className="panel-toggle-topbar-btn" onClick={() => setPanelVisible(!panelVisible)} title="Toggle info panel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <line x1="15" y1="3" x2="15" y2="21" />
@@ -464,7 +512,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             {/* CHECKLISTS DROPDOWN */}
             <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
               <div className="nav-left">
-                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><path d="M9 14l2 2 4-4" /></svg></span>
+                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg></span>
                 {!navCollapsed && <span className="nav-label">Checklists</span>}
               </div>
               {!navCollapsed && (
@@ -475,35 +523,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
             </div>
 
             <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-
-              {CHECKLIST_MODULES.map((mod) => (
-                <div
-                  key={mod.id}
-                  className={`nav-submenu-item ${selectedEq?.id === mod.id && activePage === 'checklist' ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedEq(mod);
-                    setActivePage('checklist');
-                  }}
-                >
-                  <span className="nav-icon-small">{mod.icon}</span>
-                  <span className="nav-label-small">{mod.name}</span>
-                </div>
-              ))}
-              {checklists.length > 0 && (
-                <>
-                  <div className="nav-divider-small" />
-                  <div className="nav-submenu-label">GENERAL CHECKLISTS</div>
-                  {checklists.map((cl) => (
-                    <div key={cl.id} className="nav-submenu-item" onClick={() => { setSelectedEq(cl); setActivePage('checklist'); }}>
-                      <span className="nav-icon-small">📄</span>
-                      <span className="nav-label-small">{cl.name || cl.title || 'Checklist'}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-              {checklists.length === 0 && (
-                <div className="nav-submenu-empty">No additional checklists</div>
-              )}
+              <div
+                className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`}
+                onClick={() => setActivePage('fe-checklist')}
+              >
+                <span className="nav-icon-small">🧯</span>
+                <span className="nav-label-small">Fire Extinguisher</span>
+              </div>
             </div>
 
             {/* SETUP DROPDOWN */}
@@ -533,6 +559,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
               >
                 <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
                 <span className="nav-label-small">Add Equipment</span>
+              </div>
+              <div
+                className={`nav-submenu-item ${activePage === 'checklist-config' ? 'active' : ''}`}
+                onClick={() => setActivePage('checklist-config')}
+              >
+                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></span>
+                <span className="nav-label-small">Checklist Config</span>
               </div>
             </div>
 
@@ -614,8 +647,12 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
             <section className={`page ${activePage === 'checklist' ? 'active' : ''}`}>
               <div className="cl-page">
-                <div className="cl-header">
-                  <button className="cl-back-btn" onClick={() => setActivePage('grid')}>← Back</button>
+                <div className="cm-header">
+                  <button className="cm-back-btn" onClick={() => setActivePage('grid')} title="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                      <path d="M19 12H5M12 5l-7 7 7 7" />
+                    </svg>
+                  </button>
                   <div className="cl-title">{selectedEq?.name || 'Checklist'}</div>
                   <div className="cl-prog-row">
                     <div className="cl-prog-bar"><div className="cl-prog-fill" style={{ width: `${progressPct}%` }} /></div>
@@ -666,7 +703,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
 
             <section className={`page ${activePage === 'fire-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-stats' && <FireExtinguisherStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
               {activePage === 'sprinkler-stats' && <SprinklerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
@@ -694,6 +731,12 @@ const SafetyDashboard = ({ user, onLogout }) => {
             </section>
             <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
               {activePage === 'smoke-detector-stats' && <SmokeDetectorStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
+              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+            </section>
+            <section className={`page ${activePage === 'emergency-lighting-stats' ? 'active' : ''}`}>
+              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
               {activePage === 'pa-siren-stats' && <PASirenStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
@@ -755,6 +798,15 @@ const SafetyDashboard = ({ user, onLogout }) => {
               {activePage === 'reports' && <Reports onBack={() => setActivePage('grid')} />}
             </section>
 
+            {/* ── FIRE EXTINGUISHER CHECKLIST ── */}
+            <section className={`page ${activePage === 'fe-checklist' ? 'active' : ''}`}>
+              {activePage === 'fe-checklist' && <FireExtinguisherChecklist onBack={() => setActivePage('grid')} />}
+            </section>
+
+            <section className={`page ${activePage === 'checklist-config' ? 'active' : ''}`}>
+              {activePage === 'checklist-config' && <ChecklistConfig onBack={() => setActivePage('grid')} />}
+            </section>
+
             {/* ── SETUP: COMPANY MANAGEMENT ── */}
             <section className={`page ${activePage === 'setup-company' ? 'active' : ''}`}>
               {activePage === 'setup-company' && (
@@ -766,7 +818,11 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <section className={`page ${activePage === 'setup-equipment' ? 'active' : ''}`}>
               <div className="setup-page" onScroll={handleScroll}>
                 <div className="setup-header">
-                  <button className="setup-back-btn" onClick={() => setActivePage('grid')}>← Back</button>
+                  <button className="setup-back-btn" onClick={() => setActivePage('grid')}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                      <path d="M19 12H5M12 5l-7 7 7 7" />
+                    </svg>
+                  </button>
                   <div className="setup-header-info">
                     <div className="setup-header-icon">🔧</div>
                     <div>
@@ -784,10 +840,14 @@ const SafetyDashboard = ({ user, onLogout }) => {
                         <input className="setup-input" type="text" placeholder="e.g. Fire Extinguisher – Unit 12" />
                       </div>
                       <div className="setup-field">
+                        <label className="setup-label">SOS Code / Barcode <span className="setup-required">*</span></label>
+                        <input className="setup-input" type="text" placeholder="e.g. FE-CH-001" />
+                      </div>
+                      <div className="setup-field">
                         <label className="setup-label">Equipment Type <span className="setup-required">*</span></label>
                         <select className="setup-input setup-select">
-                          <option value="">Select type</option>
-                          <option>Fire Extinguisher</option>
+                          <option value="all">All Modules</option>
+                          <option value="30">Fire Extinguishers</option>
                           <option>Hose Reel</option>
                           <option>Sprinkler System</option>
                           <option>Fire Hydrant</option>
@@ -820,9 +880,12 @@ const SafetyDashboard = ({ user, onLogout }) => {
                         <input className="setup-input" type="text" placeholder="e.g. Building A – Floor 2" />
                       </div>
                       <div className="setup-field">
-                        <label className="setup-label">Company / Site</label>
+                        <label className="setup-label">Company / Site <span className="setup-required">*</span></label>
                         <select className="setup-input setup-select">
                           <option value="">Select company</option>
+                          {adminCompanies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="setup-field">
@@ -859,6 +922,10 @@ const SafetyDashboard = ({ user, onLogout }) => {
                   availableModules={STATIC_MODULES}
                 />
               )}
+            </section>
+
+            <section className={`page ${activePage === 'diagnostics' ? 'active' : ''}`}>
+              {activePage === 'diagnostics' && <SystemDiagnostics onBack={() => setActivePage('grid')} modules={modules} />}
             </section>
           </div>
 

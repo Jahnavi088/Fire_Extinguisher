@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BackBtn from './BackBtn';
 import './FireExtinguisherStats.css'; // Reusing the same styling for consistency
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
@@ -44,13 +45,6 @@ const Spinner = () => (
     <div className="fe-spinner-ring" />
     <span className="fe-spinner-text">Loading drum hose reel data…</span>
   </div>
-);
-
-const BackBtn = ({ onClick, children }) => (
-  <button className="fe-back-btn" onClick={onClick}>
-    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-    {children}
-  </button>
 );
 
 const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
@@ -240,7 +234,7 @@ const DrumHoseStats = ({ onBack }) => {
       <div className="fe-error">
         <span className="fe-error-icon">⚠️</span>
         <p className="fe-error-msg">{error}</p>
-        <BackBtn onClick={onBack}>Return to Dashboard</BackBtn>
+        <BackBtn onClick={onBack} />
       </div>
     );
   }
@@ -254,10 +248,15 @@ const DrumHoseStats = ({ onBack }) => {
       <div className="fe-page">
         {/* Header */}
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">Drum Hose Reel Management</div>
           </div>
+          <span className="fe-score-badge" 
+            title="Health Calculation: ((Total Units - (Expired + Needs Service + Due Inspection)) / Total Units) * 100"
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
+          </span>
 
           <div className="fe-header-search">
             <div className="fe-search-box">
@@ -441,7 +440,7 @@ const DrumHoseStats = ({ onBack }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div
             style={{ width: 11, height: 11, borderRadius: '50%', background: listCfg.color, flexShrink: 0, boxShadow: `0 0 8px ${listCfg.color}` }}
           />
@@ -542,7 +541,7 @@ const DrumHoseStats = ({ onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🛢️</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>

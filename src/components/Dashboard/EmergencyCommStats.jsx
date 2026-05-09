@@ -176,8 +176,10 @@ const EmergencyCommStats = ({ onBack }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Emergency Communication Monitor</div>
           </div>
-          <span className="fe-score-badge" style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
-            {summary?.readiness_score}%
+          <span className="fe-score-badge" 
+            title="Health Calculation: ((Total Devices - (Expired + Needs Service + Due Inspection)) / Total Devices) * 100"
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
           </span>
           <div className="fe-header-search">
             <div className="fe-search-box">

@@ -78,11 +78,6 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
           {navCollapsed && <div className="sidenav-tip">Incidents</div>}
         </div>
 
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">🔍</span>
-          {!navCollapsed && <span className="cat-name">Inspections</span>}
-          {navCollapsed && <div className="sidenav-tip">Inspections</div>}
-        </div>
 
         <div className="cat-header" onClick={() => { }}>
           <span className="sidenav-icon">📅</span>

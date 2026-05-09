@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './FireExtinguisherStats.css'; // Reusing the same styling for consistency
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import SortIndicator from './SortIndicator';
+import { sortItems } from '../../services/sorting';
+import BackBtn from './BackBtn';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -44,13 +47,6 @@ const Spinner = () => (
     <div className="fe-spinner-ring" />
     <span className="fe-spinner-text">Loading hydrant data…</span>
   </div>
-);
-
-const BackBtn = ({ onClick, children }) => (
-  <button className="fe-back-btn" onClick={onClick}>
-    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-    {children}
-  </button>
 );
 
 const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
@@ -141,10 +137,11 @@ const HydrantStats = ({ onBack }) => {
   const [listLoading, setListLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   useEffect(() => { load(); }, []);
 
@@ -152,16 +149,15 @@ const HydrantStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(4),                       // /modules/4/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 4, limit: 100 }),    // /alerts?module_id=4
+        ApiService.getModuleSummary(4),
+        ApiService.getAlertsSummary(),
+        ApiService.getAlerts({ module_id: 4, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
       console.error('API Load failed for Hydrant Points, using fallback data:', err);
-      // Fallback Demo Data
       setSummary({
         total: 128,
         active: 125,
@@ -194,8 +190,6 @@ const HydrantStats = ({ onBack }) => {
       const data = await fetchByType(card.type);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
-
-      // If no items returned, add mock items
       if (!data.items || data.items.length === 0) {
         const mockItems = Array.from({ length: 10 }).map((_, i) => ({
           id: `mock_hp_${i}`,
@@ -227,6 +221,30 @@ const HydrantStats = ({ onBack }) => {
     finally { setDetailLoading(false); }
   };
 
+  const onSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    setCurrentPage(1);
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return listItems.filter(item => {
+      if (!q) return true;
+      return (item.sos_code || '').toLowerCase().includes(q) ||
+        (item.location_name || '').toLowerCase().includes(q) ||
+        (item.building_name || '').toLowerCase().includes(q) ||
+        (item.equipment_type || '').toLowerCase().includes(q);
+    });
+  }, [listItems, searchQuery]);
+
+  const sortedItems = useMemo(() => {
+    return sortItems(filteredItems, sortConfig);
+  }, [filteredItems, sortConfig]);
+
   const goBack = () => {
     if (view === 'detail') setView('list');
     else if (view === 'list') setView('overview');
@@ -254,10 +272,15 @@ const HydrantStats = ({ onBack }) => {
       <div className="fe-page">
         {/* Header */}
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">Hydrant Network Monitor</div>
           </div>
+          <span className="fe-score-badge" 
+            title="Health Calculation: ((Total Points - (Expired + Needs Service + Due Inspection)) / Total Points) * 100"
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
+          </span>
 
           <div className="fe-header-search">
             <div className="fe-search-box">
@@ -438,10 +461,18 @@ const HydrantStats = ({ onBack }) => {
      LIST VIEW
      ══════════════════════════════════════════════════════════════════════ */
   if (view === 'list') {
+    const totalPages = Math.ceil(sortedItems.length / PAGE_SIZE);
+    const pageSlice = sortedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const SortIndicator = ({ columnKey }) => {
+      if (sortConfig.key !== columnKey) return <span className="fe-sort-icon">↕</span>;
+      return <span className="fe-sort-icon active">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
+    };
+
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div
             style={{ width: 11, height: 11, borderRadius: '50%', background: listCfg.color, flexShrink: 0, boxShadow: `0 0 8px ${listCfg.color}` }}
           />
@@ -472,61 +503,62 @@ const HydrantStats = ({ onBack }) => {
           </div>
         </div>
 
-        {listLoading ? <Spinner /> : (() => {
-          const q = searchQuery.toLowerCase();
-          const filteredItems = listItems.filter(item => {
-            if (!q) return true;
-            return (item.sos_code || '').toLowerCase().includes(q) ||
-              (item.location_name || '').toLowerCase().includes(q) ||
-              (item.building_name || '').toLowerCase().includes(q) ||
-              (item.equipment_type || '').toLowerCase().includes(q);
-          });
-
-          const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
-          const pageSlice = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-          return (
-            <div className="fe-list-body">
-              <div className="fe-table">
-                <div className="fe-table-head">
-                  {['SOS Code', 'Type', 'Location', 'Building / Dept', 'Readiness', 'Next Inspection'].map(h => (
-                    <span key={h} className="fe-table-head-cell">{h}</span>
-                  ))}
-                </div>
-                {pageSlice.map((item, i) => {
-                  const sc = parseFloat(item.readiness_score) || 0;
-                  const col = scoreColor(sc);
-                  return (
-                    <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
-                      <span className="fe-table-sos">{item.sos_code || item.equipment_code}</span>
-                      <span className="fe-table-type">{item.equipment_type || 'Hydrant'}</span>
-                      <span className="fe-table-loc">{item.location_name || '—'}</span>
-                      <span className="fe-table-bldg">
-                        {[item.building_name, item.department_name].filter(Boolean).join(' · ') || '—'}
-                      </span>
-                      <span
-                        className="fe-score-chip"
-                        style={{ color: col, borderColor: col + '55', background: col + '14' }}
-                      >
-                        {sc}%
-                      </span>
-                      <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
-                    </div>
-                  );
-                })}
-                {filteredItems.length === 0 && (
-                  <div className="fe-table-empty">No matching records found.</div>
-                )}
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  total={filteredItems.length}
-                  pageSize={PAGE_SIZE}
-                  onPage={(p) => { setCurrentPage(p); }}
-                />
+        {listLoading ? <Spinner /> : (
+          <div className="fe-list-body">
+            <div className="fe-table">
+              <div className="fe-table-head">
+                {[
+                  { label: 'SOS Code', key: 'sos_code' },
+                  { label: 'Type', key: 'equipment_type' },
+                  { label: 'Location', key: 'location_name' },
+                  { label: 'Building / Dept', key: 'building_dept' },
+                  { label: 'Readiness', key: 'readiness_score' },
+                  { label: 'Next Inspection', key: 'next_inspection_due' },
+                ].map(col => (
+                  <span
+                    key={col.key}
+                    className={`fe-table-head-cell ${sortConfig.key === col.key ? 'active' : ''}`}
+                    onClick={() => onSort(col.key)}
+                  >
+                    {col.label}
+                    <SortIndicator sortConfig={sortConfig} columnKey={col.key} />
+                  </span>
+                ))}
               </div>
+              {pageSlice.map((item, i) => {
+                const sc = parseFloat(item.readiness_score) || 0;
+                const col = scoreColor(sc);
+                return (
+                  <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
+                    <span className="fe-table-sos">{item.sos_code || item.equipment_code}</span>
+                    <span className="fe-table-type">{item.equipment_type || 'Hydrant'}</span>
+                    <span className="fe-table-loc">{item.location_name || '—'}</span>
+                    <span className="fe-table-bldg">
+                      {[item.building_name, item.department_name].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                    <span
+                      className="fe-score-chip"
+                      style={{ color: col, borderColor: col + '55', background: col + '14' }}
+                    >
+                      {sc}%
+                    </span>
+                    <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
+                  </div>
+                );
+              })}
+              {sortedItems.length === 0 && (
+                <div className="fe-table-empty">No matching records found.</div>
+              )}
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={sortedItems.length}
+                pageSize={PAGE_SIZE}
+                onPage={(p) => { setCurrentPage(p); }}
+              />
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     );
   }
@@ -542,7 +574,7 @@ const HydrantStats = ({ onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🚰</span>
         <div className="fe-header-info">
           <div className="fe-header-title">Equipment Details</div>
