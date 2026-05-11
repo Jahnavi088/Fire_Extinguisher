@@ -147,9 +147,10 @@
 
 .fe-header-sub {
   font-size: 14px;
-  color: #333333 !important;
-  margin-top: 4px;
-  font-weight: 600;
+  color: #475569 !important;
+  margin-top: 2px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
 }
 
 .fe-header-search {
@@ -233,10 +234,10 @@
 /* ── Back Button ─────────────────────────────────────────────────────────── */
 .fe-back-btn {
   background: #ffffff !important;
-  border: 1.5px solid #000000 !important;
+  border: 1px solid #000000 !important;
   color: #000000 !important;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -254,8 +255,8 @@
 }
 
 .fe-back-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
   fill: none;
   stroke-width: 2.5;
@@ -890,10 +891,9 @@
 .fe-detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 15px 30px;
+  gap: 16px;
   flex: 1;
-  overflow-y: auto;
-  padding-bottom: 10px;
+  padding: 0 24px 20px;
 }
 
 @media (max-width: 900px) {
@@ -905,27 +905,28 @@
 .fe-detail-card {
   background: #045A97;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .fe-detail-card.fe-full {
   grid-column: 1 / -1;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 5px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0;
 }
 
 /* Section title inside card */
 .fe-section-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text3);
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
   text-transform: uppercase;
-  letter-spacing: 1.4px;
-  padding-bottom: 8px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: 1.2px;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Identity field grid */
@@ -936,40 +937,36 @@
 }
 
 .fe-field {
-  background: #f8fafc;
-  border-radius: 8px;
-  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 12px;
   transition: all 0.2s;
-  border: 1px solid #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .fe-field:hover {
-  background: #ffffff;
-  border-color: var(--blue);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .fe-field-label {
   font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .fe-field-value {
-  font-size: 16px;
-  font-weight: 900;
-  color: #0f172a;
-  line-height: 1.2;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .fe-field-value.mono {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--blue);
-  letter-spacing: 0.3px;
+  font-size: 12px;
+  color: #ffffff;
 }
 
 /* Info rows (key → value) */
@@ -985,9 +982,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  gap: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 12px;
 }
 
 .fe-info-row:last-child {
@@ -996,18 +993,15 @@
 }
 
 .fe-info-label {
-  font-size: 11px;
-  color: var(--text3);
-  font-weight: 500;
-  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
 }
 
 .fe-info-value {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: right;
-  flex: 1;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
 }
 
 /* Condition pills 2×2 */

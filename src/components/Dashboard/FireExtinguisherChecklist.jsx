@@ -1,45 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './FireExtinguisherChecklist.css';
-
-const CHECKLIST_DATA = [
-  // IDENTIFICATION
-  { id: 1,  category: 'Identification',    question: 'Is the fire extinguisher assigned an ID?',              critical: true  },
-  { id: 2,  category: 'Identification',    question: 'Is the extinguisher located in the designated area?',   critical: true  },
-  { id: 3,  category: 'Identification',    question: 'Is the extinguisher type appropriate for the location?',critical: true  },
-  { id: 4,  category: 'Identification',    question: 'Is the capacity clearly mentioned?',                    critical: false },
-  // ACCESSIBILITY
-  { id: 5,  category: 'Accessibility',     question: 'Is the extinguisher easily accessible?',                critical: true  },
-  { id: 6,  category: 'Accessibility',     question: 'Is it free from any obstruction?',                     critical: true  },
-  { id: 7,  category: 'Accessibility',     question: 'Is the extinguisher clearly visible?',                  critical: false },
-  { id: 8,  category: 'Accessibility',     question: 'Is the label readable and intact?',                    critical: false },
-  // PHYSICAL CONDITION
-  { id: 9,  category: 'Physical Condition',question: 'Is there any physical damage (dents/cracks)?',         critical: true  },
-  { id: 10, category: 'Physical Condition',question: 'Is there any sign of rust or corrosion?',              critical: false },
-  { id: 11, category: 'Physical Condition',question: 'Is the safety pin in place?',                          critical: true  },
-  { id: 12, category: 'Physical Condition',question: 'Is the tamper seal intact?',                           critical: true  },
-  { id: 13, category: 'Physical Condition',question: 'Is the pressure gauge in the green zone?',             critical: true  },
-  { id: 14, category: 'Physical Condition',question: 'Is the hose/nozzle in good condition?',                critical: false },
-  { id: 15, category: 'Physical Condition',question: 'Is there any leakage?',                                critical: true  },
-  { id: 16, category: 'Physical Condition',question: 'Is the handle/lever functioning properly?',            critical: false },
-  { id: 17, category: 'Physical Condition',question: 'Are wheels (if applicable) in good condition?',        critical: false },
-  // DOCUMENTATION
-  { id: 18, category: 'Documentation',    question: 'Is the last inspection date updated?',                  critical: false },
-  { id: 19, category: 'Documentation',    question: 'Is the next inspection date valid?',                    critical: false },
-  { id: 20, category: 'Documentation',    question: 'Is the extinguisher within expiry date?',               critical: true  },
-  { id: 21, category: 'Documentation',    question: 'Is the last refilling date recorded?',                  critical: false },
-  { id: 22, category: 'Documentation',    question: 'Is the hydrostatic test up to date?',                   critical: false },
-  // COMPLIANCE
-  { id: 23, category: 'Compliance',       question: 'Are operating instructions clearly visible?',           critical: false },
-  { id: 24, category: 'Compliance',       question: 'Is proper signage provided nearby?',                    critical: false },
-  { id: 25, category: 'Compliance',       question: 'Is the extinguisher suitable for fire risk in this area?', critical: true },
-  // SERVICE
-  { id: 26, category: 'Service',          question: 'Is the extinguisher in good working condition?',        critical: true  },
-  { id: 27, category: 'Service',          question: 'Does it require servicing?',                            critical: false },
-  { id: 28, category: 'Service',          question: 'Does it need replacement?',                             critical: false },
-  // SIGN-OFF
-  { id: 29, category: 'Sign-off',         question: 'Are remarks recorded?',                                 critical: false },
-  { id: 30, category: 'Sign-off',         question: 'Are inspector name and signature recorded?',            critical: false },
-];
+import { ApiService } from '../../services/apiService';
 
 const CATEGORY_ICONS = {
   'Identification':    '🔖',
@@ -49,22 +10,39 @@ const CATEGORY_ICONS = {
   'Compliance':        '✅',
   'Service':           '🔧',
   'Sign-off':          '✍️',
+  'General':           '📋'
 };
 
-const CATEGORY_ORDER = [
-  'Identification', 'Accessibility', 'Physical Condition',
-  'Documentation', 'Compliance', 'Service', 'Sign-off',
-];
+const ANSWER_OPTIONS = ['Yes', 'No', 'N/A'];
 
-const ANSWER_OPTIONS = ['True', 'False', 'NA'];
-
-export default function FireExtinguisherChecklist({ onBack }) {
+export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
+  const [checklistData, setChecklistData] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [answers, setAnswers] = useState({});
   const [remarks, setRemarks] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState(
-    Object.fromEntries(CATEGORY_ORDER.map(c => [c, true]))
-  );
+  const [expandedCategories, setExpandedCategories] = useState({});
+
+  const module_id = selectedEq?.module_id || 30;
+
+  useEffect(() => {
+    if (!module_id) return;
+    setLoading(true);
+    ApiService.getModuleChecklists(module_id)
+      .then(res => {
+        const items = Array.isArray(res) ? res : (res?.items || res?.data || []);
+        setChecklistData(items);
+        
+        // Auto-expand all categories found
+        const cats = [...new Set(items.map(i => i.category || 'General'))];
+        setExpandedCategories(Object.fromEntries(cats.map(c => [c, true])));
+      })
+      .catch(err => {
+        console.error('Failed to fetch checklist:', err);
+        setChecklistData([]);
+      })
+      .finally(() => setLoading(false));
+  }, [module_id]);
 
   const setAnswer = (id, val) =>
     setAnswers(prev => ({ ...prev, [id]: prev[id] === val ? null : val }));
@@ -73,67 +51,61 @@ export default function FireExtinguisherChecklist({ onBack }) {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
 
   const stats = useMemo(() => {
-    const total    = CHECKLIST_DATA.length;
-    const critical = CHECKLIST_DATA.filter(i => i.critical).length;
+    const total    = checklistData.length;
+    const critical = checklistData.filter(i => i.is_critical || i.critical).length;
     const answered = Object.values(answers).filter(v => v !== null && v !== undefined).length;
     return { total, critical, answered };
-  }, [answers]);
+  }, [answers, checklistData]);
 
   const resultStats = useMemo(() => {
-    if (!submitted) return null;
-    const passed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'True').length;
-    const failed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'False').length;
-    const na            = CHECKLIST_DATA.filter(i => answers[i.id] === 'NA').length;
-    const criticalFailed = CHECKLIST_DATA.filter(i => i.critical && answers[i.id] === 'False').length;
-    const score = Math.round((passed / CHECKLIST_DATA.length) * 100);
+    if (!submitted || checklistData.length === 0) return null;
+    const passed        = checklistData.filter(i => answers[i.id] === 'Yes').length;
+    const failed        = checklistData.filter(i => answers[i.id] === 'No').length;
+    const na            = checklistData.filter(i => answers[i.id] === 'N/A').length;
+    const criticalFailed = checklistData.filter(i => (i.is_critical || i.critical) && answers[i.id] === 'No').length;
+    const score = Math.round((passed / checklistData.length) * 100);
     return { passed, failed, na, criticalFailed, score };
-  }, [submitted, answers]);
+  }, [submitted, answers, checklistData]);
 
-  const grouped = useMemo(() =>
-    CATEGORY_ORDER.map(cat => ({
+  const grouped = useMemo(() => {
+    const cats = [...new Set(checklistData.map(i => i.category || 'General'))];
+    return cats.map(cat => ({
       cat,
-      items: CHECKLIST_DATA.filter(i => i.category === cat),
-    })),
-  []);
+      items: checklistData.filter(i => (i.category || 'General') === cat),
+    }));
+  }, [checklistData]);
 
-  const handleSubmit = () => {
-    const unanswered = CHECKLIST_DATA.filter(i => !answers[i.id]);
+  const handleSubmit = async () => {
+    const unanswered = checklistData.filter(i => !answers[i.id]);
     if (unanswered.length > 0) {
       alert(`Please answer all ${unanswered.length} remaining item(s) before submitting.`);
       return;
     }
 
-    const passed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'True').length;
-    const failed        = CHECKLIST_DATA.filter(i => answers[i.id] === 'False').length;
-    const na            = CHECKLIST_DATA.filter(i => answers[i.id] === 'NA').length;
-    const criticalFailed = CHECKLIST_DATA.filter(i => i.critical && answers[i.id] === 'False').length;
-
-    const record = {
-      id: Date.now(),
-      submittedAt: new Date().toISOString(),
-      passed,
-      failed,
-      na,
-      criticalFailed,
-      total: CHECKLIST_DATA.length,
-      critical: CHECKLIST_DATA.filter(i => i.critical).length,
-      items: CHECKLIST_DATA.map(i => ({
-        id: i.id,
-        category: i.category,
-        question: i.question,
-        critical: i.critical,
-        answer: answers[i.id],
-        remark: remarks[i.id] || '',
-      })),
-    };
-
+    setLoading(true);
     try {
-      const existing = JSON.parse(localStorage.getItem('fe_inspection_history') || '[]');
-      localStorage.setItem('fe_inspection_history', JSON.stringify([record, ...existing]));
-      window.dispatchEvent(new CustomEvent('fe-inspection-saved'));
-    } catch { /* storage full or unavailable */ }
+      const payload = {
+        inspector_name: ApiService.getUser()?.name || 'Inspector',
+        remarks: 'Submitted via Web Dashboard',
+        answers: checklistData.map(i => ({
+          checklist_item_id: i.id,
+          answer: answers[i.id] === 'Yes' ? 'true' : (answers[i.id] === 'No' ? 'false' : 'na'),
+          remarks: remarks[i.id] || ''
+        })),
+        signature: {
+          meaning: "I certify that this inspection was conducted accurately and completely.",
+          device_id: 1 // Default for web
+        }
+      };
 
-    setSubmitted(true);
+      await ApiService.createInspection(module_id, payload);
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Submission failed:', err);
+      alert('Failed to submit inspection. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -153,8 +125,8 @@ export default function FireExtinguisherChecklist({ onBack }) {
         <div className="fec-header-info">
           <span className="fec-header-icon">🧯</span>
           <div>
-            <div className="fec-title">Fire Extinguisher — Inspection Checklist</div>
-            <div className="fec-subtitle">Equipment Module: Fire Extinguisher &nbsp;|&nbsp; SOS Platform</div>
+            <div className="fec-title">{selectedEq?.name || 'Equipment'} — Inspection Checklist</div>
+            <div className="fec-subtitle">Equipment Module: {selectedEq?.name} &nbsp;|&nbsp; SOS Platform</div>
           </div>
         </div>
         <div className="fec-header-actions">
@@ -188,7 +160,7 @@ export default function FireExtinguisherChecklist({ onBack }) {
         <div className="fec-progress-track">
           <div className="fec-progress-label">
             <span>Completion</span>
-            <span className="fec-progress-pct">{Math.round((stats.answered / stats.total) * 100)}%</span>
+            <span className="fec-progress-pct">{stats.total > 0 ? Math.round((stats.answered / stats.total) * 100) : 0}%</span>
           </div>
           <div className="fec-progress-bar">
             <div
@@ -231,7 +203,7 @@ export default function FireExtinguisherChecklist({ onBack }) {
           <div className="fec-result-card fec-rc-score">
             <div className="fec-rc-icon">📊</div>
             <div className="fec-rc-num">{resultStats.score}<span className="fec-rc-pct">%</span></div>
-            <div className="fec-rc-label">Inspection Score</div>
+            <div className="fec-rc-label">Checklist Score</div>
           </div>
         </div>
       )}
@@ -250,7 +222,28 @@ export default function FireExtinguisherChecklist({ onBack }) {
             </tr>
           </thead>
           <tbody>
-            {grouped.map(({ cat, items }) => (
+            {loading && (
+              <tr>
+                <td colSpan={6} className="fec-loading-cell">
+                  <div className="fec-loader-wrap">
+                    <div className="fec-spinner"></div>
+                    <span>Fetching inspection criteria...</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!loading && checklistData.length === 0 && (
+              <tr>
+                <td colSpan={6} className="fec-empty-cell">
+                  <div className="fec-empty-msg">
+                    <span>📋</span>
+                    <div className="fec-empty-title">No criteria defined for {selectedEq?.name || 'this module'}</div>
+                    <div className="fec-empty-sub">Please contact the administrator to configure the inspection checklist.</div>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!loading && grouped.map(({ cat, items }) => (
               <React.Fragment key={cat}>
                 {/* Category header row */}
                 <tr
@@ -292,7 +285,7 @@ export default function FireExtinguisherChecklist({ onBack }) {
                           {ANSWER_OPTIONS.map(opt => (
                             <button
                               key={opt}
-                              className={`fec-ans-btn fec-ans-${opt.toLowerCase()} ${ans === opt ? 'selected' : ''}`}
+                              className={`fec-ans-btn fec-ans-${opt === 'N/A' ? 'na' : opt.toLowerCase()} ${ans === opt ? 'selected' : ''}`}
                               onClick={() => !submitted && setAnswer(item.id, opt)}
                               disabled={submitted}
                             >
@@ -302,14 +295,14 @@ export default function FireExtinguisherChecklist({ onBack }) {
                         </div>
                       </td>
                       <td className="fec-td-crit">
-                        {item.critical
+                        {(item.is_critical || item.critical)
                           ? <span className="fec-crit-badge">YES ⚠</span>
                           : <span className="fec-no-badge">No</span>}
                       </td>
                       <td className="fec-td-status">
-                        {ans === 'True'  && <span className="fec-status-pass">YES</span>}
-                        {ans === 'False' && <span className="fec-status-fail">NO</span>}
-                        {ans === 'NA'    && <span className="fec-status-na">N/A</span>}
+                        {ans === 'Yes'  && <span className="fec-status-pass">YES</span>}
+                        {ans === 'No' && <span className="fec-status-fail">NO</span>}
+                        {ans === 'N/A'    && <span className="fec-status-na">N/A</span>}
                         {!ans           && <span className="fec-status-pending">—</span>}
                       </td>
                       <td className="fec-td-remarks">
@@ -333,7 +326,7 @@ export default function FireExtinguisherChecklist({ onBack }) {
       {/* Footer */}
       <div className="fec-footer">
         Total: {stats.total} items &nbsp;|&nbsp; Critical: {stats.critical} &nbsp;|&nbsp;
-        Equipment Module: Fire Extinguisher &nbsp;|&nbsp; SOS Platform
+        Equipment Module: {selectedEq?.name || 'General'} &nbsp;|&nbsp; SOS Platform
       </div>
     </div>
   );

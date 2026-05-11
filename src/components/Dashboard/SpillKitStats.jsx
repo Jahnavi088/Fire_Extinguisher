@@ -31,7 +31,7 @@ const KPI_CARDS = [
 ];
 
 const fetchByType = (type) => {
-  const params = { module_id: 26, limit: 200 };
+  const params = { module_id: 48, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -94,9 +94,9 @@ const SpillKitStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(26),                       // /modules/26/summary
+        ApiService.getModuleSummary(48),                       // /modules/26/summary
         ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 26, limit: 100 }),    // /alerts?module_id=26
+        ApiService.getAlerts({ module_id: 48, limit: 100 }),    // /alerts?module_id=26
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);

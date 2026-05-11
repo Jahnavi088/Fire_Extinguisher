@@ -5,6 +5,9 @@
 
 const BASE_URL = 'https://ehs.garrev.com/app1/v1';
 
+// Module-level user cache — populated on login, read by getUser()
+let _cachedUser = null;
+
 const qs = (params = {}) => {
   const cleaned = Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
@@ -18,7 +21,7 @@ const handleResponse = async (response) => {
     let errorMessage = `HTTP error! status: ${response.status}`;
     try {
       const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
+      errorMessage = errorData.error || errorData.message || errorMessage;
     } catch (e) {
       // Not a JSON response
     }
@@ -55,14 +58,22 @@ export const ApiService = {
       localStorage.setItem('auth_token', data.token);
     }
 
-    return {
-      success: true,
-      user: data.user || { 
-        name: username, 
-        role: username === 'superadmin' ? 'superadmin' : 'admin' 
-      },
-      ...data
-    };
+    const user = data.user || { name: username, role: username === 'superadmin' ? 'superadmin' : 'admin' };
+    _cachedUser = user;
+    localStorage.setItem('auth_user', JSON.stringify(user));
+
+    return { success: true, user, ...data };
+  },
+
+  // Synchronous — returns the cached user set at login time.
+  // Used by checklist components that can't make async calls inline.
+  getUser: () => {
+    if (_cachedUser) return _cachedUser;
+    try {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) { _cachedUser = JSON.parse(stored); return _cachedUser; }
+    } catch { /* ignore */ }
+    return null;
   },
 
   getMe: async () => {
@@ -76,6 +87,8 @@ export const ApiService = {
       console.error('Logout API call failed:', e);
     }
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    _cachedUser = null;
     return { success: true };
   },
 
@@ -147,16 +160,15 @@ export const ApiService = {
     return await request(`/checklists/${type}`);
   },
 
-  submitInspection: async (data) => {
-    return await request('/inspections/submit', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
   // --- ALERTS (PUBLIC) ---
+  // Normalized: always returns { alerts: [...], ...rest } so components can
+  // safely do alertsData.alerts regardless of whether the server returns a
+  // bare array or a wrapped object.
   getAlerts: async (params = {}) => {
-    return await request(`/alerts${qs(params)}`);
+    const data = await request(`/alerts${qs(params)}`);
+    if (Array.isArray(data)) return { alerts: data };
+    if (data && !data.alerts) return { ...data, alerts: data.data || [] };
+    return data;
   },
 
   getAlertsSummary: async () => {
@@ -164,12 +176,12 @@ export const ApiService = {
   },
 
   // --- REPORTS ---
-  getInspectionReports: async () => {
-    return await request('/reports/inspections');
+  getInspectionReports: async (params = {}) => {
+    return await request(`/reports/inspections${qs(params)}`);
   },
 
-  getEquipmentStatusReports: async () => {
-    return await request('/reports/equipment-status');
+  getEquipmentStatusReports: async (params = {}) => {
+    return await request(`/reports/equipment-status${qs(params)}`);
   },
 
   // --- SYNC ---
@@ -294,6 +306,43 @@ export const ApiService = {
     return await request('/admin/export/equipment.csv');
   },
 
+  // --- ADMIN COMPANIES ---
+  getAdminCompanies: async () => {
+    return await request('/admin/companies');
+  },
+
+  createAdminCompany: async (data) => {
+    return await request('/admin/companies', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateAdminCompany: async (id, data) => {
+    return await request(`/admin/companies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAdminCompany: async (id) => {
+    return await request(`/admin/companies/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  uploadCompanyLogo: async (id, formData) => {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`${BASE_URL}/admin/companies/${id}/logo`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
   // --- ADMIN CHECKLISTS ---
   getAdminChecklists: async () => {
     return await request('/admin/checklists');
@@ -399,31 +448,6 @@ export const ApiService = {
 
   removeAdminUserModule: async (userId, moduleId) => {
     return await request(`/admin/users/${userId}/modules/${moduleId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // --- ADMIN COMPANIES ---
-  getAdminCompanies: async () => {
-    return await request('/admin/companies');
-  },
-
-  createAdminCompany: async (data) => {
-    return await request('/admin/companies', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  updateAdminCompany: async (id, data) => {
-    return await request(`/admin/companies/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-  },
-
-  deleteAdminCompany: async (id) => {
-    return await request(`/admin/companies/${id}`, {
       method: 'DELETE',
     });
   },

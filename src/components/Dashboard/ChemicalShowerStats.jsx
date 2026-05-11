@@ -33,7 +33,7 @@ const KPI_CARDS = [
 const PAGE_SIZE = 15;
 
 const fetchByType = (type) => {
-  const params = { module_id: 18, limit: 200 };
+  const params = { module_id: 60, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -115,9 +115,9 @@ const ChemicalShowerStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(18),
+        ApiService.getModuleSummary(60),
         ApiService.getAlertsSummary(),
-        ApiService.getAlerts({ module_id: 18, limit: 100 }),
+        ApiService.getAlerts({ module_id: 60, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);

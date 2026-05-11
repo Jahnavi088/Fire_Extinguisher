@@ -41,7 +41,9 @@
 }
 
 
-.cfg-header-info { flex: 1; }
+.cfg-header-info {
+  flex: 1;
+}
 
 .cfg-title-row {
   display: flex;
@@ -49,9 +51,21 @@
   gap: 12px;
 }
 
-.cfg-icon { font-size: 24px; }
-.cfg-title { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; }
-.cfg-subtitle { color: rgba(255, 255, 255, 0.55); font-size: 11px; margin-top: 3px; }
+.cfg-icon {
+  font-size: 24px;
+}
+
+.cfg-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.cfg-subtitle {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  margin-top: 3px;
+}
 
 .cfg-add-btn {
   display: flex;
@@ -74,17 +88,63 @@
 }
 
 /* BODY */
+.cfg-type-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.cfg-type-label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.cfg-type-select {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 13px;
+  padding: 6px 10px;
+  cursor: pointer;
+  min-width: 220px;
+}
+
+.cfg-type-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.cfg-type-loading {
+  font-size: 13px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.cfg-error-msg {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 6px;
+  color: #fca5a5;
+  font-size: 13px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
 .cfg-body {
   flex: 1;
   padding: 24px;
 }
 
 .cfg-list-card {
-  background: var(--surface, #045A97);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 24px 60px rgba(29, 78, 216, 0.45);
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .cfg-card-title {
@@ -101,59 +161,126 @@
   border-collapse: collapse;
 }
 
-.cfg-table thead { background: rgba(0, 0, 0, 0.22); }
-
-.cfg-table th {
-  text-align: left;
+.cfg-table thead th {
+  background: #f8f9fa;
+  color: #212529;
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.5px;
   padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #dee2e6;
 }
 
 .cfg-table td {
-  padding: 14px 12px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  font-size: 13.5px;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
 }
 
-.cfg-table tr:hover td { background: rgba(255, 255, 255, 0.05); }
-
-.cfg-cat-badge {
-  background: rgba(75, 160, 230, 0.25);
-  border: 1px solid rgba(75, 160, 230, 0.45);
-  color: #9dd4f7;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+.cfg-table tr:hover td {
+  background: #f8f9fa;
 }
 
-.cfg-crit { color: #ff8080; font-weight: 700; font-size: 12px; }
-.cfg-no-crit { color: rgba(255,255,255,0.3); }
+.cfg-q-text {
+  font-weight: 500;
+  color: #1e293b;
+}
 
-.cfg-actions { display: flex; gap: 8px; justify-content: center; }
+.cfg-crit-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cfg-crit-tag.yes {
+  color: #ef4444;
+}
+
+.cfg-crit-tag.no {
+  color: #94a3b8;
+}
+
+.cfg-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
 
 .cfg-action-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
+  color: #fff;
 }
 
-.cfg-edit-btn { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.cfg-edit-btn:hover { background: rgba(59, 130, 246, 0.35); transform: scale(1.1); }
+.cfg-action-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
 
-.cfg-delete-btn { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-.cfg-delete-btn:hover { background: rgba(239, 68, 68, 0.3); transform: scale(1.1); }
+.cfg-action-btn.edit {
+  background: #facc15;
+  color: #000;
+}
+
+.cfg-action-btn.delete {
+  background: #ef4444;
+}
+
+/* PAGINATION */
+.cfg-table tfoot td {
+  background: #f8f9fa;
+  padding: 12px 16px;
+  border: 1px solid #dee2e6;
+}
+
+.cfg-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cfg-pg-info {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.cfg-pg-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.cfg-pg-btn {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cfg-pg-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.cfg-pg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* FORM PAGE */
 .cfg-form-page {
@@ -179,8 +306,19 @@
   margin-bottom: 24px;
 }
 
-.cfg-field { display: flex; flex-direction: column; gap: 8px; }
-.cfg-field label { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 0.06em; }
+.cfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cfg-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 .cfg-input {
   background: rgba(255, 255, 255, 0.12);
@@ -216,8 +354,19 @@ textarea.cfg-input {
   border-radius: 10px;
 }
 
-.cfg-field.check input { width: 20px; height: 20px; cursor: pointer; }
-.cfg-field.check label { margin: 0; color: #fff; cursor: pointer; text-transform: none; font-size: 14px; }
+.cfg-field.check input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.cfg-field.check label {
+  margin: 0;
+  color: #fff;
+  cursor: pointer;
+  text-transform: none;
+  font-size: 14px;
+}
 
 .cfg-info-box {
   background: rgba(59, 130, 246, 0.15);
@@ -249,7 +398,10 @@ textarea.cfg-input {
   transition: all 0.2s;
 }
 
-.cfg-cancel-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.cfg-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
 
 .cfg-save-btn {
   background: #5fd3f3;

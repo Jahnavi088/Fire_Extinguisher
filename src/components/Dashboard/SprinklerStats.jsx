@@ -35,8 +35,8 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type) => {
-  const params = { module_id: 3, limit: 200 }; // Module ID 3 for Sprinklers
+const fetchByType = (type, moduleId = 3) => {
+  const params = { module_id: moduleId, limit: 200 }; // Module ID 3 for Sprinklers
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -123,7 +123,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SprinklerStats = ({ onBack }) => {
+const SprinklerStats = ({ module, onBack }) => {
+  const modId = module?.module_id || 3;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -149,9 +150,9 @@ const SprinklerStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(3),
+        ApiService.getModuleSummary(modId),
         ApiService.getAlertsSummary(),
-        ApiService.getAlerts({ module_id: 3, limit: 100 }),
+        ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -171,7 +172,7 @@ const SprinklerStats = ({ onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type);
+      const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
     } catch {

@@ -2,13 +2,17 @@ import { useState, useEffect, useReducer, useMemo } from 'react';
 import { ApiService } from '../../services/apiService';
 import './UserManagement.css';
 
-const MODULE_EMOJI = {
-  fire_extinguisher: '🧯', sprinkler: '🚿', fpca: '🔔', hose_reel: '🧵',
-  hydrant: '🚒', drum_hose: '🛢️', fire_trolley: '🛒', suppression_system: '💨',
-  fire_blanket: '🧺', smoke_detector: '🌫️', pa_system: '📢', scba: '🫁',
-  ambulance: '🚑', first_aid_kit: '🏥', safety_shower: '🚰', eyewash_station: '👀',
-  chemical_shower: '🚿', ppe_station: '🦺', fire_brigade: '👨‍🚒', wind_sock: '📍',
-};
+const NAV_MODULES = [
+  { code: 'overview',          label: 'Overview',              icon: '🏠', category: 'Main' },
+  { code: 'reports',           label: 'Reports',               icon: '📄', category: 'Operations' },
+  { code: 'fe_checklist',      label: 'Fire Extinguisher',     icon: '🧯', category: 'Checklists' },
+  { code: 'add_company',       label: 'Add Company',           icon: '🏢', category: 'Setup' },
+  { code: 'add_equipment',     label: 'Add Equipment',         icon: '🔧', category: 'Setup' },
+  { code: 'checklist_config',  label: 'Checklist Config',      icon: '⚙️', category: 'Setup' },
+  { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },
+  { code: 'equipment_access',  label: 'Equipment Access',      icon: '🔐', category: 'Users' },
+];
+const NAV_CATEGORIES = ['Main', 'Operations', 'Checklists', 'Setup', 'Users'];
 
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
@@ -45,6 +49,8 @@ const UserManagement = ({ onBack }) => {
   const [viewUser, setViewUser] = useState(null);
   const [userModules, setUserModules] = useState([]);
   const [modLoading, setModLoading] = useState(false);
+  const [moduleChecks, setModuleChecks] = useState({});
+  const [modSaving, setModSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [companies, setCompanies] = useState([]);
 
@@ -87,11 +93,6 @@ const UserManagement = ({ onBack }) => {
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
   const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const c = { total: users.length, superadmin: 0, admin: 0, inspector: 0, user: 0 };
-    users.forEach(u => { const r = (u.role || 'user').toLowerCase(); if (r in c) c[r]++; });
-    return c;
-  }, [users]);
 
   const openAdd = () => { setEditUser(null); setForm(EMPTY_FORM); setFormError(''); setShowForm(true); };
 
@@ -114,10 +115,55 @@ const UserManagement = ({ onBack }) => {
     setViewUser(u);
     setUserModules([]);
     setModLoading(true);
+    // Default all nav modules to enabled
+    const defaults = {};
+    NAV_MODULES.forEach(m => { defaults[m.code] = true; });
+    setModuleChecks(defaults);
+
     ApiService.getAdminUserModules(u.id)
-      .then(data => setUserModules(Array.isArray(data) ? data : (data?.modules || data?.data || [])))
+      .then(data => {
+        const modules = Array.isArray(data) ? data : (data?.modules || data?.data || []);
+        setUserModules(modules);
+        // If API returns nav-specific codes, use them to set check state
+        const apiCodes = new Set(modules.map(m => m.code || m.module_code || ''));
+        const hasNavCodes = NAV_MODULES.some(m => apiCodes.has(m.code));
+        if (hasNavCodes) {
+          const checks = {};
+          NAV_MODULES.forEach(m => { checks[m.code] = apiCodes.has(m.code); });
+          setModuleChecks(checks);
+        }
+      })
       .catch(() => setUserModules([]))
       .finally(() => setModLoading(false));
+  };
+
+  const handleModuleToggle = (code) => {
+    setModuleChecks(prev => ({ ...prev, [code]: !prev[code] }));
+  };
+
+  const saveModuleAccess = async () => {
+    if (!viewUser) return;
+    setModSaving(true);
+    try {
+      // Persist nav access to localStorage — SafetyDashboard reads this to filter the sidebar
+      const userId = viewUser.id || viewUser.user_id || viewUser.username;
+      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(moduleChecks));
+
+      // Best-effort API sync (server may not support nav module codes)
+      await Promise.allSettled([
+        ...NAV_MODULES.filter(m => moduleChecks[m.code]).map(m =>
+          ApiService.addAdminUserModule(viewUser.id, { module_code: m.code, access_level: 'admin' })
+        ),
+        ...NAV_MODULES.filter(m => !moduleChecks[m.code]).map(m => {
+          const existing = userModules.find(um => (um.code || um.module_code) === m.code);
+          if (existing) return ApiService.removeAdminUserModule(viewUser.id, existing.id || existing.module_id);
+          return Promise.resolve();
+        }),
+      ]);
+    } finally {
+      setModSaving(false);
+      setViewUser(null);
+    }
   };
 
   const handleSave = async () => {
@@ -365,29 +411,46 @@ const UserManagement = ({ onBack }) => {
             <div className="um-modal-body">
               {modLoading ? (
                 <div className="um-state-block"><div className="um-spinner" /><span>Loading modules...</span></div>
-              ) : userModules.length === 0 ? (
-                <div className="um-state-block">
-                  <span className="um-empty-icon">🔐</span>
-                  <p>No modules assigned to this user.</p>
-                  <p className="um-hint">Use <strong>Equipment Access</strong> to assign modules.</p>
-                </div>
               ) : (
                 <div className="um-modules-list">
-                  {userModules.map((m, i) => {
-                    const code = m.code || m.module_code || '';
-                    return (
-                      <div key={m.id || m.module_id || i} className="um-module-item">
-                        <span className="um-module-emoji">{MODULE_EMOJI[code] || '📦'}</span>
-                        <span className="um-module-name">{m.name || m.module_name || `Module ${m.module_id}`}</span>
-                        {m.access_level && <span className="um-module-level">{m.access_level}</span>}
-                      </div>
-                    );
-                  })}
+                  {NAV_CATEGORIES.map(cat => (
+                    <div key={cat} className="um-module-category">
+                      <div className="um-module-cat-label">{cat}</div>
+                      {NAV_MODULES.filter(m => m.category === cat).map(m => (
+                        <label
+                          key={m.code}
+                          className={`um-module-item${moduleChecks[m.code] ? ' assigned' : ''}`}
+                          onClick={() => handleModuleToggle(m.code)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="um-mod-check-wrap">
+                            <input
+                              type="checkbox"
+                              className="um-mod-checkbox"
+                              checked={moduleChecks[m.code] || false}
+                              onChange={() => handleModuleToggle(m.code)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            <div className="um-mod-label">
+                              <span className="um-module-emoji">{m.icon}</span>
+                              <span className="um-module-name">{m.label}</span>
+                            </div>
+                          </div>
+                          {moduleChecks[m.code] && (
+                            <span className="um-mod-status-tag">Enabled</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
             <div className="um-modal-foot">
-              <button className="um-btn-save" onClick={() => setViewUser(null)}>Close</button>
+              <button className="um-btn-cancel" onClick={() => setViewUser(null)}>Cancel</button>
+              <button className="um-btn-save" onClick={saveModuleAccess} disabled={modSaving}>
+                {modSaving ? <><div className="um-btn-spinner" /> Saving...</> : 'Save Access'}
+              </button>
             </div>
           </div>
         </div>

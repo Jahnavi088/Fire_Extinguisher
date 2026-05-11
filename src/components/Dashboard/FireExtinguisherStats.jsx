@@ -268,7 +268,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
           <span className="fe-score-badge" 
             title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
-            {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
+            {summary?.readiness_score ?? 0}%
           </span>
 
           <div className="fe-header-search">
@@ -602,13 +602,10 @@ const FireExtinguisherStats = ({ module, onBack }) => {
       <div className="fe-page">
         <div className="fe-header">
           <BackBtn onClick={goBack} />
-          <div
-            style={{ width: 11, height: 11, borderRadius: '50%', background: listCfg.color, flexShrink: 0, boxShadow: `0 0 8px ${listCfg.color}` }}
-          />
           <div className="fe-header-info">
             <div className="fe-header-title">{listCfg.title}</div>
             <div className="fe-header-sub">
-              {listLoading ? 'Fetching units…' : `${listTotal} units — click a row to view full details`}
+              {listLoading ? 'Fetching units…' : `${listTotal} units`}
             </div>
           </div>
 

@@ -38,7 +38,6 @@ import EmergencyExitStats from './EmergencyExitStats';
 import EmergencyLightingStats from './EmergencyLightingStats';
 import Reports from './Reports';
 import ChecklistConfig from './ChecklistConfig';
-import SystemDiagnostics from './SystemDiagnostics';
 
 
 
@@ -189,6 +188,19 @@ const SafetyDashboard = ({ user, onLogout }) => {
     return modules.length > 0 ? Math.round(total / modules.length) : 0;
   }, [modules]);
 
+  const statusCounts = useMemo(() => {
+    return modules.reduce(
+      (acc, m) => {
+        const score = m.health_score || 0;
+        if (score >= 80) acc.healthy++;
+        else if (score >= 50) acc.warning++;
+        else acc.critical++;
+        return acc;
+      },
+      { healthy: 0, warning: 0, critical: 0 }
+    );
+  }, [modules]);
+
   useEffect(() => {
     if (activePage !== 'checklist' || !selectedEq?.id) return;
     ApiService.getModuleChecklists(selectedEq.id)
@@ -217,13 +229,17 @@ const SafetyDashboard = ({ user, onLogout }) => {
       try {
         const results = await Promise.allSettled(
           STATIC_MODULES.map(m => ApiService.getModuleSummary(m.module_id).then(res => {
-            let score = res.health_score ?? res.score;
+            let score = res.readiness_score ?? res.health_score ?? res.score;
 
-            // If the backend didn't calculate it, we do it here:
+            // If the backend didn't calculate it, we do it here using the standard safety formula:
             if (score === undefined || score === null) {
-              const total = res.total_units ?? res.total ?? 0;
-              const active = res.active_units ?? res.active ?? 0;
-              score = total > 0 ? Math.round((active / total) * 100) : 100;
+              const total = res.total ?? res.total_units ?? 0;
+              const expired = res.expired ?? 0;
+              const needsService = res.needs_service ?? 0;
+              const dueInspection = res.due_inspection ?? 0;
+              
+              const issues = expired + needsService + dueInspection;
+              score = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
             }
 
             return { id: m.module_id, score };
@@ -297,7 +313,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
   const progressPct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
-  const getStatus = (score) => (score >= 90 ? 'healthy' : score >= 70 ? 'warning' : 'critical');
+  const getStatus = (score) => (score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical');
 
   const toggleCheck = (id) => setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -359,13 +375,31 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
   const saveCo = () => alert(companyName.trim() ? `Company saved: ${companyName}` : 'Enter a company name first');
 
+  // Read nav-module access saved by the admin in UserManagement → Modules modal.
+  // Admins/superadmins always see everything. Regular users see only what was enabled.
+  const navAccess = useMemo(() => {
+    const role = (user?.role || '').toLowerCase();
+    if (role === 'superadmin' || role === 'admin') return null; // null = unrestricted
+    const userId = user?.id || user?.user_id || user?.username;
+    if (!userId) return null;
+    const stored = localStorage.getItem(`nav_access_${userId}`);
+    if (!stored) return null;
+    try { return JSON.parse(stored); } catch { return null; }
+  }, [user]);
+
+  const isNavAllowed = (code) => {
+    if (!navAccess) return true;
+    // Default to allowed if admin never explicitly set the key
+    return navAccess[code] !== false;
+  };
+
   const navGroups = [
     {
       label: 'MAIN',
       items: [
         {
           icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>,
-          label: 'Overview',
+          label: 'Overview', code: 'overview',
           active: activePage === 'grid',
           onClick: () => setActivePage('grid')
         },
@@ -374,19 +408,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
     {
       label: 'OPERATIONS',
       items: [
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Reports', code: 'reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
       ],
     },
     {
       label: 'SYSTEM',
       items: [
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>, label: 'Settings' },
-        {
-          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
-          label: 'Diagnostics',
-          active: activePage === 'diagnostics',
-          onClick: () => setActivePage('diagnostics')
-        },
       ],
     },
   ];
@@ -415,48 +443,47 @@ const SafetyDashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
-        <div className="topbar-search">
-          <div className="search-group">
-            <div className="custom-select-wrap">
-              <div className="custom-select-trigger" onClick={() => setFilterOpen(!filterOpen)}>
-                <span className="select-label">{searchFilter}</span>
-                <svg className={`select-chevron ${filterOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </div>
-              {filterOpen && (
-                <>
-                  <div className="dropdown-overlay" onClick={() => setFilterOpen(false)} />
-                  <div className="custom-select-options">
-                    {filterOptions.map((opt) => (
-                      <div
-                        key={opt.label}
-                        className={`custom-option ${searchFilter === opt.label ? 'selected' : ''}`}
-                        onClick={() => { setSearchFilter(opt.label); setFilterOpen(false); }}
-                      >
-                        <span className="opt-icon">{opt.icon}</span>
-                        {opt.label}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="search-box">
-              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input className="search-input" placeholder="Search equipment..." />
-            </div>
-          </div>
-        </div>
 
         <div className="tb-actions">
-          <div className="tb-clock">
-            <svg className="tb-clock-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
+          {activePage === 'grid' && (
+            <div className="topbar-search">
+              <div className="search-group">
+                <div className="custom-select-wrap">
+                  <div className="custom-select-trigger" onClick={() => setFilterOpen(!filterOpen)}>
+                    <span className="select-label">{searchFilter}</span>
+                    <svg className={`select-chevron ${filterOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
+                  {filterOpen && (
+                    <>
+                      <div className="dropdown-overlay" onClick={() => setFilterOpen(false)} />
+                      <div className="custom-select-options">
+                        {filterOptions.map((opt) => (
+                          <div
+                            key={opt.label}
+                            className={`custom-option ${searchFilter === opt.label ? 'selected' : ''}`}
+                            onClick={() => { setSearchFilter(opt.label); setFilterOpen(false); }}
+                          >
+                            <span className="opt-icon">{opt.icon}</span>
+                            {opt.label}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="search-box">
+                  <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round">
+                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                  </svg>
+                  <input className="search-input" placeholder="Search equipment..." />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`tb-clock ${panelVisible ? 'hidden' : ''}`}>
             <span className="tb-time-bold">{currentTime}</span>
           </div>
           <div className="bell-wrap">
@@ -468,9 +495,18 @@ const SafetyDashboard = ({ user, onLogout }) => {
             </span>
             <span className="bell-badge">{alertCount > 99 ? '99+' : alertCount || 0}</span>
           </div>
-          <div className="status-badge">❤️ {preparednessScore}%</div>
-          <button className="panel-toggle-topbar-btn" onClick={() => setPanelVisible(!panelVisible)} title="Toggle info panel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className={`status-badge ${panelVisible ? 'hidden' : ''}`}>❤️ {preparednessScore}%</div>
+          <button 
+            className="panel-toggle-topbar-btn" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPanelVisible(!panelVisible);
+            }} 
+            title={panelVisible ? "Hide info panel" : "Show info panel"}
+            aria-label="Toggle Panel"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <line x1="15" y1="3" x2="15" y2="21" />
             </svg>
@@ -497,7 +533,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
           <nav className="sb-scroll">
             {navGroups.map((group) => (
               <React.Fragment key={group.label}>
-                {group.items.map((item) => (
+                {group.items.filter(item => isNavAllowed(item.code || '')).map((item) => (
                   <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => { })}>
                     <div className="nav-left">
                       <span className="nav-icon">{item.icon}</span>
@@ -509,95 +545,96 @@ const SafetyDashboard = ({ user, onLogout }) => {
               </React.Fragment>
             ))}
 
-            {/* CHECKLISTS DROPDOWN */}
-            <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
-              <div className="nav-left">
-                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg></span>
-                {!navCollapsed && <span className="nav-label">Checklists</span>}
-              </div>
-              {!navCollapsed && (
-                <svg className={`nav-chevron ${checklistsDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              )}
-            </div>
+            {/* CHECKLISTS DROPDOWN — hidden if no checklist items are accessible */}
+            {isNavAllowed('fe_checklist') && (
+              <>
+                <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
+                  <div className="nav-left">
+                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg></span>
+                    {!navCollapsed && <span className="nav-label">Checklists</span>}
+                  </div>
+                  {!navCollapsed && (
+                    <svg className={`nav-chevron ${checklistsDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                </div>
+                <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`}>
+                  <div className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`} onClick={() => setActivePage('fe-checklist')}>
+                    <span className="nav-icon-small">🧯</span>
+                    <span className="nav-label-small">Fire Extinguisher</span>
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-              <div
-                className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`}
-                onClick={() => setActivePage('fe-checklist')}
-              >
-                <span className="nav-icon-small">🧯</span>
-                <span className="nav-label-small">Fire Extinguisher</span>
-              </div>
-            </div>
+            {/* SETUP DROPDOWN — hidden if none of its items are accessible */}
+            {(isNavAllowed('add_company') || isNavAllowed('add_equipment') || isNavAllowed('checklist_config')) && (
+              <>
+                <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
+                  <div className="nav-left">
+                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
+                    {!navCollapsed && <span className="nav-label">Setup</span>}
+                  </div>
+                  {!navCollapsed && (
+                    <svg className={`nav-chevron ${setupDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                </div>
+                <div className={`nav-submenu ${setupDropdownOpen && !navCollapsed ? 'open' : ''}`}>
+                  {isNavAllowed('add_company') && (
+                    <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg></span>
+                      <span className="nav-label-small">Add Company</span>
+                    </div>
+                  )}
+                  {isNavAllowed('add_equipment') && (
+                    <div className={`nav-submenu-item ${activePage === 'setup-equipment' ? 'active' : ''}`} onClick={() => setActivePage('setup-equipment')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
+                      <span className="nav-label-small">Add Equipment</span>
+                    </div>
+                  )}
+                  {isNavAllowed('checklist_config') && (
+                    <div className={`nav-submenu-item ${activePage === 'checklist-config' ? 'active' : ''}`} onClick={() => setActivePage('checklist-config')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></span>
+                      <span className="nav-label-small">Checklist Config</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
-            {/* SETUP DROPDOWN */}
-            <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
-              <div className="nav-left">
-                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
-                {!navCollapsed && <span className="nav-label">Setup</span>}
-              </div>
-              {!navCollapsed && (
-                <svg className={`nav-chevron ${setupDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              )}
-            </div>
-
-            <div className={`nav-submenu ${setupDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-              <div
-                className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`}
-                onClick={() => setActivePage('setup-company')}
-              >
-                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg></span>
-                <span className="nav-label-small">Add Company</span>
-              </div>
-              <div
-                className={`nav-submenu-item ${activePage === 'setup-equipment' ? 'active' : ''}`}
-                onClick={() => setActivePage('setup-equipment')}
-              >
-                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></span>
-                <span className="nav-label-small">Add Equipment</span>
-              </div>
-              <div
-                className={`nav-submenu-item ${activePage === 'checklist-config' ? 'active' : ''}`}
-                onClick={() => setActivePage('checklist-config')}
-              >
-                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></span>
-                <span className="nav-label-small">Checklist Config</span>
-              </div>
-            </div>
-
-            {/* USERS DROPDOWN */}
-            <div className={`nav-item dropdown-toggle ${usersDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setUsersDropdownOpen(!usersDropdownOpen); }}>
-              <div className="nav-left">
-                <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></span>
-                {!navCollapsed && <span className="nav-label">Users</span>}
-              </div>
-              {!navCollapsed && (
-                <svg className={`nav-chevron ${usersDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              )}
-            </div>
-
-            <div className={`nav-submenu ${usersDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-              <div
-                className={`nav-submenu-item ${activePage === 'users-manage' ? 'active' : ''}`}
-                onClick={() => setActivePage('users-manage')}
-              >
-                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" /></svg></span>
-                <span className="nav-label-small">Manage</span>
-              </div>
-              <div
-                className={`nav-submenu-item ${activePage === 'users-equipment-access' ? 'active' : ''}`}
-                onClick={() => setActivePage('users-equipment-access')}
-              >
-                <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span>
-                <span className="nav-label-small">Equipment Access</span>
-              </div>
-            </div>
+            {/* USERS DROPDOWN — hidden if none of its items are accessible */}
+            {(isNavAllowed('user_manage') || isNavAllowed('equipment_access')) && (
+              <>
+                <div className={`nav-item dropdown-toggle ${usersDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setUsersDropdownOpen(!usersDropdownOpen); }}>
+                  <div className="nav-left">
+                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></span>
+                    {!navCollapsed && <span className="nav-label">Users</span>}
+                  </div>
+                  {!navCollapsed && (
+                    <svg className={`nav-chevron ${usersDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                </div>
+                <div className={`nav-submenu ${usersDropdownOpen && !navCollapsed ? 'open' : ''}`}>
+                  {isNavAllowed('user_manage') && (
+                    <div className={`nav-submenu-item ${activePage === 'users-manage' ? 'active' : ''}`} onClick={() => setActivePage('users-manage')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" /></svg></span>
+                      <span className="nav-label-small">Manage</span>
+                    </div>
+                  )}
+                  {isNavAllowed('equipment_access') && (
+                    <div className={`nav-submenu-item ${activePage === 'users-equipment-access' ? 'active' : ''}`} onClick={() => setActivePage('users-equipment-access')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span>
+                      <span className="nav-label-small">Equipment Access</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </nav>
 
           <div className="sb-footer">
@@ -706,31 +743,31 @@ const SafetyDashboard = ({ user, onLogout }) => {
               {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
-              {activePage === 'sprinkler-stats' && <SprinklerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hose-stats' ? 'active' : ''}`}>
-              {activePage === 'hose-stats' && <HoseReelStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'drum-stats' ? 'active' : ''}`}>
-              {activePage === 'drum-stats' && <DrumHoseStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hydrant-stats' ? 'active' : ''}`}>
-              {activePage === 'hydrant-stats' && <HydrantStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-trolley-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-trolley-stats' && <FireTrolleyStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
-              {activePage === 'suppression-system-stats' && <SuppressionSystemStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-blanket-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-blanket-stats' && <FireBlanketStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-alarm-panel-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
               {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
@@ -739,58 +776,58 @@ const SafetyDashboard = ({ user, onLogout }) => {
               {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
-              {activePage === 'pa-siren-stats' && <PASirenStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'wind-sock-stats' ? 'active' : ''}`}>
-              {activePage === 'wind-sock-stats' && <WindSockStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'scba-stats' ? 'active' : ''}`}>
-              {activePage === 'scba-stats' && <SCBAStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'ambulance-stats' ? 'active' : ''}`}>
-              {activePage === 'ambulance-stats' && <AmbulanceStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'first-aid-stats' ? 'active' : ''}`}>
-              {activePage === 'first-aid-stats' && <FirstAidBoxStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'eyewash-station-stats' ? 'active' : ''}`}>
-              {activePage === 'eyewash-station-stats' && <EyewashStationStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'chemical-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'spill-kit-stats' ? 'active' : ''}`}>
-              {activePage === 'spill-kit-stats' && <SpillKitStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'ppe-station-stats' ? 'active' : ''}`}>
-              {activePage === 'ppe-station-stats' && <PPEStationStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'safety-signage-stats' ? 'active' : ''}`}>
-              {activePage === 'safety-signage-stats' && <SafetySignageStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-comm-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-comm-stats' && <EmergencyCommStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'muster-point-stats' ? 'active' : ''}`}>
-              {activePage === 'muster-point-stats' && <MusterPointStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-brigade-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-brigade-stats' && <FireBrigadeStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'volunteer-stats' && <VolunteerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'shift-volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'trained-shift-stats' ? 'active' : ''}`}>
-              {activePage === 'trained-shift-stats' && <TrainedShiftStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-noc-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-noc-stats' && <FireNocStats onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
             </section>
 
             {/* ── REPORTS ── */}
@@ -924,9 +961,6 @@ const SafetyDashboard = ({ user, onLogout }) => {
               )}
             </section>
 
-            <section className={`page ${activePage === 'diagnostics' ? 'active' : ''}`}>
-              {activePage === 'diagnostics' && <SystemDiagnostics onBack={() => setActivePage('grid')} modules={modules} />}
-            </section>
           </div>
 
           {/* RIGHT COLUMN: INFO PANEL */}
@@ -934,13 +968,8 @@ const SafetyDashboard = ({ user, onLogout }) => {
             panelVisible={panelVisible}
             setPanelVisible={setPanelVisible}
             currentTime={currentTime}
-            companyName={companyName}
-            setCompanyName={setCompanyName}
-            saveCo={saveCo}
-            shiftData={shiftData}
-            drillTime={drillTime}
-            handoverNotes={handoverNotes}
-            setHandoverNotes={setHandoverNotes}
+            preparednessScore={preparednessScore}
+            statusCounts={statusCounts}
           />
         </main>
       </div>

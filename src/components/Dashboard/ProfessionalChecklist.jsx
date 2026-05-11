@@ -39,20 +39,20 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
     setSubmitting(true);
     try {
       const payload = {
-        module_id: module.module_id || module.id,
-        sos_code: module.sos_code || module.equipment_code,
-        submitted_at: new Date().toISOString(),
-        items: items.map(item => ({
-          id: item.id,
-          question: item.item_text || item.checklist_name || item.name,
-          answer: answers[item.id] || 'NA',
-          remark: remarks[item.id] || '',
-          critical: !!item.is_critical,
-          category: item.category || 'General'
-        }))
+        inspector_name: ApiService.getUser()?.name || 'Inspector',
+        remarks: 'Submitted via Professional Checklist',
+        answers: items.map(item => ({
+          checklist_item_id: item.id,
+          answer: answers[item.id] === 'True' ? 'true' : (answers[item.id] === 'False' ? 'false' : 'na'),
+          remarks: remarks[item.id] || ''
+        })),
+        signature: {
+          meaning: "I certify that this inspection was conducted accurately and completely.",
+          device_id: 1
+        }
       };
 
-      await ApiService.submitInspection(payload);
+      await ApiService.createInspection(module.module_id || module.id, payload);
       alert('Inspection submitted successfully!');
       if (onComplete) onComplete();
       onBack();
@@ -111,7 +111,7 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
                   return (
                     <tr key={item.id} className="cl-row">
                       <td className="cl-col-num">{itemIdx}</td>
-                      <td className="cl-col-q">{item.item_text || item.checklist_name || item.name}</td>
+                      <td className="cl-col-q">{item.question || item.item_text || item.checklist_name || item.name}</td>
                       <td className="cl-col-ans">
                         <div className="cl-ans-pill-group">
                           <div 

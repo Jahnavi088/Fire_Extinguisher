@@ -337,9 +337,18 @@ const Reports = ({ onBack }) => {
   const fetchReport = async () => {
     setLoading(true);
     try {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - parseInt(filter.dateRange));
+      const params = { 
+        start_date: start.toISOString().split('T')[0], 
+        end_date: end.toISOString().split('T')[0],
+        module_id: filter.module === 'all' ? undefined : filter.module
+      };
+
       let res;
-      if (activeTab === 'inspections') res = await ApiService.getInspectionReports();
-      else if (activeTab === 'status') res = await ApiService.getEquipmentStatusReports();
+      if (activeTab === 'inspections') res = await ApiService.getInspectionReports(params);
+      else if (activeTab === 'status') res = await ApiService.getEquipmentStatusReports(params);
       else { res = []; }
       setData(Array.isArray(res) ? res : (res?.reports || []));
     } catch {
@@ -391,7 +400,24 @@ const Reports = ({ onBack }) => {
     ];
   }, [data, activeTab, filter.dateRange]);
 
+  const CATEGORIES = [
+    { id: 'all', label: 'All Modules' },
+    { id: '30',  label: 'Fire Extinguishers' },
+    { id: '3',   label: 'Sprinklers' },
+    { id: '24',  label: 'Emergency Exits' },
+    { id: '25',  label: 'Emergency Lighting' },
+    { id: '29',  label: 'Fire NOC' },
+    { id: '23',  label: 'Trained Personnel' },
+    { id: '31',  label: 'Fire Hydrants' },
+    { id: '32',  label: 'Fire Hose Reels' },
+    { id: '33',  label: 'Fire Alarms' },
+    { id: '34',  label: 'Smoke Detectors' },
+    { id: '35',  label: 'Muster Points' },
+  ];
+
   const currentType = REPORT_TYPES.find(r => r.id === activeTab);
+  const currentCat = CATEGORIES.find(c => c.id === filter.module) || CATEGORIES[0];
+  const [catOpen, setCatOpen] = useState(false);
 
   return (
     <div className="rpt-page">
@@ -404,15 +430,7 @@ const Reports = ({ onBack }) => {
         </button>
 
         <div className="rpt-header-info">
-          <div className="rpt-header-title">
-            <div className="rpt-header-title-icon">
-              <Icons.BarChart />
-            </div>
-            <div>
-              <div className="rpt-title-text">Enterprise Safety Reporting</div>
-              <div className="rpt-header-sub">Compliance records, audit logs & historical safety analytics</div>
-            </div>
-          </div>
+          <div className="rpt-title-text">Reports</div>
         </div>
 
         <div className="rpt-header-actions">
@@ -428,23 +446,7 @@ const Reports = ({ onBack }) => {
       </div>
 
 
-      {/* ── Report Type Tabs ── */}
-      <div className="rpt-tabs-row">
-        {REPORT_TYPES.map(rt => (
-          <div
-            key={rt.id}
-            className={`rpt-tab ${activeTab === rt.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(rt.id)}
-          >
-            <div className="rpt-tab-header">
-              <div className="rpt-tab-icon-wrap"><rt.Icon /></div>
-              {activeTab === rt.id && <div className="rpt-tab-active-dot" />}
-            </div>
-            <div className="rpt-tab-name">{rt.name}</div>
-            <div className="rpt-tab-desc">{rt.desc}</div>
-          </div>
-        ))}
-      </div>
+      {/* Removed rpt-tabs-row as requested */}
 
       {/* ── Data Panel ── */}
       <div className="rpt-data-panel">
@@ -459,7 +461,6 @@ const Reports = ({ onBack }) => {
 
           <div className="rpt-header-filters">
             <div className="rpt-h-filter">
-              <span className="rpt-h-label">Time Range:</span>
               <select
                 className="rpt-h-select"
                 value={filter.dateRange}
@@ -472,84 +473,129 @@ const Reports = ({ onBack }) => {
               </select>
             </div>
 
-            <div className="rpt-h-divider" />
 
             <div className="rpt-h-filter">
-              <span className="rpt-h-label">Category:</span>
-              <select
-                className="rpt-h-select"
-                value={filter.module}
-                onChange={e => setFilter({ ...filter, module: e.target.value })}
-              >
-                <option value="all">All Modules</option>
-                <option value="30">Fire Extinguishers</option>
-                <option value="3">Sprinklers</option>
-                <option value="24">Emergency Exits</option>
-                <option value="25">Emergency Lighting</option>
-                <option value="29">Fire NOC</option>
-                <option value="23">Trained Personnel</option>
-              </select>
+              <div className="rpt-custom-select-wrap">
+                <div className="rpt-custom-select-trigger" onClick={() => setCatOpen(!catOpen)}>
+                  <span>{currentCat.label}</span>
+                  <svg className={`rpt-chevron ${catOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+                
+                {catOpen && (
+                  <>
+                    <div className="rpt-dropdown-overlay" onClick={() => setCatOpen(false)} />
+                    <div className="rpt-custom-options">
+                      {CATEGORIES.map(cat => (
+                        <div 
+                          key={cat.id} 
+                          className={`rpt-custom-option ${filter.module === cat.id ? 'active' : ''}`}
+                          onClick={() => {
+                            setFilter({ ...filter, module: cat.id });
+                            setCatOpen(false);
+                          }}
+                        >
+                          {cat.label}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {loading ? (
           <Spinner />
-        ) : activeTab === 'inspections' ? (
+        ) : activeTab === 'inspections' || activeTab === 'status' ? (
           <>
-            <div className="rpt-table">
-              <div className="rpt-table-head cols-6">
-                {['Date & Time', 'Inspector', 'Unit ID', 'Result', 'Module', 'Remarks'].map(h => (
-                  <span key={h} className="rpt-th">{h}</span>
-                ))}
-              </div>
-              <div className="rpt-table-body">
-                {pageData.length > 0 ? pageData.map((row, i) => (
-                  <div key={i} className="rpt-table-row cols-6">
-                    <div className="rpt-cell-date">
-                      <strong>{fmt(row.created_at) || '—'}</strong>
-                      <span>{fmtTime(row.created_at) || ''}</span>
-                    </div>
-                    <span className="rpt-cell-text">{row.staff_name || row.user_name || 'Admin'}</span>
-                    <span className="rpt-cell-mono">{row.sos_code || row.equipment_code || '—'}</span>
-                    <StatusChip status={row.status || 'CHECKED'} />
-                    <span className="rpt-cell-text">{row.module_name || 'Safety'}</span>
-                    <span className="rpt-cell-muted">{row.remarks || '—'}</span>
-                  </div>
-                )) : <EmptyState tab="inspections" />}
-              </div>
+            <div className="rpt-table-container">
+              <table className="rpt-grid-table">
+                <thead>
+                  {activeTab === 'inspections' ? (
+                    <tr>
+                      <th style={{ width: '60px', textAlign: 'center' }}>S.No</th>
+                      <th>Date & Time</th>
+                      <th>Inspector</th>
+                      <th>Unit ID</th>
+                      <th>Module</th>
+                      <th style={{ textAlign: 'center' }}>Result</th>
+                      <th>Remarks</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th style={{ width: '60px', textAlign: 'center' }}>S.No</th>
+                      <th>Unit ID</th>
+                      <th>Equipment Type</th>
+                      <th style={{ textAlign: 'center' }}>Operational State</th>
+                      <th>Readiness</th>
+                      <th>Building</th>
+                      <th>Last Inspection</th>
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {pageData.length > 0 ? pageData.map((row, i) => {
+                    const sno = (page - 1) * ROWS_PER_PAGE + i + 1;
+                    if (activeTab === 'inspections') {
+                      return (
+                        <tr key={i}>
+                          <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>{sno}</td>
+                          <td className="rpt-cell-date-new">
+                            <div className="rpt-d">{fmt(row.created_at)}</div>
+                            <div className="rpt-t">{fmtTime(row.created_at)}</div>
+                          </td>
+                          <td><span className="rpt-cell-text-dark">{row.staff_name || row.user_name || 'Admin'}</span></td>
+                          <td><span className="rpt-cell-mono-dark">{row.sos_code || row.equipment_code || '—'}</span></td>
+                          <td><span className="rpt-cell-text-dark">{row.module_name || 'Safety'}</span></td>
+                          <td style={{ textAlign: 'center' }}><StatusChip status={row.status || 'CHECKED'} /></td>
+                          <td><span className="rpt-cell-muted-dark">{row.remarks || '—'}</span></td>
+                        </tr>
+                      );
+                    } else {
+                      return (
+                        <tr key={i}>
+                          <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>{sno}</td>
+                          <td><span className="rpt-cell-mono-dark">{row.sos_code || '—'}</span></td>
+                          <td><span className="rpt-cell-text-dark">{row.equipment_type || '—'}</span></td>
+                          <td style={{ textAlign: 'center' }}><StatusChip status={row.operational_status || 'Operational'} /></td>
+                          <td><ScoreBar value={row.readiness_score ?? 0} /></td>
+                          <td><span className="rpt-cell-text-dark">{row.building_name || '—'}</span></td>
+                          <td className="rpt-cell-date-new">
+                            <div className="rpt-d">{fmt(row.last_inspection_date)}</div>
+                            <div className="rpt-t">{fmtTime(row.last_inspection_date)}</div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  }) : (
+                    <tr>
+                      <td colSpan="7">
+                        <EmptyState tab={activeTab} />
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="7">
+                      <div className="rpt-pagination-new">
+                        <span className="rpt-pg-info-new">
+                          Showing <strong>{pageData.length}</strong> of <strong>{data.length}</strong> records
+                        </span>
+                        <div className="rpt-pg-controls-new">
+                          <button className="rpt-pg-btn-new" onClick={() => setPage(page - 1)} disabled={page === 1}>← Previous</button>
+                          <span className="rpt-pg-current-new">Page {page} of {totalPages}</span>
+                          <button className="rpt-pg-btn-new" onClick={() => setPage(page + 1)} disabled={page === totalPages}>Next →</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            {data.length > ROWS_PER_PAGE && (
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} total={data.length} />
-            )}
-          </>
-        ) : activeTab === 'status' ? (
-          <>
-            <div className="rpt-table">
-              <div className="rpt-table-head cols-6-status">
-                {['Unit ID', 'Equipment Type', 'Operational State', 'Readiness', 'Building', 'Last Inspection'].map(h => (
-                  <span key={h} className="rpt-th">{h}</span>
-                ))}
-              </div>
-              <div className="rpt-table-body">
-                {pageData.length > 0 ? pageData.map((row, i) => (
-                  <div key={i} className="rpt-table-row cols-6-status">
-                    <span className="rpt-cell-mono">{row.sos_code || '—'}</span>
-                    <span className="rpt-cell-text">{row.equipment_type || '—'}</span>
-                    <StatusChip status={row.operational_status || 'Operational'} />
-                    <ScoreBar value={row.readiness_score ?? 0} />
-                    <span className="rpt-cell-text">{row.building_name || '—'}</span>
-                    <div className="rpt-cell-date">
-                      <strong>{fmt(row.last_inspection_date) || '—'}</strong>
-                      <span>{fmtTime(row.last_inspection_date) || ''}</span>
-                    </div>
-                  </div>
-                )) : <EmptyState tab="status" />}
-              </div>
-            </div>
-            {data.length > ROWS_PER_PAGE && (
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} total={data.length} />
-            )}
           </>
         ) : (
           <ComingSoon tab={activeTab} />

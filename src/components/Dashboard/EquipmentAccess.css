@@ -115,15 +115,46 @@
 }
 
 .ea-badge {
-  background: rgba(95, 211, 243, 0.12);
+  background: rgba(95, 211, 243, 0.1);
   color: #5fd3f3;
-  padding: 5px 14px;
-  border-radius: 20px;
+  padding: 6px 14px;
+  border-radius: 99px;
   font-size: 11px;
   font-weight: 700;
-  border: 1px solid rgba(95, 211, 243, 0.25);
+  border: 1px solid rgba(95, 211, 243, 0.2);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* ── Integrated Dashboard List ───────────────────────────────────── */
+.ea-integrated-list {
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  animation: fe-fade 0.4s ease-out;
+}
+
+.ea-integrated-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 16px 0;
+  margin-bottom: 4px;
+}
+
+.ea-integrated-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ea-integrated-title h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.2px;
 }
 
 /* ── Form section ─────────────────────────────────────────────────── */
@@ -302,111 +333,140 @@
 .ea-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 /* ── Table ────────────────────────────────────────────────────────── */
-.ea-table-wrap { overflow-x: auto; flex: 1; }
-.ea-table { width: 100%; border-collapse: collapse; }
+.ea-table-wrap { 
+  overflow-x: auto; 
+  flex: 1; 
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+
+.ea-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+}
 
 .ea-table th {
-  padding: 16px 24px;
-  background: rgba(0, 0, 0, 0.22);
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 10.5px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  color: #212529;
+  font-size: 13px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  border: 1px solid #dee2e6;
+  white-space: nowrap;
 }
 
 .ea-table td {
-  padding: 18px 24px;
+  padding: 12px 16px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #495057;
+  background: #fff;
+  border: 1px solid #dee2e6;
   vertical-align: middle;
 }
 
-.ea-table tr:hover td { background: rgba(255, 255, 255, 0.04); }
-
-.ea-user-cell { display: flex; align-items: center; gap: 14px; }
-.ea-user-avatar { 
-  width: 36px; height: 36px; border-radius: 50%; 
-  background: linear-gradient(135deg, #2563eb, #1d4ed8); 
-  display: flex; align-items: center; justify-content: center; 
-  font-weight: 700; color: #fff; 
-  border: 1.5px solid rgba(255, 255, 255, 0.15); 
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+.ea-table tr:hover td { 
+  background-color: #f1f3f5; 
 }
 
-.ea-module-tag { 
-  display: inline-flex; align-items: center; gap: 8px; 
-  background: rgba(255, 255, 255, 0.06); 
-  padding: 6px 14px; border-radius: 20px; 
-  font-size: 13px; font-weight: 500; 
-  border: 1px solid rgba(255, 255, 255, 0.12); 
+.ea-user-name { font-weight: 600; color: #1e293b; font-size: 13.5px; }
+
+.ea-module-info { 
+  display: flex; align-items: center; gap: 8px; 
+  font-size: 13.5px; font-weight: 500; 
+  color: #495057;
+}
+
+.ea-date-cell {
+  font-size: 13px;
+  color: #64748b;
 }
 
 .ea-level-tag { 
-  padding: 5px 12px; border-radius: 20px; 
-  font-size: 10.5px; font-weight: 700; 
-  text-transform: uppercase; letter-spacing: 0.6px; 
-  border: 1px solid transparent; 
+  font-size: 11.5px; 
+  font-weight: 800; 
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.ea-level-tag.superadmin { background: rgba(95, 211, 243, 0.12); color: #5fd3f3; border-color: rgba(95, 211, 243, 0.25); }
-.ea-level-tag.admin { background: rgba(255, 215, 0, 0.12); color: #FFD700; border-color: rgba(255, 215, 0, 0.25); }
-.ea-level-tag.inspector { background: rgba(255, 152, 0, 0.12); color: #FF9800; border-color: rgba(255, 152, 0, 0.25); }
-.ea-level-tag.user { background: rgba(255, 255, 255, 0.08); color: #aaa; border-color: rgba(255, 255, 255, 0.15); }
+.ea-level-tag.superadmin { color: #10b981; } 
+.ea-level-tag.admin      { color: #3b82f6; } 
+.ea-level-tag.inspector  { color: #f59e0b; } 
+.ea-level-tag.user       { color: #64748b; } 
 
-.ea-delete-btn { 
-  background: rgba(231, 76, 60, 0.1); color: #ff8585; 
-  border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 9px; 
-  width: 36px; height: 36px; cursor: pointer; 
-  transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; 
+.ea-actions { display: flex; align-items: center; justify-content: center; }
+
+.ea-action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #fff;
 }
-.ea-delete-btn:hover { background: rgba(231, 76, 60, 0.2); border-color: rgba(231, 76, 60, 0.4); transform: scale(1.08); }
+.ea-action-btn:hover { transform: translateY(-1px); opacity: 0.9; }
+.ea-action-btn.delete { background: #ef4444; }
+
+.ea-btn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ea-spin 0.6s linear infinite;
+}
+
+.ea-table tfoot td {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+}
 
 /* ── Pagination ───────────────────────────────────────────────────── */
 .ea-pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 12px;
-  padding: 20px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(0, 0, 0, 0.12);
 }
 
 .ea-pg-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.6);
-  border-radius: 8px;
-  padding: 8px 18px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  border-radius: 6px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .ea-pg-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #f8f9fa;
+  border-color: #adb5bd;
+  color: #212529;
 }
 
 .ea-pg-btn:disabled {
-  opacity: 0.25;
+  opacity: 0.5;
   cursor: not-allowed;
+  background: #e9ecef;
 }
 
 .ea-pg-info {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.35);
-  font-weight: 500;
-  min-width: 110px;
-  text-align: center;
+  font-size: 14px;
+  color: #212529;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ── States ───────────────────────────────────────────────────────── */

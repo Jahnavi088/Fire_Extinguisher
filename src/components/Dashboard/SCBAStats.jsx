@@ -31,8 +31,8 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type) => {
-  const params = { module_id: 13, limit: 200 };
+const fetchByType = (type, moduleId = 13) => {
+  const params = { module_id: moduleId, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -94,7 +94,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SCBAStats = ({ onBack }) => {
+const SCBAStats = ({ module, onBack }) => {
+  const modId = module?.module_id || 13;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -115,9 +116,9 @@ const SCBAStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(13),
+        ApiService.getModuleSummary(modId),
         ApiService.getAlertsSummary(),
-        ApiService.getAlerts({ module_id: 13, limit: 100 }),
+        ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -136,7 +137,7 @@ const SCBAStats = ({ onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type);
+      const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
       if (!data.items || data.items.length === 0) {

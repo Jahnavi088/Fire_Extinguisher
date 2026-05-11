@@ -31,7 +31,7 @@ const KPI_CARDS = [
 ];
 
 const fetchByType = (type) => {
-  const params = { module_id: 27, limit: 200 };
+  const params = { module_id: 62, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -95,9 +95,9 @@ const SafetySignageStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(27),                       // /modules/27/summary
+        ApiService.getModuleSummary(62),                       // /modules/27/summary
         ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 27, limit: 100 }),    // /alerts?module_id=27
+        ApiService.getAlerts({ module_id: 62, limit: 100 }),    // /alerts?module_id=27
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);

@@ -14,10 +14,10 @@ const MODULE_EMOJI = {
 };
 
 const ACCESS_LEVELS = [
-  { value: 'superadmin', label: 'Superadmin' },
-  { value: 'admin',      label: 'Admin'      },
-  { value: 'inspector',  label: 'Inspector'  },
-  { value: 'user',       label: 'User'       },
+  { value: 'view', label: 'View Only' },
+  { value: 'inspect', label: 'Inspector' },
+  { value: 'manage', label: 'Manager' },
+  { value: 'admin', label: 'Administrator' },
 ];
 
 const getLevelLabel = (val) =>
@@ -38,25 +38,25 @@ function dataReducer(state, action) {
   }
 }
 
-const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
+const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin = false }) => {
   const [dataState, dispatch] = useReducer(dataReducer, {
     loading: true, error: null, users: [], assignments: [],
   });
   const { loading: usersLoading, error, users, assignments } = dataState;
 
-  const [view,               setView]               = useState('list'); // 'list' or 'form'
-  const [currentPage,        setCurrentPage]        = useState(1);
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const [selectedUser,       setSelectedUser]       = useState(null);
-  const [selectedModule,     setSelectedModule]     = useState(null);
-  const [accessLevel,        setAccessLevel]        = useState('user');
-  const [userDropdownOpen,   setUserDropdownOpen]   = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [accessLevel, setAccessLevel] = useState('user');
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false);
-  const [levelDropdownOpen,  setLevelDropdownOpen]  = useState(false);
-  const [saving,             setSaving]             = useState(false);
-  const [removing,           setRemoving]           = useState(null);
-  const [refreshKey,         setRefreshKey]         = useState(0);
+  const [levelDropdownOpen, setLevelDropdownOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const modules = availableModules.length > 0 ? availableModules : [];
 
@@ -81,14 +81,14 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
           const mods = Array.isArray(data) ? data : (data?.modules || data?.data || []);
           mods.forEach(m => {
             flat.push({
-              id:         `${user.id}_${m.module_id || m.id}`,
-              userId:     user.id,
-              userName:   user.name || user.username || 'Unknown',
-              moduleId:   m.module_id || m.id,
+              id: `${user.id}_${m.module_id || m.id}`,
+              userId: user.id,
+              userName: user.name || user.username || 'Unknown',
+              moduleId: m.module_id || m.id,
               moduleName: m.name || m.module_name || `Module ${m.module_id || m.id}`,
               moduleCode: m.code || m.module_code || '',
-              level:      m.access_level || 'user',
-              date:       (m.created_at || m.assigned_at || '').split('T')[0] || new Date().toISOString().split('T')[0],
+              level: m.access_level || 'user',
+              date: (m.created_at || m.assigned_at || '').split('T')[0] || new Date().toISOString().split('T')[0],
             });
           });
         });
@@ -112,20 +112,19 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
     try {
       const moduleId = selectedModule.module_id || selectedModule.id;
       await ApiService.addAdminUserModule(selectedUser.id, {
-        module_id:    moduleId,
-        access_level: accessLevel,
+        module_ids: [moduleId],
       });
       dispatch({
         type: 'add',
         assignment: {
-          id:         `${selectedUser.id}_${moduleId}`,
-          userId:     selectedUser.id,
-          userName:   selectedUser.name || selectedUser.username || 'Unknown',
+          id: `${selectedUser.id}_${moduleId}`,
+          userId: selectedUser.id,
+          userName: selectedUser.name || selectedUser.username || 'Unknown',
           moduleId,
           moduleName: selectedModule.name,
           moduleCode: selectedModule.code || '',
-          level:      accessLevel,
-          date:       new Date().toISOString().split('T')[0],
+          level: accessLevel,
+          date: new Date().toISOString().split('T')[0],
         },
       });
       setSelectedUser(null);
@@ -170,10 +169,10 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
         <div className="setup-header-info" style={{ flex: 1 }}>
           <div className="setup-header-icon">🔐</div>
           <div>
-            <div className="setup-title">{view === 'list' ? 'Equipment Access' : 'Assign New Access'}</div>
+            <div className="setup-title">{view === 'list' ? (isSuperAdmin ? 'Module Permissions' : 'Equipment Access') : 'Assign New Access'}</div>
             <div className="setup-subtitle">
-              {view === 'list' 
-                ? 'Superadmin Portal — Manage user permissions and equipment assignments'
+              {view === 'list'
+                ? (isSuperAdmin ? 'Superadmin Portal — Manage user permissions and module authorizations' : 'Equipment Access Management')
                 : 'Link a user to a specific safety module and define their access level'}
             </div>
           </div>
@@ -197,20 +196,11 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
 
       <div className="ea-body">
         {view === 'list' ? (
-          <div className="ea-card ea-list-card full">
-            <div className="ea-card-header">
-              <span className="ea-card-icon">📋</span>
-              <div className="ea-card-title">Current Access Assignments</div>
-              {usersLoading
-                ? <div className="ea-badge-spinner" />
-                : <div className="ea-badge">{assignments.length} Total</div>
-              }
-            </div>
-
+          <div className="ea-integrated-list">
             {usersLoading ? (
               <div className="ea-list-loading">
                 <div className="ea-spinner" />
-                <span>Loading assignments...</span>
+                <span>Synchronizing permission data...</span>
               </div>
             ) : (
               <>
@@ -218,47 +208,66 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
                   <table className="ea-table">
                     <thead>
                       <tr>
+                        <th style={{ width: '60px', textAlign: 'center' }}>S.No</th>
                         <th>User</th>
                         <th>Equipment</th>
                         <th>Level</th>
                         <th>Assigned Date</th>
-                        <th style={{ textAlign: 'center' }}>Action</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {assignments.length > 0 ? assignments
                         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                        .map(a => (
-                        <tr key={a.id}>
-                          <td>
-                            <div className="ea-user-cell">
-                              <div className="ea-user-avatar">{(a.userName || '?').charAt(0).toUpperCase()}</div>
-                              <span>{a.userName}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="ea-module-tag">
-                              {MODULE_EMOJI[a.moduleCode] || '📦'} {a.moduleName}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`ea-level-tag ${(a.level || '').toLowerCase()}`}>
-                              {getLevelLabel(a.level)}
-                            </span>
-                          </td>
-                          <td>{a.date}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              className="ea-delete-btn"
-                              onClick={() => handleRemoveAssignment(a)}
-                              disabled={removing === a.id}
-                              title="Revoke Access"
-                            >
-                              {removing === a.id ? '⏳' : '🗑️'}
-                            </button>
-                          </td>
-                        </tr>
-                      )) : (
+                        .map((a, idx) => {
+                          const dateObj = new Date(a.date);
+                          const formattedDate = !isNaN(dateObj)
+                            ? `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`
+                            : a.date;
+
+                          return (
+                            <tr key={a.id}>
+                              <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
+                                {(currentPage - 1) * itemsPerPage + idx + 1}
+                              </td>
+                              <td>
+                                <div className="ea-user-cell">
+                                  <span className="ea-user-name">{a.userName}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="ea-module-info">
+                                  {a.moduleName}
+                                </div>
+                              </td>
+                              <td>
+                                <span className={`ea-level-tag ${(a.level || '').toLowerCase()}`}>
+                                  {getLevelLabel(a.level)}
+                                </span>
+                              </td>
+                              <td className="ea-date-cell">{formattedDate}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                <div className="ea-actions">
+                                  <button
+                                    className="ea-action-btn delete"
+                                    onClick={() => handleRemoveAssignment(a)}
+                                    disabled={removing === a.id}
+                                    title="Revoke Access"
+                                  >
+                                    {removing === a.id ? (
+                                      <div className="ea-btn-spinner" />
+                                    ) : (
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }) : (
                         <tr>
                           <td colSpan="5" className="ea-empty">
                             {error ? 'Could not load assignments.' : 'No access assignments found.'}
@@ -266,30 +275,35 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
                         </tr>
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="5">
+                          {assignments.length > itemsPerPage && (
+                            <div className="ea-pagination">
+                              <button
+                                className="ea-pg-btn"
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                              >
+                                ← Previous
+                              </button>
+                              <span className="ea-pg-info">
+                                Page <strong>{currentPage}</strong> of {Math.ceil(assignments.length / itemsPerPage)}
+                              </span>
+                              <button
+                                className="ea-pg-btn"
+                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(assignments.length / itemsPerPage), p + 1))}
+                                disabled={currentPage === Math.ceil(assignments.length / itemsPerPage)}
+                              >
+                                Next →
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
-
-                {assignments.length > itemsPerPage && (
-                  <div className="ea-pagination">
-                    <button 
-                      className="ea-pg-btn" 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </button>
-                    <span className="ea-pg-info">
-                      Page {currentPage} of {Math.ceil(assignments.length / itemsPerPage)}
-                    </span>
-                    <button 
-                      className="ea-pg-btn" 
-                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(assignments.length / itemsPerPage), p + 1))}
-                      disabled={currentPage === Math.ceil(assignments.length / itemsPerPage)}
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -361,7 +375,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [] }) => {
                     {moduleDropdownOpen && (
                       <div className="ea-dropdown-options">
                         {modules.map(m => {
-                          const mId  = m.module_id || m.id;
+                          const mId = m.module_id || m.id;
                           const selId = selectedModule?.module_id || selectedModule?.id;
                           return (
                             <div

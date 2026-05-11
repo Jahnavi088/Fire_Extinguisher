@@ -1,102 +1,17 @@
 .cm-page {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow-y: auto;
-  background: transparent;
+  animation: fe-fade 0.35s ease-out;
 }
 
-/* HEADER */
-.cm-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: #045A97;
-  padding: 18px 24px;
-  flex-wrap: wrap;
-  border-bottom: 3px solid #5fd3f3;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.cm-back-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.cm-back-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
-}
-
-.cm-header-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.cm-header-icon {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.cm-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.2;
-  letter-spacing: 0.3px;
-}
-
-.cm-subtitle {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-  margin-top: 3px;
-}
-
-.cm-add-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: #5fd3f3;
-  color: #000;
-  border: none;
-  border-radius: 8px;
-  padding: 9px 18px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-.cm-add-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.cm-add-btn:active {
-  transform: translateY(0);
-}
-
-/* BODY / TABLE */
+/* Inherit styles from EquipmentAccess / Global */
 .cm-body {
-  flex: 1;
   padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .cm-table-wrap {
