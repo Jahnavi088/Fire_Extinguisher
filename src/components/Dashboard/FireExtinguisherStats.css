@@ -276,10 +276,32 @@
   letter-spacing: -0.3px;
 }
 
+/* ── Compliance History Button ───────────────────────────────────────────── */
+.fe-compliance-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: var(--font);
+}
+
+.fe-compliance-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 /* ── KPI Cards Grid ──────────────────────────────────────────────────────── */
 .fe-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
   padding: 20px 24px 0;
 }

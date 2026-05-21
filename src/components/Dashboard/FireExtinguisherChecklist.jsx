@@ -22,6 +22,8 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
   const [remarks, setRemarks] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({});
+  // SOS code of the specific equipment unit being inspected
+  const [equipmentSosCode, setEquipmentSosCode] = useState('');
 
   const module_id = selectedEq?.module_id || 30;
 
@@ -76,6 +78,10 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
   }, [checklistData]);
 
   const handleSubmit = async () => {
+    if (!equipmentSosCode.trim()) {
+      alert('Please enter the Equipment SOS Code before submitting.');
+      return;
+    }
     const unanswered = checklistData.filter(i => !answers[i.id]);
     if (unanswered.length > 0) {
       alert(`Please answer all ${unanswered.length} remaining item(s) before submitting.`);
@@ -98,11 +104,12 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
         }
       };
 
-      await ApiService.createInspection(module_id, payload);
+      // Use the specific equipment SOS code — NOT the module_id
+      await ApiService.createInspection(equipmentSosCode.trim(), payload);
       setSubmitted(true);
     } catch (err) {
       console.error('Submission failed:', err);
-      alert('Failed to submit inspection. Please check your connection.');
+      alert('Failed to submit inspection. Please check the SOS code and your connection.');
     } finally {
       setLoading(false);
     }
@@ -112,6 +119,7 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
     setAnswers({});
     setRemarks({});
     setSubmitted(false);
+    setEquipmentSosCode('');
   };
 
   return (
@@ -130,11 +138,39 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
           </div>
         </div>
         <div className="fec-header-actions">
+          {/* Equipment SOS Code input — required before submitting */}
+          {!submitted && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>SOS Code:</label>
+              <input
+                type="text"
+                placeholder="e.g. ESEXT26270055"
+                value={equipmentSosCode}
+                onChange={e => setEquipmentSosCode(e.target.value.toUpperCase())}
+                style={{
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid ' + (equipmentSosCode.trim() ? 'rgba(40,167,69,0.5)' : 'rgba(255,100,100,0.4)'),
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  width: '185px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+          )}
           {submitted && (
             <button className="fec-reset-btn" onClick={handleReset}>Reset</button>
           )}
           {!submitted && (
-            <button className="fec-submit-btn" onClick={handleSubmit}>
+            <button
+              className="fec-submit-btn"
+              onClick={handleSubmit}
+              disabled={!equipmentSosCode.trim()}
+              style={{ opacity: equipmentSosCode.trim() ? 1 : 0.45, cursor: equipmentSosCode.trim() ? 'pointer' : 'not-allowed' }}
+            >
               Submit Inspection
             </button>
           )}

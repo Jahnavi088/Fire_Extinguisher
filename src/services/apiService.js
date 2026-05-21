@@ -27,16 +27,26 @@ const handleResponse = async (response) => {
     }
     throw new Error(errorMessage);
   }
-  return await response.json();
+  if (response.status === 204) return { success: true };
+  const text = await response.text();
+  if (!text.trim()) return { success: true };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: true, raw: text };
+  }
 };
 
 const request = async (endpoint, options = {}) => {
   const token = localStorage.getItem('auth_token');
   const headers = {
-    'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
+  // Only set JSON content-type for non-FormData bodies
+  if (options.body && typeof options.body.append !== 'function') {
+    headers['Content-Type'] = 'application/json';
+  }
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
@@ -80,6 +90,17 @@ export const ApiService = {
     return await request('/auth/me');
   },
 
+  getPermissions: async () => {
+    return await request('/auth/me/permissions');
+  },
+
+  refreshToken: async (refreshToken) => {
+    return await request('/auth/token/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  },
+
   logout: async () => {
     try {
       await request('/auth/logout', { method: 'POST' });
@@ -93,6 +114,10 @@ export const ApiService = {
   },
 
   // --- SYSTEM ---
+  getRoot: async () => {
+    return await request('/');
+  },
+
   getHealth: async () => {
     return await request('/health');
   },
@@ -105,6 +130,10 @@ export const ApiService = {
   // --- EQUIPMENT ---
   getEquipment: async (params = {}) => {
     return await request(`/equipment${qs(params)}`);
+  },
+
+  createEquipment: async (data) => {
+    return await request('/equipment', { method: 'POST', body: JSON.stringify(data) });
   },
 
   getEquipmentBySosCode: async (sosCode) => {
@@ -149,6 +178,10 @@ export const ApiService = {
 
   getModuleFields: async (id) => {
     return await request(`/modules/${id}/fields`);
+  },
+
+  getModuleSchedule: async (id, params = {}) => {
+    return await request(`/modules/${id}/schedule${qs(params)}`);
   },
 
   // --- CHECKLISTS ---
@@ -219,15 +252,17 @@ export const ApiService = {
     return await request('/updates/pending');
   },
 
-  approveUpdate: async (id) => {
+  approveUpdate: async (id, remarks) => {
     return await request(`/updates/${id}/approve`, {
       method: 'PATCH',
+      body: remarks ? JSON.stringify({ remarks }) : undefined,
     });
   },
 
-  rejectUpdate: async (id) => {
+  rejectUpdate: async (id, reason) => {
     return await request(`/updates/${id}/reject`, {
       method: 'PATCH',
+      body: reason ? JSON.stringify({ reason }) : undefined,
     });
   },
 
@@ -262,6 +297,22 @@ export const ApiService = {
 
   getLegacyStatusNeedsService: async () => {
     return await request('/status/needs-service');
+  },
+
+  // Legacy extinguisher-scoped inspection routes (endpoints 34–36)
+  getLegacyExtinguisherInspections: async (id, params = {}) => {
+    return await request(`/extinguishers/${id}/inspections${qs(params)}`);
+  },
+
+  getLegacyExtinguisherLatestInspection: async (id) => {
+    return await request(`/extinguishers/${id}/inspections/latest`);
+  },
+
+  createLegacyExtinguisherInspection: async (id, data) => {
+    return await request(`/extinguishers/${id}/inspections`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   // --- ADMIN EQUIPMENT ---
@@ -306,9 +357,25 @@ export const ApiService = {
     return await request('/admin/export/equipment.csv');
   },
 
+  // --- ADMIN MODULE WEIGHTS ---
+  getAdminModuleWeights: async () => {
+    return await request('/admin/module-weights');
+  },
+
+  updateAdminModuleWeight: async (moduleId, data) => {
+    return await request(`/admin/module-weights/${moduleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- ADMIN COMPANIES ---
   getAdminCompanies: async () => {
     return await request('/admin/companies');
+  },
+
+  getAdminCompanyById: async (id) => {
+    return await request(`/admin/companies/${id}`);
   },
 
   createAdminCompany: async (data) => {
@@ -435,11 +502,22 @@ export const ApiService = {
     });
   },
 
+  deleteAdminUser: async (id) => {
+    return await request(`/admin/users/${id}`, { method: 'DELETE' });
+  },
+
   getAdminUserModules: async (id) => {
     return await request(`/admin/users/${id}/modules`);
   },
 
   addAdminUserModule: async (id, data) => {
+    return await request(`/admin/users/${id}/modules`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  assignAdminUserModules: async (id, data) => {
     return await request(`/admin/users/${id}/modules`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -452,6 +530,55 @@ export const ApiService = {
     });
   },
 
+  // --- USER NAV ACCESS ---
+  // Returns { modules: ["overview", "work_orders", "fire_extinguisher", "fire_trolley", ...] }
+  getUserNavAccess: async (userId) => {
+    return await request(`/admin/users/${userId}/nav-access`);
+  },
+
+  getAdminUserNavAccess: async (userId) => {
+    return await request(`/admin/users/${userId}/nav-access`);
+  },
+
+  // Saves the full nav access list for a user
+  updateUserNavAccess: async (userId, modules) => {
+    return await request(`/admin/users/${userId}/nav-access`, {
+      method: 'PUT',
+      body: JSON.stringify({ modules }),
+    });
+  },
+
+  updateAdminUserNavAccess: async (userId, modules) => {
+    return await request(`/admin/users/${userId}/nav-access`, {
+      method: 'PUT',
+      body: JSON.stringify({ modules }),
+    });
+  },
+
+  // --- ADMIN DEVICES ---
+  getAdminDevices: async (params = {}) => {
+    return await request(`/admin/devices${qs(params)}`);
+  },
+
+  getAdminDeviceById: async (id) => {
+    return await request(`/admin/devices/${id}`);
+  },
+
+  approveAdminDevice: async (id) => {
+    return await request(`/admin/devices/${id}/approve`, { method: 'PATCH' });
+  },
+
+  revokeAdminDevice: async (id, reason) => {
+    return await request(`/admin/devices/${id}/revoke`, {
+      method: 'PATCH',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    });
+  },
+
+  deleteAdminDevice: async (id) => {
+    return await request(`/admin/devices/${id}`, { method: 'DELETE' });
+  },
+
   // --- QR / PUBLIC PAGES ---
   scanEquipment: async (sosCode) => {
     return await request(`/scan/${sosCode}`);
@@ -460,6 +587,130 @@ export const ApiService = {
   getPublicDetails: async (sosCode) => {
     return await request(`/details/${sosCode}`);
   },
+
+  // --- WORK ORDERS ---
+  getWorkOrders: async (params = {}) => {
+    return await request(`/admin/work-orders${qs(params)}`);
+  },
+
+  getWorkOrderById: async (id) => {
+    return await request(`/admin/work-orders/${id}`);
+  },
+
+  createWorkOrder: async (data) => {
+    return await request('/admin/work-orders', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  updateWorkOrder: async (id, data) => {
+    return await request(`/admin/work-orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  deleteWorkOrder: async (id) => {
+    return await request(`/admin/work-orders/${id}`, { method: 'DELETE' });
+  },
+
+  // --- AUDIT LOG ---
+  getAdminAuditLog: async (params = {}) => {
+    return await request(`/admin/audit-log${qs(params)}`);
+  },
+
+  // --- NOTIFICATIONS ---
+  getNotifications: async (params = {}) => {
+    return await request(`/notifications${qs(params)}`);
+  },
+
+  markNotificationRead: async (ids) => {
+    const idList = Array.isArray(ids) ? ids : (ids == null ? [] : [ids]);
+    return await request('/notifications/read', {
+      method: 'PATCH',
+      body: JSON.stringify({ ids: idList }),
+    });
+  },
+
+  broadcastNotification: async (data) => {
+    return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  // Kept for backward compatibility — use broadcastNotification for new code
+  sendNotification: async (data) => {
+    return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  // --- ADMIN INSPECTION PLANS ---
+  getAdminPlans: async (params = {}) => {
+    return await request(`/admin/plans${qs(params)}`);
+  },
+
+  getAdminPlanById: async (id) => {
+    return await request(`/admin/plans/${id}`);
+  },
+
+  createAdminPlan: async (data) => {
+    return await request('/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateAdminPlan: async (id, data) => {
+    return await request(`/admin/plans/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAdminPlan: async (id) => {
+    return await request(`/admin/plans/${id}`, { method: 'DELETE' });
+  },
+
+  getAdminPlanItems: async (id, params = {}) => {
+    return await request(`/admin/plans/${id}/items${qs(params)}`);
+  },
+
+  updateAdminPlanItem: async (planId, itemId, data) => {
+    return await request(`/admin/plans/${planId}/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // --- ADMIN TENANT CONFIG ---
+  getAdminTenantConfig: async () => {
+    return await request('/admin/tenant-config');
+  },
+
+  updateAdminTenantConfig: async (data) => {
+    return await request('/admin/tenant-config', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // --- ADMIN SUBSCRIPTION PLANS ---
+  getAdminSubscriptionPlans: async () => {
+    return await request('/admin/subscription-plans');
+  },
+
+  getAdminSubscriptionPlanById: async (id) => {
+    return await request(`/admin/subscription-plans/${id}`);
+  },
+
+  // --- ADMIN SESSIONS (superadmin only) ---
+  getAdminSessions: async (params = {}) => {
+    return await request(`/admin/sessions${qs(params)}`);
+  },
+
+  deleteAdminSession: async (id) => {
+    return await request(`/admin/sessions/${id}`, { method: 'DELETE' });
+  },
+
+  deleteAdminUserSessions: async (userId) => {
+    return await request(`/admin/sessions/user/${userId}`, { method: 'DELETE' });
+  },
+
+  // --- PUBLIC HELPERS ---
+  getPublicScanUrl: (sosCode) => `https://ehs.garrev.com/scan/${sosCode}`,
+  getPublicDetailUrl: (sosCode) => `https://ehs.garrev.com/details/${sosCode}`,
 
   // --- COMPATIBILITY WRAPPERS (FOR UI COMPONENTS) ---
   getSummary: async () => {

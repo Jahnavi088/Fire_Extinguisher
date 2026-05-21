@@ -27,7 +27,6 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 const KPI_CARDS = [
   { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#045A97', key: 'total' },
   { type: 'active', label: 'Active', icon: '✅', color: '#045A97', key: 'active' },
-  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#045A97', key: 'upcoming' },
   { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#045A97', key: 'needs_service' },
   { type: 'expired', label: 'Expired', icon: '⌛', color: '#045A97', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#045A97', key: 'due_inspection' },
@@ -201,10 +200,11 @@ const FireExtinguisherStats = ({ module, onBack }) => {
   const openDetail = async (item) => {
     setView('detail');
     setDetailLoading(true);
-    setSelectedUnit(item);
+    // Unwrap nested `details` so top-level fields like pressure_status, extinguisher_type are accessible
+    setSelectedUnit({ ...item, ...(item.details || {}) });
     try {
       const data = await ApiService.getEquipmentById(item.sos_code || item.id);
-      setSelectedUnit(data);
+      setSelectedUnit({ ...data, ...(data.details || {}) });
     } catch { /* keep row data */ }
     finally { setDetailLoading(false); }
   };
@@ -222,11 +222,13 @@ const FireExtinguisherStats = ({ module, onBack }) => {
     const q = searchQuery.toLowerCase();
     return listItems.filter(item => {
       if (!q) return true;
+      const d = item.details || {};
       return (item.sos_code || '').toLowerCase().includes(q) ||
-        (item.equipment_code || '').toLowerCase().includes(q) ||
+        (d.equipment_code || item.equipment_code || '').toLowerCase().includes(q) ||
         (item.location_name || '').toLowerCase().includes(q) ||
         (item.building_name || '').toLowerCase().includes(q) ||
-        (item.extinguisher_type || '').toLowerCase().includes(q);
+        (d.extinguisher_type || item.extinguisher_type || '').toLowerCase().includes(q) ||
+        (d.barcode || '').toLowerCase().includes(q);
     });
   }, [listItems, searchQuery]);
 
@@ -285,6 +287,12 @@ const FireExtinguisherStats = ({ module, onBack }) => {
               )}
             </div>
           </div>
+          <button
+            className="fe-compliance-btn"
+            onClick={() => alert('Compliance History — coming soon')}
+          >
+            📋 COMPLIANCE HISTORY
+          </button>
         </div>
 
         {/* KPI cards */}
@@ -299,31 +307,16 @@ const FireExtinguisherStats = ({ module, onBack }) => {
               onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
             >
               <span className="fe-kpi-emoji">{card.icon}</span>
-              <span className="fe-kpi-value">{summary?.[card.key] ?? '—'}</span>
+              <span className="fe-kpi-value">
+                {card.key === 'active'
+                  ? ((summary?.active || 0) + (summary?.upcoming || 0))
+                  : (summary?.[card.key] ?? '—')}
+              </span>
               <span className="fe-kpi-label">{card.label}</span>
               <span className="fe-kpi-cta">View details →</span>
             </div>
           ))}
         </div>
-
-        {/* Alert level KPIs */}
-        {alertsSummary && (
-          <div className="fe-alert-levels">
-            {[1, 2, 3].map(lvl => {
-              const d = alertsSummary[`level_${lvl}`];
-              const c = ALERT_COLOR[lvl];
-              return (
-                <div key={lvl} className="fe-alert-level-card" style={{ '--level-color': c }}>
-                  <div className="fe-alert-level-count">{d.count}</div>
-                  <div>
-                    <div className="fe-alert-level-name">Level {lvl} — {d.label}</div>
-                    <div className="fe-alert-level-desc">{d.description}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Alerts + Fleet health */}
         <div className="fe-panels">
@@ -445,8 +438,8 @@ const FireExtinguisherStats = ({ module, onBack }) => {
           </div>
         </div>
 
-        {/* ── Inspection History ─────────────────────────────────────── */}
-        <div className="fe-ih-section">
+        {/* Inspection history removed */}
+        <div className="fe-ih-section" style={{ display: 'none' }}>
           <div className="fe-ih-header">
             <div className="fe-ih-title">
               <span className="fe-ih-title-icon">📋</span>
@@ -653,10 +646,11 @@ const FireExtinguisherStats = ({ module, onBack }) => {
               {pageSlice.map((item, i) => {
                 const sc = parseFloat(item.readiness_score) || 0;
                 const col = scoreColor(sc);
+                const d = item.details || {};
                 return (
                   <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
-                    <span className="fe-table-sos">{item.sos_code || item.equipment_code}</span>
-                    <span className="fe-table-type">{item.extinguisher_type || '—'}</span>
+                    <span className="fe-table-sos">{item.sos_code || d.equipment_code || item.equipment_code}</span>
+                    <span className="fe-table-type">{d.extinguisher_type || item.extinguisher_type || '—'}</span>
                     <span className="fe-table-loc">{item.location_name || '—'}</span>
                     <span className="fe-table-bldg">
                       {[item.building_name, item.department_name].filter(Boolean).join(' · ') || '—'}

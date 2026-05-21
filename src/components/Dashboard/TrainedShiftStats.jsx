@@ -24,7 +24,6 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 const KPI_CARDS = [
   { type: 'all', label: 'Trained Workforce', icon: '🎓', color: '#3b82f6', key: 'total' },
   { type: 'active', label: 'On Shift Now', icon: '🕒', color: '#28a745', key: 'active' },
-  { type: 'upcoming', label: 'Refresh < 15d', icon: '📅', color: '#FF9800', key: 'upcoming' },
   { type: 'needs-service', label: 'New Trainees', icon: '📖', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Expired Certs', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Briefing', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -201,30 +200,16 @@ const TrainedShiftStats = ({ onBack }) => {
           {KPI_CARDS.map(card => (
             <div key={card.type} className="fe-kpi-card" style={{ '--kpi-color': card.color }} onClick={() => openList(card)}>
               <span className="fe-kpi-emoji">{card.icon}</span>
-              <span className="fe-kpi-value">{summary?.[card.key] ?? '—'}</span>
+              <span className="fe-kpi-value">
+                {card.key === 'active'
+                  ? ((summary?.active || 0) + (summary?.upcoming || 0))
+                  : (summary?.[card.key] ?? '—')}
+              </span>
               <span className="fe-kpi-label">{card.label}</span>
               <span className="fe-kpi-cta">Analyze data →</span>
             </div>
           ))}
         </div>
-
-        {alertsSummary && (
-          <div className="fe-alert-levels">
-            {[1, 2, 3].map(lvl => {
-              const d = alertsSummary[`level_${lvl}`];
-              const c = ALERT_COLOR[lvl];
-              return (
-                <div key={lvl} className="fe-alert-level-card" style={{ '--level-color': c }}>
-                  <div className="fe-alert-level-count">{d.count}</div>
-                  <div>
-                    <div className="fe-alert-level-name">Level {lvl} — {d.label}</div>
-                    <div className="fe-alert-level-desc">{d.description}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <div className="fe-panels">
           <div className="fe-panel">

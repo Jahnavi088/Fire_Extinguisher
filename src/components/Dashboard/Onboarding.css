@@ -1,0 +1,251 @@
+.ob-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  background: transparent;
+}
+
+.ob-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.ob-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 60px 24px;
+  color: rgba(255,255,255,0.6);
+}
+
+.ob-body {
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Progress card */
+.ob-progress-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.ob-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ob-progress-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+}
+
+.ob-progress-pct {
+  font-size: 22px;
+  font-weight: 700;
+  color: #5fd3f3;
+}
+
+.ob-progress-track {
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.ob-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #045A97, #5fd3f3);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.ob-progress-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Stats row */
+.ob-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ob-stat-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ob-stat-icon {
+  font-size: 22px;
+}
+
+.ob-stat-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.ob-stat-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Steps grid */
+.ob-steps-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ob-step-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.ob-step-card.done {
+  border-color: rgba(40,167,69,0.35);
+  background: rgba(40,167,69,0.06);
+}
+
+.ob-step-card.pending {
+  border-color: rgba(255,152,0,0.25);
+}
+
+.ob-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.6);
+  flex-shrink: 0;
+}
+
+.ob-step-card.done .ob-step-num {
+  background: rgba(40,167,69,0.25);
+  color: #28a745;
+}
+
+.ob-step-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.ob-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ob-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 4px;
+}
+
+.ob-step-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.4;
+}
+
+.ob-step-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ob-done-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #28a745;
+  background: rgba(40,167,69,0.15);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(40,167,69,0.3);
+}
+
+.ob-pending-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FF9800;
+  background: rgba(255,152,0,0.12);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,152,0,0.3);
+}
+
+.ob-step-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: #5fd3f3;
+  background: rgba(95,211,243,0.1);
+  border: 1px solid rgba(95,211,243,0.25);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.ob-step-btn:hover {
+  background: rgba(95,211,243,0.2);
+  color: #fff;
+}
+
+/* Completion banner */
+.ob-complete-banner {
+  background: rgba(40,167,69,0.15);
+  border: 1px solid rgba(40,167,69,0.35);
+  border-radius: 10px;
+  padding: 16px 20px;
+  color: #28a745;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .ob-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ob-step-card {
+    flex-wrap: wrap;
+  }
+}

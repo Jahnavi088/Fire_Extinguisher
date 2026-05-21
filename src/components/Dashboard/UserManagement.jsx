@@ -5,14 +5,16 @@ import './UserManagement.css';
 const NAV_MODULES = [
   { code: 'overview',          label: 'Overview',              icon: '🏠', category: 'Main' },
   { code: 'reports',           label: 'Reports',               icon: '📄', category: 'Operations' },
-  { code: 'fe_checklist',      label: 'Fire Extinguisher',     icon: '🧯', category: 'Checklists' },
+  { code: 'work_orders',       label: 'Work Orders',           icon: '🔧', category: 'Operations' },
+  { code: 'fe_checklist',      label: 'FE Checklist',          icon: '🧯', category: 'Checklists' },
+  { code: 'fire_extinguisher', label: 'Fire Extinguisher',     icon: '🧯', category: 'Modules' },
+  { code: 'fire_trolley',      label: 'Fire Trolley',          icon: '🛒', category: 'Modules' },
+  { code: 'onboarding',        label: 'Onboarding',            icon: '🚀', category: 'Setup' },
   { code: 'add_company',       label: 'Add Company',           icon: '🏢', category: 'Setup' },
-  { code: 'add_equipment',     label: 'Add Equipment',         icon: '🔧', category: 'Setup' },
-  { code: 'checklist_config',  label: 'Checklist Config',      icon: '⚙️', category: 'Setup' },
   { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },
   { code: 'equipment_access',  label: 'Equipment Access',      icon: '🔐', category: 'Users' },
 ];
-const NAV_CATEGORIES = ['Main', 'Operations', 'Checklists', 'Setup', 'Users'];
+const NAV_CATEGORIES = ['Main', 'Operations', 'Checklists', 'Modules', 'Setup', 'Users'];
 
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
@@ -96,6 +98,16 @@ const UserManagement = ({ onBack }) => {
 
   const openAdd = () => { setEditUser(null); setForm(EMPTY_FORM); setFormError(''); setShowForm(true); };
 
+  const handleDelete = async (u) => {
+    if (!window.confirm(`Delete user "${u.name || u.username}"? This cannot be undone.`)) return;
+    try {
+      await ApiService.deleteAdminUser(u.id);
+      setRefreshKey(k => k + 1);
+    } catch (err) {
+      alert(err.message || 'Failed to delete user.');
+    }
+  };
+
   const openEdit = (u) => {
     setEditUser(u);
     setForm({ 
@@ -145,11 +157,17 @@ const UserManagement = ({ onBack }) => {
     if (!viewUser) return;
     setModSaving(true);
     try {
-      // Persist nav access to localStorage — SafetyDashboard reads this to filter the sidebar
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
-      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(moduleChecks));
+      // Build an array of enabled module codes (matches API format)
+      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
 
-      // Best-effort API sync (server may not support nav module codes)
+      // 1. Persist to API — /admin/users/{id}/nav-access
+      await ApiService.updateUserNavAccess(userId, enabledCodes);
+
+      // 2. Also cache locally so SafetyDashboard can use it immediately without re-fetching
+      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
+
+      // 3. Best-effort sync with the legacy /admin/users/{id}/modules endpoint
       await Promise.allSettled([
         ...NAV_MODULES.filter(m => moduleChecks[m.code]).map(m =>
           ApiService.addAdminUserModule(viewUser.id, { module_code: m.code, access_level: 'admin' })
@@ -160,6 +178,12 @@ const UserManagement = ({ onBack }) => {
           return Promise.resolve();
         }),
       ]);
+    } catch (err) {
+      console.error('Failed to save nav access via API, falling back to localStorage:', err);
+      // Fallback: still save locally so it works offline
+      const userId = viewUser.id || viewUser.user_id || viewUser.username;
+      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
+      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
     } finally {
       setModSaving(false);
       setViewUser(null);
@@ -296,9 +320,16 @@ const UserManagement = ({ onBack }) => {
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
                           </button>
-                          <button className="um-action-btn modules" onClick={() => openViewModules(u)} title="View assigned modules">
+                          <button className="um-action-btn modules" onClick={() => openViewModules(u)} title="Manage access">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                          </button>
+                          <button className="um-action-btn delete" onClick={() => handleDelete(u)} title="Delete user">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                              <path d="M10 11v6" /><path d="M14 11v6" />
+                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                             </svg>
                           </button>
                         </div>

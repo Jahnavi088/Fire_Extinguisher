@@ -24,7 +24,6 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 const KPI_CARDS = [
   { type: 'all', label: 'Total Exits', icon: '🚪', color: '#045A97', key: 'total' },
   { type: 'active', label: 'Clear Routes', icon: '✅', color: '#045A97', key: 'active' },
-  { type: 'upcoming', label: 'Due < 30 Days', icon: '📅', color: '#045A97', key: 'upcoming' },
   { type: 'needs-service', label: 'Needs Maintenance', icon: '🔧', color: '#045A97', key: 'needs_service' },
   { type: 'expired', label: 'Blocked/Faulty', icon: '🚨', color: '#045A97', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '📋', color: '#045A97', key: 'due_inspection' },
@@ -174,7 +173,11 @@ const EmergencyExitStats = ({ onBack }) => {
           {KPI_CARDS.map(card => (
             <div key={card.type} className="fe-kpi-card" style={{ '--kpi-color': card.color }} onClick={() => openList(card)}>
               <span className="fe-kpi-emoji">{card.icon}</span>
-              <span className="fe-kpi-value">{summary?.[card.key] ?? '—'}</span>
+              <span className="fe-kpi-value">
+                {card.key === 'active'
+                  ? ((summary?.active || 0) + (summary?.upcoming || 0))
+                  : (summary?.[card.key] ?? '—')}
+              </span>
               <span className="fe-kpi-label">{card.label}</span>
               <span className="fe-kpi-cta">View details →</span>
             </div>

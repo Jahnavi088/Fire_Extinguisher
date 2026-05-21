@@ -1,35 +1,115 @@
 import { useState } from 'react';
 
-const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, handleLogout }) => {
+const NAV_GROUPS = [
+  {
+    label: 'Main Dashboard',
+    items: [
+      {
+        code: 'overview',
+        page: 'grid',
+        label: 'Overview',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'Field Operations',
+    items: [
+      {
+        code: 'reports',
+        page: 'reports',
+        label: 'Service Reports',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+        ),
+      },
+      {
+        code: 'work_orders',
+        page: 'work-orders',
+        label: 'Work Orders',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          </svg>
+        ),
+      },
+      {
+        code: 'pending_updates',
+        page: 'pending-updates',
+        label: 'Pending Approvals',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+        ),
+      },
+      {
+        code: 'auto_scheduler',
+        page: 'auto-scheduler',
+        label: 'Auto-Scheduler',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'System & Security',
+    items: [
+      {
+        code: 'audit_logs',
+        page: 'audit-logs',
+        label: 'Audit Logs',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+        ),
+      },
+    ],
+  },
+];
+
+const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, handleLogout, user }) => {
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
 
+  const userInitial = (user?.name || user?.username || 'A').charAt(0).toUpperCase();
+  const userName = user?.name || user?.username || 'Admin User';
+  const userRole = user?.role === 'superadmin' ? 'Super Admin' : (user?.role || 'Safety Officer');
+
   return (
-    <div className={`sidebar ${navCollapsed ? 'collapsed' : ''}`}>
+    <aside className={`sidebar ${navCollapsed ? 'collapsed' : ''}`}>
       <div className="sb-header" style={{ justifyContent: navCollapsed ? 'center' : 'space-between' }}>
         {!navCollapsed && (
           <div className="topbar-logo-pill" style={{ margin: '0' }}>
-            <img
-              src="/apitoria-logo.png"
-              alt="Apitoria"
-              className="topbar-logo"
-            />
+            <img src="/apitoria-logo.png" alt="Apitoria" className="topbar-logo" />
           </div>
         )}
         {navCollapsed && (
           <div className="topbar-logo-pill" style={{ width: '38px', height: '38px', padding: '4px' }}>
-            <img
-              src="/apitoria-logo.png"
-              alt="Logo"
-              style={{ height: '26px', width: '26px', objectFit: 'contain', display: 'block', margin: 'auto' }}
-            />
+            <img src="/apitoria-logo.png" alt="Logo" style={{ height: '26px', width: '26px', objectFit: 'contain', display: 'block', margin: 'auto' }} />
           </div>
         )}
-        <button
-          className="sidenav-toggle-btn"
-          onClick={() => setNavCollapsed(!navCollapsed)}
-          title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{ marginLeft: navCollapsed ? '0' : '8px' }}
-        >
+        <button className="sidenav-toggle-btn" onClick={() => setNavCollapsed(!navCollapsed)} title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} style={{ marginLeft: navCollapsed ? '0' : '8px' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
@@ -37,84 +117,119 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
       </div>
 
       <div className="sb-scroll">
-        {!navCollapsed && <div className="sb-section-label">Main</div>}
-
-        <div className={`cat-header ${activePage === 'grid' ? 'active' : ''}`} onClick={() => setActivePage('grid')}>
-          <span className="sidenav-icon">📊</span>
-          {!navCollapsed && <span className="cat-name">Overview</span>}
-          {navCollapsed && <div className="sidenav-tip">Overview</div>}
-        </div>
-
-        <div className={`cat-header ${activePage === 'fire-stats' ? 'active' : ''}`} onClick={() => setActivePage('fire-stats')}>
-          <span className="sidenav-icon">📋</span>
-          {!navCollapsed && <span className="cat-name">Reports</span>}
-          {navCollapsed && <div className="sidenav-tip">Reports</div>}
-        </div>
-
-        <div className={`cat-header ${usersOpen ? 'active' : ''}`} onClick={() => setUsersOpen(!usersOpen)}>
-          <span className="sidenav-icon">👥</span>
-          {!navCollapsed && <span className="cat-name">Users</span>}
-          {navCollapsed && <div className="sidenav-tip">Users</div>}
-        </div>
-
-        <div className={`sb-submenu ${usersOpen && !navCollapsed ? 'open' : ''}`}>
-          <div className={`sb-sub-item ${activePage === 'users-manage' ? 'active' : ''}`} onClick={() => setActivePage('users-manage')}>
-            <span className="sb-sub-icon">➕</span>
-            <span className="sb-sub-text">Manage</span>
+        {NAV_GROUPS.map(group => (
+          <div className="sb-nav-group" key={group.label}>
+            {!navCollapsed && <div className="nav-section-label">{group.label}</div>}
+            {group.items.map(item => (
+              <div
+                key={item.code}
+                className={`nav-item ${activePage === item.page ? 'active' : ''}`}
+                onClick={() => setActivePage(item.page)}
+              >
+                <div className="nav-left">
+                  <span className="nav-icon">{item.icon}</span>
+                  {!navCollapsed && <span className="nav-label">{item.label}</span>}
+                </div>
+                {navCollapsed && <div className="sidenav-tip">{item.label}</div>}
+              </div>
+            ))}
           </div>
-          <div className={`sb-sub-item ${activePage === 'users-equipment-access' ? 'active' : ''}`} onClick={() => setActivePage('users-equipment-access')}>
-            <span className="sb-sub-icon">🔐</span>
-            <span className="sb-sub-text">Equipment Access</span>
+        ))}
+
+        {/* Management section with dropdowns */}
+        <div className="sb-nav-group">
+          {!navCollapsed && <div className="nav-section-label">Management</div>}
+
+          {/* Checklists dropdown */}
+          <div className={`nav-item dropdown-toggle ${checklistOpen ? 'open' : ''}`} onClick={e => { e.stopPropagation(); setChecklistOpen(!checklistOpen); }}>
+            <div className="nav-left">
+              <span className="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              </span>
+              {!navCollapsed && <span className="nav-label">Checklists</span>}
+            </div>
+            {!navCollapsed && (
+              <svg className={`nav-chevron ${checklistOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
           </div>
-        </div>
+          <div className={`nav-submenu ${checklistOpen && !navCollapsed ? 'open' : ''}`}>
+            <div className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`} onClick={() => setActivePage('fe-checklist')}>
+              <span className="nav-icon-small">🧯</span>
+              <span className="nav-label-small">Fire Extinguisher</span>
+            </div>
+          </div>
 
-        <div className="sidenav-divider"></div>
-        {!navCollapsed && <div className="sb-section-label">Operations</div>}
+          {/* Setup dropdown */}
+          <div className={`nav-item dropdown-toggle ${setupOpen ? 'open' : ''}`} onClick={e => { e.stopPropagation(); setSetupOpen(!setupOpen); }}>
+            <div className="nav-left">
+              <span className="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+              </span>
+              {!navCollapsed && <span className="nav-label">Setup</span>}
+            </div>
+            {!navCollapsed && (
+              <svg className={`nav-chevron ${setupOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
+          </div>
+          <div className={`nav-submenu ${setupOpen && !navCollapsed ? 'open' : ''}`}>
+            <div className={`nav-submenu-item ${activePage === 'setup-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('setup-onboarding')}>
+              <span className="nav-icon-small">🚀</span>
+              <span className="nav-label-small">Onboarding</span>
+            </div>
+            <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
+              <span className="nav-icon-small">🏢</span>
+              <span className="nav-label-small">Add Company</span>
+            </div>
+          </div>
 
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">🚨</span>
-          {!navCollapsed && <span className="cat-name">Incidents</span>}
-          {!navCollapsed && <span className="sidenav-badge">NEW</span>}
-          {navCollapsed && <div className="sidenav-tip">Incidents</div>}
-        </div>
-
-
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">📅</span>
-          {!navCollapsed && <span className="cat-name">Planning</span>}
-          {navCollapsed && <div className="sidenav-tip">Planning</div>}
-        </div>
-
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">📈</span>
-          {!navCollapsed && <span className="cat-name">Analytics</span>}
-          {navCollapsed && <div className="sidenav-tip">Analytics</div>}
-        </div>
-
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">📚</span>
-          {!navCollapsed && <span className="cat-name">Training</span>}
-          {!navCollapsed && <span className="sidenav-badge">NEW</span>}
-          {navCollapsed && <div className="sidenav-tip">Training</div>}
-        </div>
-
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">⚠️</span>
-          {!navCollapsed && <span className="cat-name">Risk Register</span>}
-          {navCollapsed && <div className="sidenav-tip">Risk Register</div>}
-        </div>
-
-        <div className="sidenav-divider"></div>
-        {!navCollapsed && <div className="sb-section-label">System</div>}
-
-        <div className="cat-header" onClick={() => { }}>
-          <span className="sidenav-icon">⚙️</span>
-          {!navCollapsed && <span className="cat-name">Settings</span>}
-          {navCollapsed && <div className="sidenav-tip">Settings</div>}
+          {/* Users dropdown */}
+          <div className={`nav-item dropdown-toggle ${usersOpen ? 'open' : ''}`} onClick={e => { e.stopPropagation(); setUsersOpen(!usersOpen); }}>
+            <div className="nav-left">
+              <span className="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </span>
+              {!navCollapsed && <span className="nav-label">Users</span>}
+            </div>
+            {!navCollapsed && (
+              <svg className={`nav-chevron ${usersOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
+          </div>
+          <div className={`nav-submenu ${usersOpen && !navCollapsed ? 'open' : ''}`}>
+            <div className={`nav-submenu-item ${activePage === 'users-manage' ? 'active' : ''}`} onClick={() => setActivePage('users-manage')}>
+              <span className="nav-icon-small">👤</span>
+              <span className="nav-label-small">Manage Users</span>
+            </div>
+            <div className={`nav-submenu-item ${activePage === 'users-equipment-access' ? 'active' : ''}`} onClick={() => setActivePage('users-equipment-access')}>
+              <span className="nav-icon-small">🔑</span>
+              <span className="nav-label-small">Equipment Access</span>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="sb-footer">
+        <div className="sb-user-section">
+          <div className="sb-user-avatar">{userInitial}</div>
+          {!navCollapsed && (
+            <div className="sb-user-info">
+              <div className="sb-user-name">{userName}</div>
+              <div className="sb-user-role">{userRole}</div>
+            </div>
+          )}
+        </div>
         <button className="logout-btn" onClick={handleLogout}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -124,7 +239,7 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
           {!navCollapsed && 'Logout'}
         </button>
       </div>
-    </div>
+    </aside>
   );
 };
 
