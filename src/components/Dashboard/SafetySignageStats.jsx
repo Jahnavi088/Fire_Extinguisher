@@ -29,8 +29,18 @@ const KPI_CARDS = [
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const fetchByType = (type) => {
-  const params = { module_id: 62, limit: 200 };
+const fetchByType = async (type) => {
+  if (type === 'active') {
+    const [activeData, upcomingData] = await Promise.all([
+      ApiService.getEquipment({ module_id: 62, limit: 500, status: 'active' }),
+      ApiService.getEquipment({ module_id: 62, limit: 500, status: 'upcoming' }),
+    ]);
+    return {
+      items: [...(activeData.items || []), ...(upcomingData.items || [])],
+      total: (activeData.total || 0) + (upcomingData.total || 0),
+    };
+  }
+  const params = { module_id: 62, limit: 500 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -74,7 +84,7 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SafetySignageStats = ({ onBack }) => {
+const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -228,8 +238,7 @@ const SafetySignageStats = ({ onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Compliant', val: summary.active, color: '#28a745' },
-                        { name: 'Due Check', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Issues', val: summary.expired, color: '#dc3545' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -239,7 +248,7 @@ const SafetySignageStats = ({ onBack }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#FF9800' }, { color: '#dc3545' }].map((entry, index) => (
+                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
@@ -248,8 +257,7 @@ const SafetySignageStats = ({ onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Compliant', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming Check', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Missing/Damaged', val: summary.expired, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
@@ -319,6 +327,15 @@ const SafetySignageStats = ({ onBack }) => {
           <div className="fe-header-title">{u.sos_code || '…'}</div>
           <div className="fe-header-sub">{u.equipment_type || 'Safety Signage'} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
 

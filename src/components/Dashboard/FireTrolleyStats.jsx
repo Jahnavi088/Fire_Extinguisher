@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
+import { fetchEquipmentByStatus } from '../../services/equipmentService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import InspectionHistoryPanel from './InspectionHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -54,7 +56,7 @@ const InfoRow = ({ label, val, color }) => (
 );
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const FireTrolleyStats = ({ module, onBack }) => {
+const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
   // Use module_id from prop — falls back to 55 (Fire Trolley default)
   const modId = module?.module_id || 55;
 
@@ -93,8 +95,18 @@ const FireTrolleyStats = ({ module, onBack }) => {
     } finally { setLoading(false); }
   };
 
-  const fetchByType = (type) => {
-    const params = { module_id: modId, limit: 200 };
+  const fetchByType = async (type) => {
+    if (type === 'active') {
+      const [activeData, upcomingData] = await Promise.all([
+        ApiService.getEquipment({ module_id: modId, limit: 500, status: 'active' }),
+        ApiService.getEquipment({ module_id: modId, limit: 500, status: 'upcoming' }),
+      ]);
+      return {
+        items: [...(activeData.items || []), ...(upcomingData.items || [])],
+        total: (activeData.total || 0) + (upcomingData.total || 0),
+      };
+    }
+    const params = { module_id: modId, limit: 500 };
     if (type !== 'all') params.status = type;
     return ApiService.getEquipment(params);
   };
@@ -184,8 +196,7 @@ const FireTrolleyStats = ({ module, onBack }) => {
               <div style={{ height: 150, width: '100%', marginTop: 5 }}>
                 <ResponsiveContainer>
                   <BarChart data={[
-                    { name: 'Functional', val: summary.active,        color: '#28a745' },
-                    { name: 'Upcoming',   val: summary.upcoming,      color: '#FF9800' },
+                    { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { name: 'Needs Svc',  val: summary.needs_service, color: '#f59e0b' },
                     { name: 'Expired',    val: summary.expired,       color: '#8b5cf6' },
                     { name: 'Due Insp',   val: summary.due_inspection,color: '#dc3545' },
@@ -195,7 +206,7 @@ const FireTrolleyStats = ({ module, onBack }) => {
                     <YAxis hide />
                     <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', fontSize: '12px' }} />
                     <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={42}>
-                      {['#28a745','#FF9800','#f59e0b','#8b5cf6','#dc3545'].map((col, i) => <Cell key={i} fill={col} />)}
+                      {['#28a745','#f59e0b','#8b5cf6','#dc3545'].map((col, i) => <Cell key={i} fill={col} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -305,6 +316,15 @@ const FireTrolleyStats = ({ module, onBack }) => {
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>{u.sos_code || 'Unit Details'}</div>
           <div className="fe-header-sub">{u.location_name} · {u.building_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
       <div className="fe-detail-grid">

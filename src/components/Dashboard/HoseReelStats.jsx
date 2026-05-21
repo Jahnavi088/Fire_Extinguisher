@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './FireExtinguisherStats.css'; // Reusing the same styling for consistency
 import { ApiService } from '../../services/apiService';
+import { fetchEquipmentByStatus } from '../../services/equipmentService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import SortIndicator from './SortIndicator';
 import { sortItems } from '../../services/sorting';
 import BackBtn from './BackBtn';
+import InspectionHistoryPanel from './InspectionHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -34,8 +36,18 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type, moduleId = 2) => {
-  const params = { module_id: moduleId, limit: 200 }; // Module ID 2 for Hose Reels
+const fetchByType = async (type, moduleId = 33) => {
+  if (type === 'active') {
+    const [activeData, upcomingData] = await Promise.all([
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'upcoming' }),
+    ]);
+    return {
+      items: [...(activeData.items || []), ...(upcomingData.items || [])],
+      total: (activeData.total || 0) + (upcomingData.total || 0),
+    };
+  }
+  const params = { module_id: moduleId, limit: 500 }; // Module ID 33 for Hose Reels
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -122,8 +134,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const HoseReelStats = ({ module, onBack }) => {
-  const modId = module?.module_id || 2;
+const HoseReelStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || module?.id || 33;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -159,13 +171,13 @@ const HoseReelStats = ({ module, onBack }) => {
     } catch (err) {
       console.error('API Load failed for Hose Reels, using fallback data:', err);
       setSummary({
-        total: 84,
-        active: 82,
-        upcoming: 2,
-        needs_service: 0,
-        expired: 0,
-        due_inspection: 0,
-        readiness_score: 98
+        total: 200,
+        active: 88,
+        upcoming: 30,
+        needs_service: 34,
+        expired: 15,
+        due_inspection: 33,
+        readiness_score: 72.5
       });
       setAlertsSummary({
         total_alerts: 0,
@@ -375,8 +387,7 @@ const HoseReelStats = ({ module, onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Functional', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Faulty', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Insp.', val: summary.due_inspection, color: '#dc3545' },
@@ -405,7 +416,6 @@ const HoseReelStats = ({ module, onBack }) => {
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
                           { color: '#28a745' },
-                          { color: '#FF9800' },
                           { color: '#f59e0b' },
                           { color: '#8b5cf6' },
                           { color: '#dc3545' },
@@ -418,8 +428,7 @@ const HoseReelStats = ({ module, onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Functional', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming (30d)', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Faulty/Critical', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -567,6 +576,15 @@ const HoseReelStats = ({ module, onBack }) => {
           </div>
           <div className="fe-header-sub">{u.equipment_type || 'Hose Reel'} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span
           className="fe-score-badge"
           style={{ color: c, borderColor: c + '66', background: c + '18' }}

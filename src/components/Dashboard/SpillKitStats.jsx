@@ -29,8 +29,18 @@ const KPI_CARDS = [
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const fetchByType = (type) => {
-  const params = { module_id: 48, limit: 200 };
+const fetchByType = async (type, moduleId) => {
+  if (type === 'active') {
+    const [activeData, upcomingData] = await Promise.all([
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'upcoming' }),
+    ]);
+    return {
+      items: [...(activeData.items || []), ...(upcomingData.items || [])],
+      total: (activeData.total || 0) + (upcomingData.total || 0),
+    };
+  }
+  const params = { module_id: moduleId, limit: 500 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -73,7 +83,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SpillKitStats = ({ onBack }) => {
+const SpillKitStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || 48;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -93,9 +104,9 @@ const SpillKitStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(48),                       // /modules/26/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 48, limit: 100 }),    // /alerts?module_id=26
+        ApiService.getModuleSummary(modId),
+        ApiService.getAlertsSummary(),
+        ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -117,7 +128,7 @@ const SpillKitStats = ({ onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type);
+      const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
 
@@ -227,8 +238,7 @@ const SpillKitStats = ({ onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Active', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Damaged', val: summary.expired, color: '#dc3545' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -238,7 +248,7 @@ const SpillKitStats = ({ onBack }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#FF9800' }, { color: '#dc3545' }].map((entry, index) => (
+                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
@@ -247,8 +257,7 @@ const SpillKitStats = ({ onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Damaged/Used', val: summary.expired, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
@@ -318,6 +327,15 @@ const SpillKitStats = ({ onBack }) => {
           <div className="fe-header-title">{u.sos_code || '…'}</div>
           <div className="fe-header-sub">{u.equipment_type || 'Spill Kit'} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
 

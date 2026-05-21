@@ -11,6 +11,7 @@ import SuppressionSystemStats from './SuppressionSystemStats';
 import FireBlanketStats from './FireBlanketStats';
 import FireAlarmPanelStats from './FireAlarmPanelStats';
 import SmokeDetectorStats from './SmokeDetectorStats';
+import HeatDetectorStats from './HeatDetectorStats';
 import PASirenStats from './PASirenStats';
 import WindSockStats from './WindSockStats';
 import SCBAStats from './SCBAStats';
@@ -46,65 +47,61 @@ import Onboarding from './Onboarding';
 
 const STATIC_MODULES = [
   { module_id: 30, name: 'Fire Extinguishers', code: 'fire_extinguisher', health_score: 100, category: 'fire', image: '/images/fire_extinguisher1.png' },
-  { module_id: 2,  name: 'Hose Reels',         code: 'hose_reel',         health_score: 92,  category: 'fire', image: '/images/hosereels1.png' },
-  { module_id: 3,  name: 'Sprinklers',          code: 'sprinkler',         health_score: 93,  category: 'fire', image: '/images/sprinkler1.png' },
-  { module_id: 4,  name: 'Fire Hydrants',       code: 'hydrant',           health_score: 92,  category: 'fire', image: '/images/hydrant1.png' },
-  { module_id: 9,  name: 'Alarm Panels',        code: 'fpca',              health_score: 92,  category: 'fire', image: '/images/firealarm_panel1.png' },
-  { module_id: 10, name: 'Smoke Detectors',     code: 'smoke_detector',    health_score: 92,  category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 33, name: 'Hose Reels',         code: 'hose_reel',         health_score: 92,  category: 'fire', image: '/images/hosereels1.png' },
+  { module_id: 31, name: 'Sprinklers',          code: 'sprinkler',         health_score: 93,  category: 'fire', image: '/images/sprinkler1.png' },
+  { module_id: 34, name: 'Fire Hydrants',       code: 'hydrant',           health_score: 92,  category: 'fire', image: '/images/hydrant1.png' },
+  { module_id: 35, name: 'Alarm Panels',        code: 'fpca',              health_score: 92,  category: 'fire', image: '/images/firealarm_panel1.png' },
+  { module_id: 36, name: 'Smoke Detectors',     code: 'smoke_detector',    health_score: 92,  category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 37, name: 'Heat Detectors',      code: 'heat_detector',     health_score: 92,  category: 'fire', image: '/images/heatdetector1.png' },
   { module_id: 55, name: 'Fire Trolleys',       code: 'fire_trolley',      health_score: 100, category: 'fire', image: '/images/fire_trolley1.png' },
-  { module_id: 24, name: 'Emergency Exits',     code: 'emergency_door',    health_score: 92,  category: 'fire', image: '/images/emergency_exit1.png' },
-  { module_id: 25, name: 'Emergency Lighting',  code: 'emergency_light',   health_score: 92,  category: 'fire', image: '/images/emergencylight1.png' },
-  { module_id: 11, name: 'PA Systems',          code: 'pa_system',         health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
-  { module_id: 12, name: 'Wind Socks',          code: 'wind_sock',         health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
-  { module_id: 13, name: 'SCBA Units',          code: 'scba',              health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
-  { module_id: 14, name: 'Ambulances',          code: 'ambulance',         health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
-  { module_id: 15, name: 'First Aid Kits',      code: 'first_aid_kit',     health_score: 93,  category: 'chemical', image: '/images/Firstaid1.png' },
-  { module_id: 16, name: 'Safety Showers',      code: 'safety_shower',     health_score: 94,  category: 'chemical', image: '/images/safety_shower.png' },
-  { module_id: 17, name: 'Eye Wash Stations',   code: 'eyewash_station',   health_score: 92,  category: 'chemical', image: '/images/eye_wash1.png' },
-  { module_id: 26, name: 'Spill Kits',          code: 'spill_kit',         health_score: 92,  category: 'chemical', image: '/images/spill_kit1.png' },
-  { module_id: 18, name: 'Chemical Showers',    code: 'chemical_shower',   health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
-  { module_id: 19, name: 'PPE Stations',        code: 'ppe_station',       health_score: 94,  category: 'chemical', image: '/images/ppe_station1.png' },
-  { module_id: 7,  name: 'CO2 Systems',         code: 'suppression_system',health_score: 94,  category: 'fire',     image: '/images/suppression_system.png' },
-  { module_id: 27, name: 'Safety Signage',      code: 'safety_signage',    health_score: 100, category: 'permit',   image: '/images/signage1.png' },
-  { module_id: 21, name: 'Emergency Comms',     code: 'emergency_comm',    health_score: 100, category: 'permit',   image: '/images/Emergency_call1.png' },
-  { module_id: 8,  name: 'Fire Blankets',       code: 'fire_blanket',      health_score: 93,  category: 'fire',     image: '/images/fireblanket1.png' },
-  { module_id: 28, name: 'Muster Points',       code: 'muster_point',      health_score: 100, category: 'permit',   image: '/images/muster_point1.png' },
-  { module_id: 20, name: 'Fire Brigades',       code: 'fire_brigade',      health_score: 90,  category: 'fire',     image: '/images/fire_brigade.png' },
-  { module_id: 31, name: 'Volunteers',          code: 'volunteers',        health_score: 78,  category: 'permit',   image: '/images/volunteers.png' },
-  { module_id: 22, name: 'Shift Volunteers',    code: 'shift_volunteers',  health_score: 72,  category: 'permit',   image: '/images/shift_volunteers.png' },
-  { module_id: 23, name: 'Trained Staff',       code: 'trained_shift',     health_score: 85,  category: 'permit',   image: '/images/trained_staff.png' },
-  { module_id: 29, name: 'Fire NOC',            code: 'fire_noc',          health_score: 100, category: 'permit',   image: '/images/fire_noc.png' },
+  { module_id: 39, name: 'Emergency Exits',     code: 'emergency_door',    health_score: 92,  category: 'fire', image: '/images/emergency_exitdoor1.png' },
+  { module_id: 38, name: 'Emergency Lighting',  code: 'emergency_light',   health_score: 92,  category: 'fire', image: '/images/emergencylight1.png' },
+  { module_id: 44, name: 'PA Systems',          code: 'pa_system',         health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
+  { module_id: 56, name: 'Wind Socks',          code: 'wind_sock',         health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
+  { module_id: 57, name: 'SCBA Units',          code: 'scba',              health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
+  { module_id: 58, name: 'Ambulances',          code: 'ambulance',         health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
+  { module_id: 45, name: 'First Aid Kits',      code: 'first_aid_kit',     health_score: 93,  category: 'chemical', image: '/images/Firstaid1.png' },
+  { module_id: 46, name: 'Eye Wash Stations',   code: 'eyewash_station',   health_score: 92,  category: 'chemical', image: '/images/eye_wash1.png' },
+  { module_id: 48, name: 'Spill Kits',          code: 'spill_kit',         health_score: 92,  category: 'chemical', image: '/images/spill_kit1.png' },
+  { module_id: 60, name: 'Chemical Showers',    code: 'chemical_shower',   health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
+  { module_id: 49, name: 'PPE Stations',        code: 'ppe_station',       health_score: 94,  category: 'chemical', image: '/images/ppe_station1.png' },
+  { module_id: 42, name: 'CO2 Systems',         code: 'suppression_system',health_score: 94,  category: 'fire',     image: '/images/suppression_system.png' },
+  { module_id: 62, name: 'Safety Signage',      code: 'safety_signage',    health_score: 100, category: 'permit',   image: '/images/signage1.png' },
+  { module_id: 61, name: 'Emergency Comms',     code: 'emergency_comm',    health_score: 100, category: 'permit',   image: '/images/Emergency_call1.png' },
+  { module_id: 41, name: 'Fire Blankets',       code: 'fire_blanket',      health_score: 93,  category: 'fire',     image: '/images/fireblanket1.png' },
+  { module_id: 59, name: 'Muster Points',       code: 'muster_point',      health_score: 100, category: 'permit',   image: '/images/muster_point1.png' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
 
 const CHECKLIST_MODULES = [
   { id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2" /><path d="M15 7v2" /><path d="M8 10h8" /><path d="M8 14h8" /><path d="M7 18h10" /><path d="M9 2v3" /><path d="M11 2v3" /><rect x="5" y="5" width="14" height="17" rx="2" /></svg> },
-  { id: 3, name: 'Sprinkler System', code: 'sprinkler', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4" /><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /><path d="M12 16v6" /><path d="M8 12H2" /><path d="M22 12h-6" /></svg> },
-  { id: 9, name: 'FPCA / Alarm Panel', code: 'fpca', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
-  { id: 2, name: 'Hose Reel', code: 'hose_reel', icon: CHECKLIST_GENERIC_ICON },
-  { id: 4, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
-  { id: 10, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
-  { id: 13, name: 'SCBA Units', code: 'scba', icon: CHECKLIST_GENERIC_ICON },
-  { id: 25, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
-  { id: 24, name: 'Exit Sign', code: 'emergency_door', icon: CHECKLIST_GENERIC_ICON },
-  { id: 8, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
-  { id: 7, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
-  { id: 15, name: 'First Aid Kit', code: 'first_aid_kit', icon: CHECKLIST_GENERIC_ICON },
-  { id: 26, name: 'Spill Kit', code: 'spill_kit', icon: CHECKLIST_GENERIC_ICON },
-  { id: 6, name: 'Fire Trolley', code: 'fire_trolley', icon: CHECKLIST_GENERIC_ICON },
-  { id: 11, name: 'PA System', code: 'pa_system', icon: CHECKLIST_GENERIC_ICON },
-  { id: 12, name: 'Wind Sock', code: 'wind_sock', icon: CHECKLIST_GENERIC_ICON },
-  { id: 14, name: 'Ambulance', code: 'ambulance', icon: CHECKLIST_GENERIC_ICON },
-  { id: 16, name: 'Safety Shower', code: 'safety_shower', icon: CHECKLIST_GENERIC_ICON },
-  { id: 17, name: 'Eye Wash', code: 'eyewash_station', icon: CHECKLIST_GENERIC_ICON },
-  { id: 18, name: 'Chemical Shower', code: 'chemical_shower', icon: CHECKLIST_GENERIC_ICON },
-  { id: 19, name: 'PPE Station', code: 'ppe_station', icon: CHECKLIST_GENERIC_ICON },
-  { id: 27, name: 'Safety Signage', code: 'safety_signage', icon: CHECKLIST_GENERIC_ICON },
-  { id: 21, name: 'Emergency Comm', code: 'emergency_comm', icon: CHECKLIST_GENERIC_ICON },
-  { id: 28, name: 'Muster Point', code: 'muster_point', icon: CHECKLIST_GENERIC_ICON },
+  { id: 31, name: 'Sprinkler System', code: 'sprinkler', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4" /><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /><path d="M12 16v6" /><path d="M8 12H2" /><path d="M22 12h-6" /></svg> },
+  { id: 35, name: 'FPCA / Alarm Panel', code: 'fpca', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
+  { id: 33, name: 'Hose Reel', code: 'hose_reel', icon: CHECKLIST_GENERIC_ICON },
+  { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
+  { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 57, name: 'SCBA Units', code: 'scba', icon: CHECKLIST_GENERIC_ICON },
+  { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
+  { id: 39, name: 'Exit Sign', code: 'emergency_door', icon: CHECKLIST_GENERIC_ICON },
+  { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
+  { id: 42, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: CHECKLIST_GENERIC_ICON },
+  { id: 48, name: 'Spill Kit', code: 'spill_kit', icon: CHECKLIST_GENERIC_ICON },
+  { id: 55, name: 'Fire Trolley', code: 'fire_trolley', icon: CHECKLIST_GENERIC_ICON },
+  { id: 44, name: 'PA System', code: 'pa_system', icon: CHECKLIST_GENERIC_ICON },
+  { id: 56, name: 'Wind Sock', code: 'wind_sock', icon: CHECKLIST_GENERIC_ICON },
+  { id: 58, name: 'Ambulance', code: 'ambulance', icon: CHECKLIST_GENERIC_ICON },
+  { id: 47, name: 'Safety Shower', code: 'safety_shower', icon: CHECKLIST_GENERIC_ICON },
+  { id: 46, name: 'Eye Wash', code: 'eyewash_station', icon: CHECKLIST_GENERIC_ICON },
+  { id: 60, name: 'Chemical Shower', code: 'chemical_shower', icon: CHECKLIST_GENERIC_ICON },
+  { id: 49, name: 'PPE Station', code: 'ppe_station', icon: CHECKLIST_GENERIC_ICON },
+  { id: 62, name: 'Safety Signage', code: 'safety_signage', icon: CHECKLIST_GENERIC_ICON },
+  { id: 61, name: 'Emergency Comm', code: 'emergency_comm', icon: CHECKLIST_GENERIC_ICON },
+  { id: 59, name: 'Muster Point', code: 'muster_point', icon: CHECKLIST_GENERIC_ICON },
   { id: 20, name: 'Fire Brigade', code: 'fire_brigade', icon: CHECKLIST_GENERIC_ICON },
-  { id: 31, name: 'Volunteers', code: 'volunteers', icon: CHECKLIST_GENERIC_ICON },
+  { id: 3, name: 'Volunteers', code: 'volunteers', icon: CHECKLIST_GENERIC_ICON },
   { id: 22, name: 'Shift Volunteers', code: 'shift_volunteers', icon: CHECKLIST_GENERIC_ICON },
   { id: 23, name: 'Trained/Shift', code: 'trained_shift', icon: CHECKLIST_GENERIC_ICON },
   { id: 29, name: 'Fire NOC', code: 'fire_noc', icon: CHECKLIST_GENERIC_ICON },
@@ -121,6 +118,7 @@ const MODULE_EMOJI = {
   suppression_system: '💨',
   fire_blanket: '🧲',
   smoke_detector: '🌫️',
+  heat_detector: '🌡️',
   pa_system: '📢',
   emergency_comm: '📞',
   scba: '🫁',
@@ -143,9 +141,47 @@ const MODULE_EMOJI = {
   fire_noc: '📜',
 };
 
+const CHECKLIST_TYPE_LABELS = {
+  ambulance:          { label: 'Ambulance',          icon: '🚑' },
+  chemical_shower:    { label: 'Chemical Shower',    icon: '🚿' },
+  co_detector:        { label: 'CO Detector',        icon: '🌫️' },
+  emergency_comm:     { label: 'Emergency Comm',     icon: '📞' },
+  emergency_light:    { label: 'Emergency Lighting', icon: '🔦' },
+  exit_sign:          { label: 'Exit Sign',          icon: '🚪' },
+  eyewash_station:    { label: 'Eye Wash Station',   icon: '👀' },
+  fire_alarm:         { label: 'Fire Alarm',         icon: '🔔' },
+  fire_blanket:       { label: 'Fire Blanket',       icon: '🧲' },
+  fire_door:          { label: 'Fire Door',          icon: '🚪' },
+  fire_extinguisher:  { label: 'Fire Extinguisher',  icon: '🧯' },
+  fire_trolley:       { label: 'Fire Trolley',       icon: '🛒' },
+  first_aid_kit:      { label: 'First Aid Kit',      icon: '🏥' },
+  fpca:               { label: 'FPCA / Alarm Panel', icon: '🔔' },
+  heat_detector:      { label: 'Heat Detector',      icon: '🌡️' },
+  hose_reel:          { label: 'Hose Reel',          icon: '🧵' },
+  hydrant:            { label: 'Fire Hydrant',       icon: '🚒' },
+  muster_point:       { label: 'Muster Point',       icon: '📌' },
+  pa_system:          { label: 'PA System',          icon: '📢' },
+  ppe_station:        { label: 'PPE Station',        icon: '🦺' },
+  safety_shower:      { label: 'Safety Shower',      icon: '🚰' },
+  scba_unit:          { label: 'SCBA Unit',          icon: '🫁' },
+  signage:            { label: 'Safety Signage',     icon: '⚠️' },
+  smoke_detector:     { label: 'Smoke Detector',     icon: '🌫️' },
+  spill_kit:          { label: 'Spill Kit',          icon: '⚗️' },
+  sprinkler:          { label: 'Sprinkler System',   icon: '🚿' },
+  suppression_system: { label: 'Suppression System', icon: '💨' },
+  wind_sock:          { label: 'Wind Sock',          icon: '📍' },
+};
+
 const SafetyDashboard = ({ user, onLogout }) => {
-  const [activePage, setActivePage] = useState('grid');
-  const [selectedEq, setSelectedEq] = useState(null);
+  const [activePage, setActivePage] = useState(() => {
+    return sessionStorage.getItem('sd_activePage') || 'grid';
+  });
+  const [selectedEq, setSelectedEq] = useState(() => {
+    try {
+      const s = sessionStorage.getItem('sd_selectedEq');
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
   const [checkedItems, setCheckedItems] = useState({});
   const [panelVisible, setPanelVisible] = useState(true);
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
@@ -156,6 +192,10 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [shiftData, setShiftData] = useState({ icon: '🌅', name: 'Day Shift', time: '06:00 - 14:00', staff: 12 });
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [checklistTypes, setChecklistTypes] = useState([]);
+  const [selectedChecklistType, setSelectedChecklistType] = useState(
+    () => sessionStorage.getItem('sd_checklistType') || null
+  );
   const [searchFilter, setSearchFilter] = useState('All');
   const [filterOpen, setFilterOpen] = useState(false);
   const [modules, setModules] = useState(STATIC_MODULES);
@@ -179,6 +219,11 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [topbarVisible, setTopbarVisible] = useState(true);
   const [adminCompanies, setAdminCompanies] = useState([]);
   const lastScrollY = React.useRef(0);
+  const [workOrderPrefill, setWorkOrderPrefill] = useState(null);
+  const handleRaiseWorkOrder = (sosCode) => {
+    setWorkOrderPrefill(sosCode);
+    setActivePage('work-orders');
+  };
 
   const filterOptions = [
     { label: 'All', icon: '🔍' },
@@ -196,10 +241,15 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const statusCounts = useMemo(() => {
     return modules.reduce(
       (acc, m) => {
-        const score = m.health_score || 0;
-        if (score >= 80) acc.healthy++;
-        else if (score >= 50) acc.warning++;
-        else acc.critical++;
+        if (m.health_colour === 'green') { acc.healthy++; }
+        else if (m.health_colour === 'amber') { acc.warning++; }
+        else if (m.health_colour === 'red' || m.health_colour === 'critical') { acc.critical++; }
+        else {
+          const score = m.health_score || 0;
+          if (score >= 80) acc.healthy++;
+          else if (score >= 50) acc.warning++;
+          else acc.critical++;
+        }
         return acc;
       },
       { healthy: 0, warning: 0, critical: 0 }
@@ -239,8 +289,8 @@ const SafetyDashboard = ({ user, onLogout }) => {
   }, [user]);
 
   useEffect(() => {
-    if (activePage !== 'checklist' || !selectedEq?.id) return;
-    ApiService.getModuleChecklists(selectedEq.id)
+    if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
+    ApiService.getModuleChecklists(selectedEq.module_id || selectedEq.id)
       .then(d => {
         const list = Array.isArray(d) ? d : (d?.items || d?.data || d?.checklists || []);
         dispatchCl({ type: 'success', items: list });
@@ -250,9 +300,36 @@ const SafetyDashboard = ({ user, onLogout }) => {
   }, [activePage, selectedEq]);
 
   useEffect(() => {
+    sessionStorage.setItem('sd_activePage', activePage);
+  }, [activePage]);
+
+  useEffect(() => {
+    if (selectedEq) {
+      sessionStorage.setItem('sd_selectedEq', JSON.stringify(selectedEq));
+    } else {
+      sessionStorage.removeItem('sd_selectedEq');
+    }
+  }, [selectedEq]);
+
+  useEffect(() => {
+    if (selectedChecklistType) {
+      sessionStorage.setItem('sd_checklistType', selectedChecklistType);
+    } else {
+      sessionStorage.removeItem('sd_checklistType');
+    }
+  }, [selectedChecklistType]);
+
+  useEffect(() => {
     ApiService.getAlertsSummary()
       .then((d) => setAlertCount(d.total_alerts || 0))
       .catch(() => setAlertCount(0));
+
+    ApiService.getChecklists()
+      .then(d => {
+        const types = Array.isArray(d) ? d : (d?.types || d?.data || []);
+        setChecklistTypes(types);
+      })
+      .catch(() => setChecklistTypes([]));
 
     ApiService.getAdminCompanies()
       .then(d => {
@@ -279,13 +356,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
               score = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
             }
 
-            return { id: m.module_id, score };
+            return { id: m.module_id, score, health_colour: res.health_colour };
           }))
         );
 
         setModules(current => current.map(m => {
           const match = results.find(r => r.status === 'fulfilled' && r.value.id === m.module_id);
-          return match ? { ...m, health_score: match.value.score } : m;
+          return match ? { ...m, health_score: match.value.score, health_colour: match.value.health_colour } : m;
         }));
       } catch (err) {
         console.error('Failed to fetch module summaries:', err);
@@ -357,7 +434,13 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
   const progressPct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
-  const getStatus = (score) => (score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical');
+  const getStatus = (mod) => {
+    if (mod.health_colour === 'green') return 'healthy';
+    if (mod.health_colour === 'amber') return 'warning';
+    if (mod.health_colour === 'red' || mod.health_colour === 'critical') return 'critical';
+    const score = mod.health_score || 0;
+    return score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
+  };
 
   const toggleCheck = (id) => setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -373,6 +456,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
     else if (mod.code === 'fire_blanket') setActivePage('fire-blanket-stats');
     else if (mod.code === 'fpca') setActivePage('fire-alarm-panel-stats');
     else if (mod.code === 'smoke_detector') setActivePage('smoke-detector-stats');
+    else if (mod.code === 'heat_detector') setActivePage('heat-detector-stats');
     else if (mod.code === 'emergency_door') setActivePage('emergency-exit-stats');
     else if (mod.code === 'emergency_light') setActivePage('emergency-lighting-stats');
     else if (mod.code === 'pa_system') setActivePage('pa-siren-stats');
@@ -414,6 +498,9 @@ const SafetyDashboard = ({ user, onLogout }) => {
     } catch (err) {
       console.error('Logout error:', err);
     }
+    sessionStorage.removeItem('sd_activePage');
+    sessionStorage.removeItem('sd_selectedEq');
+    sessionStorage.removeItem('sd_checklistType');
     onLogout();
   };
 
@@ -581,7 +668,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             {/* MANAGEMENT section */}
             {!navCollapsed && <div className="nav-section-label">Management</div>}
 
-            {/* CHECKLISTS DROPDOWN — hidden if no checklist items are accessible */}
+            {/* CHECKLISTS DROPDOWN — dynamic from API */}
             {isNavAllowed('fe_checklist') && (
               <>
                 <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
@@ -595,11 +682,27 @@ const SafetyDashboard = ({ user, onLogout }) => {
                     </svg>
                   )}
                 </div>
-                <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-                  <div className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`} onClick={() => setActivePage('fe-checklist')}>
-                    <span className="nav-icon-small">🧯</span>
-                    <span className="nav-label-small">Fire Extinguisher</span>
-                  </div>
+                <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`} style={{ maxHeight: checklistsDropdownOpen && !navCollapsed ? '320px' : '0', overflowY: 'auto' }}>
+                  {(checklistTypes.length > 0 ? checklistTypes : [{ equipment_type: 'fire_extinguisher' }]).map(ct => {
+                    const meta = CHECKLIST_TYPE_LABELS[ct.equipment_type] || { label: ct.equipment_type.replace(/_/g, ' '), icon: '📋' };
+                    const isActive = activePage === 'equipment-checklist' && selectedChecklistType === ct.equipment_type;
+                    return (
+                      <div
+                        key={ct.equipment_type}
+                        className={`nav-submenu-item ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedChecklistType(ct.equipment_type);
+                          setActivePage('equipment-checklist');
+                        }}
+                      >
+                        <span className="nav-icon-small">{meta.icon}</span>
+                        <span className="nav-label-small">{meta.label}</span>
+                        {ct.total_items && (
+                          <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>{ct.total_items}</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -698,7 +801,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
               <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
                 <div className="eq-grid">
                   {filteredModules.map((mod) => (
-                    <div key={mod.module_id} className={`eq-card ${getStatus(mod.health_score)}`} onClick={() => handleOpenModule(mod)}>
+                    <div key={mod.module_id} className={`eq-card ${getStatus(mod)}`} onClick={() => handleOpenModule(mod)}>
                       <div className="eq-icon">
                         {mod.image
                           ? <img src={mod.image} alt={mod.name} className={`eq-card-img eq-img-${mod.code}`}
@@ -773,94 +876,97 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
 
             <section className={`page ${activePage === 'fire-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
-              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'hose-stats' ? 'active' : ''}`}>
-              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'drum-stats' ? 'active' : ''}`}>
-              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'hydrant-stats' ? 'active' : ''}`}>
-              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'fire-trolley-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
-              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'fire-blanket-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'fire-alarm-panel-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+            </section>
+            <section className={`page ${activePage === 'heat-detector-stats' ? 'active' : ''}`}>
+              {activePage === 'heat-detector-stats' && <HeatDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'emergency-lighting-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
-              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'wind-sock-stats' ? 'active' : ''}`}>
-              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'scba-stats' ? 'active' : ''}`}>
-              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'ambulance-stats' ? 'active' : ''}`}>
-              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'first-aid-stats' ? 'active' : ''}`}>
-              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'emergency-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'eyewash-station-stats' ? 'active' : ''}`}>
-              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'chemical-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'spill-kit-stats' ? 'active' : ''}`}>
-              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'ppe-station-stats' ? 'active' : ''}`}>
-              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'safety-signage-stats' ? 'active' : ''}`}>
-              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'emergency-comm-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'muster-point-stats' ? 'active' : ''}`}>
-              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'fire-brigade-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'shift-volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'trained-shift-stats' ? 'active' : ''}`}>
-              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'fire-noc-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} />}
+              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
 
             {/* ── REPORTS ── */}
@@ -870,7 +976,16 @@ const SafetyDashboard = ({ user, onLogout }) => {
 
             {/* ── WORK ORDERS ── */}
             <section className={`page ${activePage === 'work-orders' ? 'active' : ''}`}>
-              {activePage === 'work-orders' && <WorkOrders onBack={() => setActivePage('grid')} />}
+              {activePage === 'work-orders' && (
+                <WorkOrders
+                  onBack={() => {
+                    setActivePage('grid');
+                    setWorkOrderPrefill(null);
+                  }}
+                  prefill={workOrderPrefill}
+                  clearPrefill={() => setWorkOrderPrefill(null)}
+                />
+              )}
             </section>
 
             {/* ── PENDING APPROVALS ── */}
@@ -902,9 +1017,21 @@ const SafetyDashboard = ({ user, onLogout }) => {
               {activePage === 'audit-logs' && <AuditLog onBack={() => setActivePage('grid')} />}
             </section>
 
-            {/* ── FIRE EXTINGUISHER CHECKLIST ── */}
+            {/* ── FIRE EXTINGUISHER CHECKLIST (legacy) ── */}
             <section className={`page ${activePage === 'fe-checklist' ? 'active' : ''}`}>
               {activePage === 'fe-checklist' && <FireExtinguisherChecklist onBack={() => setActivePage('grid')} />}
+            </section>
+
+            {/* ── EQUIPMENT CHECKLIST (sidebar — all types via /checklists/:type) ── */}
+            <section className={`page ${activePage === 'equipment-checklist' ? 'active' : ''}`}>
+              {activePage === 'equipment-checklist' && selectedChecklistType && (
+                <FireExtinguisherChecklist
+                  key={selectedChecklistType}
+                  equipmentType={selectedChecklistType}
+                  displayName={(CHECKLIST_TYPE_LABELS[selectedChecklistType] || {}).label || selectedChecklistType}
+                  onBack={() => setActivePage('grid')}
+                />
+              )}
             </section>
 
             {/* ── SETUP: ONBOARDING ── */}

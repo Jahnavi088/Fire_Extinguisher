@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
+import { fetchEquipmentByStatus } from '../../services/equipmentService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import SortIndicator from './SortIndicator';
 import { sortItems } from '../../services/sorting';
 import BackBtn from './BackBtn';
+import InspectionHistoryPanel from './InspectionHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -34,11 +36,6 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type, moduleId = 30) => {
-  const params = { module_id: moduleId, limit: 200 };
-  if (type !== 'all') params.status = type;
-  return ApiService.getEquipment(params);
-};
 
 /* ── Sub-components ───────────────────────────────────────────────────────── */
 const Spinner = () => (
@@ -122,15 +119,7 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const loadHistory = () => {
-  try { return JSON.parse(localStorage.getItem('fe_inspection_history') || '[]'); }
-  catch { return []; }
-};
-
-const ANSWER_COLOR = { True: '#28a745', False: '#dc3545', NA: '#888' };
-const ANSWER_LABEL = { True: 'True', False: 'False', NA: 'NA' };
-
-const FireExtinguisherStats = ({ module, onBack }) => {
+const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const modId = module?.module_id || 30;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
@@ -148,18 +137,10 @@ const FireExtinguisherStats = ({ module, onBack }) => {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [inspectionHistory, setInspectionHistory] = useState(loadHistory);
-  const [expandedRecord, setExpandedRecord] = useState(null);
 
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    const handler = () => setInspectionHistory(loadHistory());
-    window.addEventListener('fe-inspection-saved', handler);
-    return () => window.removeEventListener('fe-inspection-saved', handler);
-  }, []);
 
   const load = async () => {
     try {
@@ -187,7 +168,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type, modId);
+      const data = await fetchEquipmentByStatus(modId, card.type);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
     } catch {
@@ -374,8 +355,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Active', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Expired', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -404,7 +384,6 @@ const FireExtinguisherStats = ({ module, onBack }) => {
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
                           { color: '#28a745' }, // Active
-                          { color: '#FF9800' }, // Upcoming
                           { color: '#f59e0b' }, // Needs Service
                           { color: '#8b5cf6' }, // Expired
                           { color: '#dc3545' }, // Due Inspection
@@ -417,8 +396,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming (30d)', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Expired', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -438,148 +416,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
           </div>
         </div>
 
-        {/* Inspection history removed */}
-        <div className="fe-ih-section" style={{ display: 'none' }}>
-          <div className="fe-ih-header">
-            <div className="fe-ih-title">
-              <span className="fe-ih-title-icon">📋</span>
-              Inspection History
-              <span className="fe-ih-count">{inspectionHistory.length}</span>
-            </div>
-            {inspectionHistory.length > 0 && (
-              <button
-                className="fe-ih-clear-btn"
-                onClick={() => {
-                  if (!window.confirm('Clear all inspection records?')) return;
-                  localStorage.removeItem('fe_inspection_history');
-                  setInspectionHistory([]);
-                  setExpandedRecord(null);
-                }}
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-
-          {inspectionHistory.length === 0 ? (
-            <div className="fe-ih-empty">
-              <span className="fe-ih-empty-icon">📝</span>
-              <p>No inspections submitted yet.</p>
-              <span>Complete a checklist inspection and submit it — the record will appear here.</span>
-            </div>
-          ) : (
-            <div className="fe-ih-list">
-              {/* Table header */}
-              <div className="fe-ih-row fe-ih-row-head">
-                <div className="fe-ih-col fe-ih-col-date">Date &amp; Time</div>
-                <div className="fe-ih-col fe-ih-col-stat">✅ Passed</div>
-                <div className="fe-ih-col fe-ih-col-stat">❌ Failed</div>
-                <div className="fe-ih-col fe-ih-col-stat">➖ N/A</div>
-                <div className="fe-ih-col fe-ih-col-crit">Critical Failures</div>
-                <div className="fe-ih-col fe-ih-col-status">Result</div>
-                <div className="fe-ih-col fe-ih-col-action"></div>
-              </div>
-
-              {inspectionHistory.map((rec) => {
-                const isExpanded = expandedRecord === rec.id;
-                const hasIssues  = rec.failed > 0 || rec.criticalFailed > 0;
-                const date       = new Date(rec.submittedAt);
-                const dateStr    = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-                const timeStr    = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-                return (
-                  <React.Fragment key={rec.id}>
-                    <div className={`fe-ih-row fe-ih-row-data ${isExpanded ? 'fe-ih-row-expanded' : ''}`}>
-                      <div className="fe-ih-col fe-ih-col-date">
-                        <span className="fe-ih-date">{dateStr}</span>
-                        <span className="fe-ih-time">{timeStr}</span>
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-stat">
-                        <span className="fe-ih-num fe-ih-pass">{rec.passed}</span>
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-stat">
-                        <span className="fe-ih-num fe-ih-fail">{rec.failed}</span>
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-stat">
-                        <span className="fe-ih-num fe-ih-na">{rec.na}</span>
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-crit">
-                        {rec.criticalFailed > 0
-                          ? <span className="fe-ih-crit-badge">{rec.criticalFailed} critical ⚠</span>
-                          : <span className="fe-ih-crit-ok">None</span>}
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-status">
-                        <span className={`fe-ih-result ${hasIssues ? 'fe-ih-result-issues' : 'fe-ih-result-pass'}`}>
-                          {hasIssues ? 'Has Issues' : 'Passed'}
-                        </span>
-                      </div>
-                      <div className="fe-ih-col fe-ih-col-action">
-                        <button
-                          className={`fe-ih-expand-btn ${isExpanded ? 'open' : ''}`}
-                          onClick={() => setExpandedRecord(isExpanded ? null : rec.id)}
-                        >
-                          {isExpanded ? 'Hide' : 'View'}
-                          <svg viewBox="0 0 24 24">
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expanded detail */}
-                    {isExpanded && (
-                      <div className="fe-ih-detail">
-                        <table className="fe-ih-detail-table">
-                          <thead>
-                            <tr>
-                              <th>#</th>
-                              <th>Inspection Question</th>
-                              <th>Answer</th>
-                              <th>Critical</th>
-                              <th>Remark</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rec.items.map((item, idx) => {
-                              const isSection = idx === 0 || item.category !== rec.items[idx - 1].category;
-                              return (
-                                <React.Fragment key={item.id}>
-                                  {isSection && (
-                                    <tr className="fe-ih-cat-row">
-                                      <td colSpan={5}>{item.category.toUpperCase()}</td>
-                                    </tr>
-                                  )}
-                                  <tr className={`fe-ih-item-row ${item.answer === 'False' ? 'fe-ih-item-fail' : item.answer === 'True' ? 'fe-ih-item-pass' : 'fe-ih-item-na'}`}>
-                                    <td className="fe-ih-item-num">{item.id}</td>
-                                    <td className="fe-ih-item-q">{item.question}</td>
-                                    <td className="fe-ih-item-ans">
-                                      <span
-                                        className="fe-ih-ans-pill"
-                                        style={{ background: ANSWER_COLOR[item.answer], color: '#fff' }}
-                                      >
-                                        {ANSWER_LABEL[item.answer]}
-                                      </span>
-                                    </td>
-                                    <td className="fe-ih-item-crit">
-                                      {item.critical
-                                        ? <span className="fe-ih-crit-dot">YES ⚠</span>
-                                        : <span className="fe-ih-no-dot">No</span>}
-                                    </td>
-                                    <td className="fe-ih-item-remark">{item.remark || '—'}</td>
-                                  </tr>
-                                </React.Fragment>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <InspectionHistoryPanel moduleId={modId} />
       </div>
     );
   }
@@ -631,7 +468,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
                   { label: 'Location', key: 'location_name' },
                   { label: 'Building / Dept', key: 'building_dept' },
                   { label: 'Readiness', key: 'readiness_score' },
-                  { label: 'Next Inspection', key: 'next_inspection_due' },
+                  { label: 'Last Inspected', key: 'last_inspection_date' },
                 ].map(col => (
                   <span
                     key={col.key}
@@ -661,7 +498,7 @@ const FireExtinguisherStats = ({ module, onBack }) => {
                     >
                       {sc}%
                     </span>
-                    <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
+                    <span className="fe-table-date">{fmt(item.last_inspection_date || item.next_inspection_due)}</span>
                   </div>
                 );
               })}
@@ -701,6 +538,15 @@ const FireExtinguisherStats = ({ module, onBack }) => {
           </div>
           <div className="fe-header-sub">{u.extinguisher_type} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span
           className="fe-score-badge"
           style={{ color: c, borderColor: c + '66', background: c + '18' }}

@@ -31,8 +31,18 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type, moduleId = 9) => {
-  const params = { module_id: moduleId, limit: 200 };
+const fetchByType = async (type, moduleId = 35) => {
+  if (type === 'active') {
+    const [activeData, upcomingData] = await Promise.all([
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'upcoming' }),
+    ]);
+    return {
+      items: [...(activeData.items || []), ...(upcomingData.items || [])],
+      total: (activeData.total || 0) + (upcomingData.total || 0),
+    };
+  }
+  const params = { module_id: moduleId, limit: 500 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -62,8 +72,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const FireAlarmPanelStats = ({ module, onBack }) => {
-  const modId = module?.module_id || 9;
+const FireAlarmPanelStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || module?.id || 35;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -96,8 +106,21 @@ const FireAlarmPanelStats = ({ module, onBack }) => {
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
       console.error('API Load failed for Fire Alarm Panels, using fallback:', err);
-      setSummary({ total: 8, active: 7, upcoming: 1, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 98 });
-      setAlertsSummary({ total_alerts: 1, level_1: { count: 1, label: 'Low', description: 'Fault' }, level_2: { count: 0, label: 'Med', description: 'Trouble' }, level_3: { count: 0, label: 'High', description: 'Alarm' } });
+      setSummary({
+        total: 14,
+        active: 8,
+        upcoming: 1,
+        needs_service: 2,
+        expired: 1,
+        due_inspection: 2,
+        readiness_score: 76.4
+      });
+      setAlertsSummary({
+        total_alerts: 5,
+        level_1: { count: 3, label: 'Low', description: 'Fault' },
+        level_2: { count: 2, label: 'Med', description: 'Trouble' },
+        level_3: { count: 0, label: 'High', description: 'Alarm' }
+      });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -201,25 +224,68 @@ const FireAlarmPanelStats = ({ module, onBack }) => {
             </div>
           </div>
           <div className="fe-panel">
-            <div className="fe-panel-title">📊 System Health Breakdown</div>
+            <div className="fe-panel-title">📊 Fleet Health Breakdown</div>
             {summary && (
               <>
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
-                    <BarChart data={[
-                      { name: 'Normal', val: summary.active, color: '#28a745' },
-                      { name: 'Due', val: summary.upcoming, color: '#FF9800' },
-                      { name: 'Faulty', val: summary.expired, color: '#dc3545' },
-                    ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <BarChart
+                      data={[
+                        { name: 'Normal', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                        { name: 'Needs Service', val: summary.needs_service || 0, color: '#f59e0b' },
+                        { name: 'Faulty', val: summary.expired || 0, color: '#8b5cf6' },
+                        { name: 'Due Insp.', val: summary.due_inspection || 0, color: '#dc3545' },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text3)', fontSize: 10 }} />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'var(--text3)', fontSize: 10, fontWeight: 600 }}
+                        interval={0}
+                      />
                       <YAxis hide />
-                      <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
+                      <Tooltip
+                        cursor={false}
+                        contentStyle={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          color: 'var(--text)'
+                        }}
+                      />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#FF9800' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        {[
+                          { color: '#28a745' },
+                          { color: '#f59e0b' },
+                          { color: '#8b5cf6' },
+                          { color: '#dc3545' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+                <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
+                  {[
+                    { label: 'Normal State', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { label: 'Needs Service', val: summary.needs_service || 0, color: '#f59e0b' },
+                    { label: 'Faulty/Critical', val: summary.expired || 0, color: '#8b5cf6' },
+                    { label: 'Due Inspection', val: summary.due_inspection || 0, color: '#dc3545' },
+                  ].map(row => (
+                    <div key={row.label} className="fe-legend-row">
+                      <div className="fe-legend-dot" style={{ background: row.color }} />
+                      <span className="fe-legend-label">{row.label}</span>
+                      <span className="fe-legend-val" style={{ color: row.color }}>{row.val}</span>
+                      <span className="fe-legend-pct">
+                        {((row.val / (summary.total || 1)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </>
             )}
@@ -271,6 +337,15 @@ const FireAlarmPanelStats = ({ module, onBack }) => {
           <div className="fe-header-title">{u.sos_code || '…'}</div>
           <div className="fe-header-sub">{u.equipment_type || 'Fire Alarm Panel'} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
       {detailLoading ? <Spinner /> : (
@@ -304,5 +379,14 @@ const FireAlarmPanelStats = ({ module, onBack }) => {
     </div>
   );
 };
+
+const InfoRow = ({ label, val, color }) => (
+  <div className="fe-info-row">
+    <span className="fe-info-label">{label}</span>
+    <span className="fe-info-value" style={color ? { color } : {}}>
+      {val || '—'}
+    </span>
+  </div>
+);
 
 export default FireAlarmPanelStats;

@@ -403,16 +403,16 @@ const Reports = ({ onBack }) => {
   const CATEGORIES = [
     { id: 'all', label: 'All Modules' },
     { id: '30',  label: 'Fire Extinguishers' },
-    { id: '3',   label: 'Sprinklers' },
-    { id: '24',  label: 'Emergency Exits' },
-    { id: '25',  label: 'Emergency Lighting' },
+    { id: '31',  label: 'Sprinklers' },
+    { id: '39',  label: 'Emergency Exits' },
+    { id: '38',  label: 'Emergency Lighting' },
     { id: '29',  label: 'Fire NOC' },
     { id: '23',  label: 'Trained Personnel' },
-    { id: '31',  label: 'Fire Hydrants' },
-    { id: '32',  label: 'Fire Hose Reels' },
-    { id: '33',  label: 'Fire Alarms' },
-    { id: '34',  label: 'Smoke Detectors' },
-    { id: '35',  label: 'Muster Points' },
+    { id: '34',  label: 'Fire Hydrants' },
+    { id: '33',  label: 'Fire Hose Reels' },
+    { id: '35',  label: 'Fire Alarms' },
+    { id: '36',  label: 'Smoke Detectors' },
+    { id: '59',  label: 'Muster Points' },
   ];
 
   const currentType = REPORT_TYPES.find(r => r.id === activeTab);

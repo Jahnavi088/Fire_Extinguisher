@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './WorkOrders.css';
 import { ApiService } from '../../services/apiService';
 
-const WorkOrders = ({ onBack }) => {
+const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
   const [workOrders, setWorkOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,12 +12,20 @@ const WorkOrders = ({ onBack }) => {
 
   useEffect(() => { loadOrders(); }, []);
 
+  useEffect(() => {
+    if (prefill) {
+      setForm(prev => ({ ...prev, equipment_id: prefill }));
+      setShowModal(true);
+      if (clearPrefill) clearPrefill();
+    }
+  }, [prefill, clearPrefill]);
+
   const loadOrders = async () => {
     setLoading(true);
     try {
       const res = await ApiService.getWorkOrders();
-      const items = Array.isArray(res) ? res : res?.work_orders || res?.data || [];
-      if (items.length > 0) setWorkOrders(items);
+      const items = res?.items || (Array.isArray(res) ? res : res?.work_orders || res?.data || []);
+      setWorkOrders(items);
       setError(null);
     } catch (e) {
       setError('Failed to load work orders.');
@@ -31,7 +39,42 @@ const WorkOrders = ({ onBack }) => {
     if (!form.title.trim() || !form.equipment_id.trim()) return;
     setSubmitting(true);
     try {
-      await ApiService.createWorkOrder(form);
+      let numericId = null;
+      const eqInput = form.equipment_id.trim();
+
+      // If it looks like a number, check if it's already an integer database ID
+      if (/^\d+$/.test(eqInput)) {
+        numericId = parseInt(eqInput, 10);
+      } else {
+        // Look up by SOS Code
+        try {
+          const eqDetails = await ApiService.getEquipmentBySosCode(eqInput);
+          if (eqDetails && eqDetails.id) {
+            numericId = eqDetails.id;
+          }
+        } catch (lookupErr) {
+          console.warn('Failed lookup by SOS Code, trying Admin Equipment lookup...', lookupErr);
+          try {
+            const adminEqDetails = await ApiService.getAdminEquipmentBySosCode(eqInput);
+            if (adminEqDetails && adminEqDetails.id) {
+              numericId = adminEqDetails.id;
+            }
+          } catch (adminLookupErr) {
+            console.error('Admin equipment lookup failed too:', adminLookupErr);
+          }
+        }
+      }
+
+      if (!numericId) {
+        throw new Error(`Equipment with SOS Code/Reference "${eqInput}" could not be found. Please check the code and try again.`);
+      }
+
+      const payload = {
+        ...form,
+        equipment_id: numericId
+      };
+
+      await ApiService.createWorkOrder(payload);
       alert('Work Order created successfully!');
       setShowModal(false);
       setForm({ title: '', description: '', equipment_id: '', priority: 'medium', assignee: '' });
@@ -49,6 +92,16 @@ const WorkOrders = ({ onBack }) => {
       setWorkOrders(prev => prev.map(wo => wo.id === id ? { ...wo, status } : wo));
     } catch (e) {
       alert('Failed to update status: ' + e.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this work order?')) return;
+    try {
+      await ApiService.deleteWorkOrder(id);
+      setWorkOrders(prev => prev.filter(wo => wo.id !== id));
+    } catch (e) {
+      alert('Failed to delete work order: ' + e.message);
     }
   };
 
@@ -145,16 +198,42 @@ const WorkOrders = ({ onBack }) => {
                     <td><span className={`wo-badge ${priorityClass(wo.priority)}`}>{wo.priority?.toUpperCase()}</span></td>
                     <td>{wo.assignee || 'Unassigned'}</td>
                     <td><span className={`wo-badge ${statusClass(wo.status || 'open')}`}>{(wo.status || 'open').toUpperCase()}</span></td>
-                    <td>
+                    <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <select
                         className="wo-action-select"
                         value={wo.status || 'open'}
                         onChange={e => handleStatusChange(wo.id, e.target.value)}
+                        style={{ flex: 1 }}
                       >
                         <option value="open">Set Open</option>
                         <option value="in progress">Set Progress</option>
                         <option value="completed">Complete</option>
                       </select>
+                      <button
+                        className="wo-delete-btn"
+                        onClick={() => handleDelete(wo.id)}
+                        title="Delete Work Order"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#dc3545',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '4px',
+                          borderRadius: '4px',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69, 0.15)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))}

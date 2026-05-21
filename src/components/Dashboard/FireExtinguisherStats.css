@@ -254,6 +254,19 @@
   transform: translateX(-2px);
 }
 
+.fe-back-btn.has-text {
+  width: auto !important;
+  border-radius: 20px !important;
+  padding: 0 14px 0 10px !important;
+  gap: 6px;
+}
+
+.fe-back-btn-text {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .fe-back-btn svg {
   width: 16px;
   height: 16px;

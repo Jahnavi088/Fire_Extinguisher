@@ -11,30 +11,29 @@ const fmt = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
-const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
   return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'CLEAN' ? '#28a745'
-    : (v === 'DIRTY' || v === 'DUSTY') ? '#FF9800'
-      : (v === 'FAULTY' || v === 'OFFLINE' || v === 'DAMAGED') ? '#dc3545'
+  v === 'OK' || v === 'NORMAL' || v === 'CLEAN' ? '#28a745'
+    : (v === 'DIRTY' || v === 'DUSTY' || v === 'NEEDS_CALIBRATION') ? '#FF9800'
+      : (v === 'FAULTY' || v === 'OFFLINE' || v === 'DAMAGED' || v === 'CRITICAL') ? '#dc3545'
         : '#666';
 
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Fleet', icon: '🌫️', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
-  { type: 'needs-service', label: 'Needs Cleaning', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
+  { type: 'all', label: 'Total Detectors', icon: '🌡️', color: '#3b82f6', key: 'total' },
+  { type: 'active', label: 'Normal State', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Faulty/Critical', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
 const PAGE_SIZE = 15;
 
-const fetchByType = async (type, moduleId = 10) => {
+const fetchByType = async (type, moduleId = 37) => {
   if (type === 'active') {
     const [activeData, upcomingData] = await Promise.all([
       ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
@@ -54,7 +53,7 @@ const fetchByType = async (type, moduleId = 10) => {
 const Spinner = () => (
   <div className="fe-spinner">
     <div className="fe-spinner-ring" />
-    <span className="fe-spinner-text">Loading smoke detector data…</span>
+    <span className="fe-spinner-text">Loading heat detector data…</span>
   </div>
 );
 
@@ -77,7 +76,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
   return (
     <div className="fe-pagination">
       <span className="fe-page-info">
-        Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> smoke detectors
+        Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> heat detectors
       </span>
       <div className="fe-page-controls">
         <button className="fe-page-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>
@@ -132,8 +131,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
-  const modId = module?.module_id || 10;
+const HeatDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || module?.id || 37;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -191,9 +190,22 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Smoke Detectors, using fallback:', err);
-      setSummary({ total: 156, active: 148, upcoming: 4, needs_service: 2, expired: 2, due_inspection: 0, readiness_score: 95 });
-      setAlertsSummary({ total_alerts: 4, level_1: { count: 3, label: 'Low', description: 'Cleaning' }, level_2: { count: 1, label: 'Med', description: 'Battery' }, level_3: { count: 0, label: 'High', description: 'Fault' } });
+      console.error('API Load failed for Heat Detectors, using fallback:', err);
+      setSummary({
+        total: 180,
+        active: 98,
+        upcoming: 4,
+        needs_service: 26,
+        expired: 14,
+        due_inspection: 38,
+        readiness_score: 73.4
+      });
+      setAlertsSummary({
+        total_alerts: 5,
+        level_1: { count: 3, label: 'Low', description: 'Calibration Due' },
+        level_2: { count: 2, label: 'Med', description: 'Battery Low' },
+        level_3: { count: 0, label: 'High', description: 'Sensor Failure' }
+      });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -214,13 +226,13 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
       if (!data.items || data.items.length === 0) {
         const mock = Array.from({ length: 10 }).map((_, i) => ({
-          id: `sd_${i}`,
-          sos_code: `SD-${3000 + i}`,
-          equipment_type: i % 2 === 0 ? 'Optical' : 'Ionization',
-          location_name: `Room ${101 + i}`,
-          building_name: 'Admin Block',
-          readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
+          id: `hd_${i}`,
+          sos_code: `HD-${4000 + i}`,
+          equipment_type: i % 2 === 0 ? 'Rate of Rise' : 'Fixed Temperature',
+          location_name: `Warehouse Zone ${String.fromCharCode(65 + i)}`,
+          building_name: 'Main Storage',
+          readiness_score: 95 - i * 2,
+          next_inspection_due: new Date(Date.now() + 86400000 * 30).toISOString()
         }));
         setListItems(mock);
         setListTotal(mock.length);
@@ -259,7 +271,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack} />
           <div className="fe-header-info">
-            <div className="fe-header-title">Smoke Detector Fleet Monitor</div>
+            <div className="fe-header-title">Heat Detector Fleet Monitor</div>
           </div>
           <span className="fe-score-badge" 
             title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
@@ -271,7 +283,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
               <span className="fe-search-icon">🔍</span>
               <input
                 type="text"
-                placeholder="Search SOS Code, room..."
+                placeholder="Search SOS Code, location..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="fe-search-input"
@@ -319,17 +331,39 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
-                        { name: 'Faulty', val: summary.expired, color: '#dc3545' },
+                        { name: 'Normal', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                        { name: 'Needs Service', val: summary.needs_service || 0, color: '#f59e0b' },
+                        { name: 'Faulty', val: summary.expired || 0, color: '#8b5cf6' },
+                        { name: 'Due Insp.', val: summary.due_inspection || 0, color: '#dc3545' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text3)', fontSize: 10 }} />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'var(--text3)', fontSize: 10, fontWeight: 600 }}
+                        interval={0}
+                      />
                       <YAxis hide />
-                      <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
+                      <Tooltip
+                        cursor={false}
+                        contentStyle={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          color: 'var(--text)'
+                        }}
+                      />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => (
+                        {[
+                          { color: '#28a745' },
+                          { color: '#f59e0b' },
+                          { color: '#8b5cf6' },
+                          { color: '#dc3545' },
+                        ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
@@ -338,13 +372,18 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
-                    { label: 'Faulty/Expired', val: summary.expired, color: '#dc3545' },
+                    { label: 'Normal State', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { label: 'Needs Service', val: summary.needs_service || 0, color: '#f59e0b' },
+                    { label: 'Faulty/Critical', val: summary.expired || 0, color: '#8b5cf6' },
+                    { label: 'Due Inspection', val: summary.due_inspection || 0, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
                       <div className="fe-legend-dot" style={{ background: row.color }} />
                       <span className="fe-legend-label">{row.label}</span>
                       <span className="fe-legend-val" style={{ color: row.color }}>{row.val}</span>
+                      <span className="fe-legend-pct">
+                        {((row.val / (summary.total || 1)) * 100).toFixed(1)}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -430,10 +469,10 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
     <div className="fe-page">
       <div className="fe-header">
         <BackBtn onClick={goBack} />
-        <span className="fe-header-icon">🌫️</span>
+        <span className="fe-header-icon">🌡️</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>
-          <div className="fe-header-sub">{u.equipment_type || 'Smoke Detector'} · {u.location_name}</div>
+          <div className="fe-header-sub">{u.equipment_type || 'Heat Detector'} · {u.location_name}</div>
         </div>
         {onRaiseWorkOrder && (
           <button
@@ -472,7 +511,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <SectionTitle>🔧 Operational Status</SectionTitle>
             <div className="fe-condition-pills">
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.chamber_status) + '44', background: condColor(u.chamber_status) + '12' }}>
-                <span className="fe-condition-pill-label">Chamber</span>
+                <span className="fe-condition-pill-label">Sensor</span>
                 <span className="fe-condition-pill-value" style={{ color: condColor(u.chamber_status) }}>{u.chamber_status || 'CLEAN'}</span>
               </div>
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.battery_status) + '44', background: condColor(u.battery_status) + '12' }}>
@@ -488,4 +527,4 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
   );
 };
 
-export default SmokeDetectorStats;
+export default HeatDetectorStats;

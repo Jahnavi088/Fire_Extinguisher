@@ -15,7 +15,7 @@ const CATEGORY_ICONS = {
 
 const ANSWER_OPTIONS = ['Yes', 'No', 'N/A'];
 
-export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
+export default function FireExtinguisherChecklist({ selectedEq, equipmentType, displayName, onBack }) {
   const [checklistData, setChecklistData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [answers, setAnswers] = useState({});
@@ -26,16 +26,24 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
   const [equipmentSosCode, setEquipmentSosCode] = useState('');
 
   const module_id = selectedEq?.module_id || 30;
+  // equipmentType prop takes priority (sidebar-driven); fall back to module-based
+  const useTypeApi = !!equipmentType;
 
   useEffect(() => {
-    if (!module_id) return;
     setLoading(true);
-    ApiService.getModuleChecklists(module_id)
+    setChecklistData([]);
+    setAnswers({});
+    setRemarks({});
+    setSubmitted(false);
+
+    const fetch = useTypeApi
+      ? ApiService.getChecklistsByType(equipmentType)
+      : ApiService.getModuleChecklists(module_id);
+
+    fetch
       .then(res => {
-        const items = Array.isArray(res) ? res : (res?.items || res?.data || []);
+        const items = Array.isArray(res) ? res : (res?.items || res?.data || res?.checklist_items || []);
         setChecklistData(items);
-        
-        // Auto-expand all categories found
         const cats = [...new Set(items.map(i => i.category || 'General'))];
         setExpandedCategories(Object.fromEntries(cats.map(c => [c, true])));
       })
@@ -44,7 +52,7 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
         setChecklistData([]);
       })
       .finally(() => setLoading(false));
-  }, [module_id]);
+  }, [equipmentType, module_id, useTypeApi]);
 
   const setAnswer = (id, val) =>
     setAnswers(prev => ({ ...prev, [id]: prev[id] === val ? null : val }));
@@ -133,7 +141,7 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
         <div className="fec-header-info">
           <span className="fec-header-icon">🧯</span>
           <div>
-            <div className="fec-title">{selectedEq?.name || 'Equipment'} — Inspection Checklist</div>
+            <div className="fec-title">{displayName || selectedEq?.name || 'Equipment'} — Inspection Checklist</div>
             <div className="fec-subtitle">Equipment Module: {selectedEq?.name} &nbsp;|&nbsp; SOS Platform</div>
           </div>
         </div>
@@ -362,7 +370,7 @@ export default function FireExtinguisherChecklist({ selectedEq, onBack }) {
       {/* Footer */}
       <div className="fec-footer">
         Total: {stats.total} items &nbsp;|&nbsp; Critical: {stats.critical} &nbsp;|&nbsp;
-        Equipment Module: {selectedEq?.name || 'General'} &nbsp;|&nbsp; SOS Platform
+        Equipment Module: {displayName || selectedEq?.name || 'General'} &nbsp;|&nbsp; SOS Platform
       </div>
     </div>
   );

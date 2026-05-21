@@ -32,7 +32,7 @@ const KPI_CARDS = [
 const PAGE_SIZE = 15;
 
 const fetchByType = (type) => {
-  const params = { module_id: 31, limit: 200 };
+  const params = { module_id: 3, limit: 200 };
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params); // Using generic equipment fetch for volunteers
 };
@@ -115,9 +115,9 @@ const VolunteerStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(31),
+        ApiService.getModuleSummary(3),
         ApiService.getAlertsSummary(),
-        ApiService.getAlerts({ module_id: 31, limit: 100 }),
+        ApiService.getAlerts({ module_id: 3, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);

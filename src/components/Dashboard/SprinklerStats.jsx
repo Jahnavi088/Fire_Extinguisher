@@ -34,8 +34,18 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type, moduleId = 3) => {
-  const params = { module_id: moduleId, limit: 200 }; // Module ID 3 for Sprinklers
+const fetchByType = async (type, moduleId = 31) => {
+  if (type === 'active') {
+    const [activeData, upcomingData] = await Promise.all([
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
+      ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'upcoming' }),
+    ]);
+    return {
+      items: [...(activeData.items || []), ...(upcomingData.items || [])],
+      total: (activeData.total || 0) + (upcomingData.total || 0),
+    };
+  }
+  const params = { module_id: moduleId, limit: 500 }; // Module ID 31 for Sprinklers
   if (type !== 'all') params.status = type;
   return ApiService.getEquipment(params);
 };
@@ -123,7 +133,7 @@ const ReadinessBar = ({ score }) => {
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 const SprinklerStats = ({ module, onBack }) => {
-  const modId = module?.module_id || 3;
+  const modId = module?.module_id || module?.id || 31;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -184,10 +194,10 @@ const SprinklerStats = ({ module, onBack }) => {
   const openDetail = async (item) => {
     setView('detail');
     setDetailLoading(true);
-    setSelectedUnit(item);
+    setSelectedUnit({ ...item, ...(item.details || {}) });
     try {
       const data = await ApiService.getEquipmentBySosCode(item.sos_code || item.id);
-      setSelectedUnit(data);
+      setSelectedUnit({ ...data, ...(data.details || {}) });
     } catch { /* keep row data */ }
     finally { setDetailLoading(false); }
   };
@@ -346,8 +356,7 @@ const SprinklerStats = ({ module, onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Functional', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Faulty', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Insp.', val: summary.due_inspection, color: '#dc3545' },
@@ -376,7 +385,6 @@ const SprinklerStats = ({ module, onBack }) => {
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
                           { color: '#28a745' },
-                          { color: '#FF9800' },
                           { color: '#f59e0b' },
                           { color: '#8b5cf6' },
                           { color: '#dc3545' },
@@ -389,8 +397,7 @@ const SprinklerStats = ({ module, onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Functional', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming (30d)', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Faulty/Critical', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -596,15 +603,17 @@ const SprinklerStats = ({ module, onBack }) => {
 
           {/* Physical Condition */}
           <div className="fe-detail-card">
-            <SectionTitle>🔧 System Condition</SectionTitle>
+            <SectionTitle>🔧 System Specifications</SectionTitle>
             <div className="fe-condition-pills">
               {[
-                { label: 'Main Valve', val: u.valve_status || 'OK' },
-                { label: 'Pressure', val: u.pressure_status || 'OK' },
-                { label: 'Head Condition', val: u.head_status || 'OK' },
-                { label: 'Pipework', val: u.pipe_status || 'OK' },
+                { label: 'System Type', val: u.system_type },
+                { label: 'Operating Pressure', val: u.operating_pressure_bar ? `${u.operating_pressure_bar} bar` : null },
+                { label: 'Head Count', val: u.sprinkler_count },
+                { label: 'Coverage Area', val: u.coverage_area_sqm ? `${u.coverage_area_sqm} m²` : null },
+                { label: 'Pipe Material', val: u.pipe_material },
+                { label: 'Last Flow Test', val: u.last_flow_test ? fmt(u.last_flow_test) : null },
               ].map(pill => {
-                const pc = condColor(pill.val);
+                const pc = '#3b82f6'; // elegant specs blue
                 return (
                   <div
                     key={pill.label}

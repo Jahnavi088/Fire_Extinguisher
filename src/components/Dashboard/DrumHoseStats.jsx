@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import BackBtn from './BackBtn';
 import './FireExtinguisherStats.css'; // Reusing the same styling for consistency
 import { ApiService } from '../../services/apiService';
+import { fetchEquipmentByStatus } from '../../services/equipmentService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import InspectionHistoryPanel from './InspectionHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -32,11 +34,6 @@ const KPI_CARDS = [
 
 const PAGE_SIZE = 15;
 
-const fetchByType = (type) => {
-  const params = { module_id: 3, limit: 200 }; // Module ID 3 for Drum Hose Reels
-  if (type !== 'all') params.status = type;
-  return ApiService.getEquipment(params);
-};
 
 /* ── Sub-components ───────────────────────────────────────────────────────── */
 const Spinner = () => (
@@ -120,7 +117,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const DrumHoseStats = ({ onBack }) => {
+const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || 40;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -145,9 +143,9 @@ const DrumHoseStats = ({ onBack }) => {
     try {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
-        ApiService.getModuleSummary(3),                       // /modules/3/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
-        ApiService.getAlerts({ module_id: 3, limit: 100 }),    // /alerts?module_id=3
+        ApiService.getModuleSummary(modId),
+        ApiService.getAlertsSummary(),
+        ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
@@ -184,24 +182,9 @@ const DrumHoseStats = ({ onBack }) => {
     setView('list');
     setListLoading(true);
     try {
-      const data = await fetchByType(card.type);
+      const data = await fetchEquipmentByStatus(modId, card.type);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
-
-      // If no items returned, add mock items
-      if (!data.items || data.items.length === 0) {
-        const mockItems = Array.from({ length: 3 }).map((_, i) => ({
-          id: `mock_dh_${i}`,
-          sos_code: `DH-${1000 + i}`,
-          equipment_type: 'Drum Hose',
-          location_name: 'Warehouse B',
-          building_name: 'Main Plant',
-          readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
-        }));
-        setListItems(mockItems);
-        setListTotal(mockItems.length);
-      }
     } catch {
       setListItems([]);
     } finally {
@@ -350,8 +333,7 @@ const DrumHoseStats = ({ onBack }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Functional', val: summary.active, color: '#28a745' },
-                        { name: 'Upcoming', val: summary.upcoming, color: '#FF9800' },
+                        { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Faulty', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Insp.', val: summary.due_inspection, color: '#dc3545' },
@@ -380,7 +362,6 @@ const DrumHoseStats = ({ onBack }) => {
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
                           { color: '#28a745' },
-                          { color: '#FF9800' },
                           { color: '#f59e0b' },
                           { color: '#8b5cf6' },
                           { color: '#dc3545' },
@@ -393,8 +374,7 @@ const DrumHoseStats = ({ onBack }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Functional', val: summary.active, color: '#28a745' },
-                    { label: 'Upcoming (30d)', val: summary.upcoming, color: '#FF9800' },
+                    { label: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Faulty/Critical', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -413,6 +393,8 @@ const DrumHoseStats = ({ onBack }) => {
             )}
           </div>
         </div>
+
+        <InspectionHistoryPanel moduleId={3} />
       </div>
     );
   }
@@ -471,7 +453,7 @@ const DrumHoseStats = ({ onBack }) => {
             <div className="fe-list-body">
               <div className="fe-table">
                 <div className="fe-table-head">
-                  {['SOS Code', 'Type', 'Location', 'Building / Dept', 'Readiness', 'Next Inspection'].map(h => (
+                  {['SOS Code', 'Type', 'Location', 'Building / Dept', 'Readiness', 'Last Inspected'].map(h => (
                     <span key={h} className="fe-table-head-cell">{h}</span>
                   ))}
                 </div>
@@ -492,7 +474,7 @@ const DrumHoseStats = ({ onBack }) => {
                       >
                         {sc}%
                       </span>
-                      <span className="fe-table-date">{fmt(item.next_inspection_due)}</span>
+                      <span className="fe-table-date">{fmt(item.last_inspection_date || item.next_inspection_due)}</span>
                     </div>
                   );
                 })}
@@ -533,6 +515,15 @@ const DrumHoseStats = ({ onBack }) => {
           </div>
           <div className="fe-header-sub">{u.equipment_type || 'Drum Hose'} · {u.location_name}</div>
         </div>
+        {onRaiseWorkOrder && (
+          <button
+            className="fe-compliance-btn"
+            style={{ marginRight: '8px', background: '#059669', borderColor: '#34d399' }}
+            onClick={() => onRaiseWorkOrder(u.sos_code || u.equipment_code || u.id)}
+          >
+            🔧 Raise Work Order
+          </button>
+        )}
         <span
           className="fe-score-badge"
           style={{ color: c, borderColor: c + '66', background: c + '18' }}
