@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ApiService } from '../../services/apiService';
 import './EquipmentOnboarding.css';
 
@@ -31,7 +31,7 @@ const LOCATIONS = [
   'Parking Level 1', 'Rooftop', 'Basement - Storage',
 ];
 
-const FDA_TEXT = `I hereby declare and certify under penalty of regulatory non-compliance that this safety equipment has undergone comprehensive physical verification, precise calibration, and strict field audits. I confirm that all technical parameters conform to state fire protection codes and standard operating procedures. By executing this electronic signature, I authorize the immediate provisioning of this asset, creating a secure, legally-binding, and fully auditable record in the system's ledger.`;
+const FDA_TEXT = `I certify that this equipment has undergone required physical verification and complies with safety standards. This electronic signature authorizes its secure provisioning.`;
 
 const EMPTY_FORM = {
   sos_code: '',
@@ -43,6 +43,67 @@ const EMPTY_FORM = {
   floor_name: '',
   department_name: '',
   area_name: '',
+};
+
+const Field = ({ label, required, error, children }) => (
+  <div className={`eob-field ${error ? 'has-error' : ''}`}>
+    <label className="eob-label">{label}{required && <span className="eob-req">*</span>}</label>
+    {children}
+    {error && <span className="eob-error-msg">{error}</span>}
+  </div>
+);
+
+const CustomSelect = ({ value, onChange, options, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div className={`eob-custom-select ${isOpen ? 'is-open' : ''}`} ref={dropdownRef}>
+      <div 
+        className={`eob-select-trigger ${isOpen ? 'open' : ''}`} 
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(prev => !prev);
+        }}
+      >
+        <span className={selectedOption ? '' : 'placeholder-text'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="eob-select-icon" style={{ pointerEvents: 'none' }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+      <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`}>
+        {options.map(opt => (
+          <div
+            key={opt.value}
+            className={`eob-select-option ${String(opt.value) === String(value) ? 'selected' : ''}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(opt.value);
+              setIsOpen(false);
+            }}
+          >
+            {opt.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const EquipmentOnboarding = ({ onBack, onSuccess }) => {
@@ -118,13 +179,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
     }
   };
 
-  const Field = ({ label, required, error, children }) => (
-    <div className={`eob-field ${error ? 'has-error' : ''}`}>
-      <label className="eob-label">{label}{required && <span className="eob-req">*</span>}</label>
-      {children}
-      {error && <span className="eob-error-msg">{error}</span>}
-    </div>
-  );
+
 
   return (
     <div className="eob-page">
@@ -165,72 +220,80 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
           </Field>
 
           <Field label="EQUIPMENT TYPE" required error={errors.module_id}>
-            <select className="eob-select" value={form.module_id} onChange={e => set('module_id', e.target.value)}>
-              <option value="">All Modules</option>
-              {modules.map(m => (
-                <option key={m.id || m.module_id} value={m.id || m.module_id}>
-                  {m.name || m.module_name}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              value={form.module_id}
+              onChange={v => set('module_id', v)}
+              placeholder="All Modules"
+              options={modules.map(m => ({ value: m.id || m.module_id, label: m.name || m.module_name }))}
+            />
           </Field>
 
           <Field label="SUPPLIERS NAME" required error={errors.supplier_name}>
-            <select className="eob-select" value={form.supplier_name} onChange={e => set('supplier_name', e.target.value)}>
-              <option value="">Select Options</option>
-              {SUPPLIERS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <CustomSelect
+              value={form.supplier_name}
+              onChange={v => set('supplier_name', v)}
+              placeholder="Select Options"
+              options={SUPPLIERS.map(s => ({ value: s, label: s }))}
+            />
           </Field>
 
           {/* Row 2 */}
           <Field label="LOCATION" required error={errors.location_name}>
-            <select className="eob-select" value={form.location_name} onChange={e => set('location_name', e.target.value)}>
-              <option value="">Select Location</option>
-              {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <CustomSelect
+              value={form.location_name}
+              onChange={v => set('location_name', v)}
+              placeholder="Select Location"
+              options={LOCATIONS.map(l => ({ value: l, label: l }))}
+            />
           </Field>
 
           <Field label="BUILDING" required error={errors.building_id}>
-            <select className="eob-select" value={form.building_id} onChange={e => set('building_id', e.target.value)}>
-              <option value="">Select Building</option>
-              {buildings.length > 0
-                ? buildings.map(b => (
-                    <option key={b.id} value={b.id}>{b.name || b.building_name}</option>
-                  ))
-                : ['Main Block', 'Block A', 'Block B', 'Annex', 'Warehouse'].map(n => (
-                    <option key={n} value={n}>{n}</option>
-                  ))
+            <CustomSelect
+              value={form.building_id}
+              onChange={v => set('building_id', v)}
+              placeholder="Select Building"
+              options={buildings.length > 0
+                ? buildings.map(b => ({ value: b.id || b, label: b.name || b.building_name || b }))
+                : ['Main Block', 'Block A', 'Block B', 'Annex', 'Warehouse'].map(n => ({ value: n, label: n }))
               }
-            </select>
+            />
           </Field>
 
           <Field label="ZONE" required error={errors.zone_name}>
-            <select className="eob-select" value={form.zone_name} onChange={e => set('zone_name', e.target.value)}>
-              <option value="">Select Zone</option>
-              {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
-            </select>
+            <CustomSelect
+              value={form.zone_name}
+              onChange={v => set('zone_name', v)}
+              placeholder="Select Zone"
+              options={ZONES.map(z => ({ value: z, label: z }))}
+            />
           </Field>
 
           {/* Row 3 */}
           <Field label="FLOOR" required error={errors.floor_name}>
-            <select className="eob-select" value={form.floor_name} onChange={e => set('floor_name', e.target.value)}>
-              <option value="">Select Floor</option>
-              {FLOORS.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
+            <CustomSelect
+              value={form.floor_name}
+              onChange={v => set('floor_name', v)}
+              placeholder="Select Floor"
+              options={FLOORS.map(f => ({ value: f, label: f }))}
+            />
           </Field>
 
           <Field label="DEPARTMENT" required error={errors.department_name}>
-            <select className="eob-select" value={form.department_name} onChange={e => set('department_name', e.target.value)}>
-              <option value="">Select Department</option>
-              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <CustomSelect
+              value={form.department_name}
+              onChange={v => set('department_name', v)}
+              placeholder="Select Department"
+              options={DEPARTMENTS.map(d => ({ value: d, label: d }))}
+            />
           </Field>
 
           <Field label="AREA" required error={errors.area_name}>
-            <select className="eob-select" value={form.area_name} onChange={e => set('area_name', e.target.value)}>
-              <option value="">Select Area</option>
-              {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <CustomSelect
+              value={form.area_name}
+              onChange={v => set('area_name', v)}
+              placeholder="Select Area"
+              options={AREAS.map(a => ({ value: a, label: a }))}
+            />
           </Field>
         </div>
 

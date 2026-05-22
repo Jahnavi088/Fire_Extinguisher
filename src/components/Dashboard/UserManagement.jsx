@@ -3,18 +3,58 @@ import { ApiService } from '../../services/apiService';
 import './UserManagement.css';
 
 const NAV_MODULES = [
+  // --- MAIN ---
   { code: 'overview',          label: 'Overview',              icon: '🏠', category: 'Main' },
-  { code: 'reports',           label: 'Reports',               icon: '📄', category: 'Operations' },
+
+  // --- OPERATIONS ---
+  { code: 'reports',           label: 'Service Reports',       icon: '📄', category: 'Operations' },
   { code: 'work_orders',       label: 'Work Orders',           icon: '🔧', category: 'Operations' },
+  { code: 'pending_updates',   label: 'Pending Approvals',     icon: '⏳', category: 'Operations' },
+  { code: 'auto_scheduler',    label: 'Auto-Scheduler',        icon: '📅', category: 'Operations' },
+
+  // --- SYSTEM & SECURITY ---
+  { code: 'audit_logs',        label: 'Audit Logs',            icon: '📝', category: 'System & Security' },
+  { code: 'device_monitoring', label: 'Device Monitoring',     icon: '🖥️', category: 'System & Security' },
+
+  // --- CHECKLISTS ---
   { code: 'fe_checklist',      label: 'FE Checklist',          icon: '🧯', category: 'Checklists' },
-  { code: 'fire_extinguisher', label: 'Fire Extinguisher',     icon: '🧯', category: 'Modules' },
-  { code: 'fire_trolley',      label: 'Fire Trolley',          icon: '🛒', category: 'Modules' },
+
+  // --- EQUIPMENT MODULES ---
+  { code: 'fire_extinguisher', label: 'Fire Extinguishers',    icon: '🧯', category: 'Modules' },
+  { code: 'hose_reel',         label: 'Hose Reels',            icon: '🧵', category: 'Modules' },
+  { code: 'sprinkler',         label: 'Sprinklers',            icon: '🚿', category: 'Modules' },
+  { code: 'hydrant',           label: 'Fire Hydrants',         icon: '🚒', category: 'Modules' },
+  { code: 'fpca',              label: 'Alarm Panels',          icon: '🔔', category: 'Modules' },
+  { code: 'smoke_detector',    label: 'Smoke Detectors',       icon: '🌫️', category: 'Modules' },
+  { code: 'heat_detector',     label: 'Heat Detectors',        icon: '🌡️', category: 'Modules' },
+  { code: 'fire_trolley',      label: 'Fire Trolleys',         icon: '🛒', category: 'Modules' },
+  { code: 'emergency_door',    label: 'Emergency Exits',       icon: '🚪', category: 'Modules' },
+  { code: 'emergency_light',   label: 'Emergency Lighting',    icon: '🔦', category: 'Modules' },
+  { code: 'pa_system',         label: 'PA Systems',            icon: '📢', category: 'Modules' },
+  { code: 'wind_sock',         label: 'Wind Socks',            icon: '📍', category: 'Modules' },
+  { code: 'scba',              label: 'SCBA Units',            icon: '🫁', category: 'Modules' },
+  { code: 'ambulance',         label: 'Ambulances',            icon: '🚑', category: 'Modules' },
+  { code: 'first_aid_kit',     label: 'First Aid Kits',        icon: '🏥', category: 'Modules' },
+  { code: 'eyewash_station',   label: 'Eye Wash Stations',     icon: '👀', category: 'Modules' },
+  { code: 'spill_kit',         label: 'Spill Kits',            icon: '⚗️', category: 'Modules' },
+  { code: 'chemical_shower',   label: 'Chemical Showers',      icon: '🚿', category: 'Modules' },
+  { code: 'ppe_station',       label: 'PPE Stations',          icon: '🦺', category: 'Modules' },
+  { code: 'suppression_system',label: 'CO2 Systems',           icon: '💨', category: 'Modules' },
+  { code: 'safety_signage',    label: 'Safety Signage',        icon: '⚠️', category: 'Modules' },
+  { code: 'emergency_comm',    label: 'Emergency Comms',       icon: '📞', category: 'Modules' },
+  { code: 'fire_blanket',      label: 'Fire Blankets',         icon: '🧲', category: 'Modules' },
+  { code: 'muster_point',      label: 'Muster Points',         icon: '📌', category: 'Modules' },
+
+  // --- SETUP ---
   { code: 'onboarding',        label: 'Onboarding',            icon: '🚀', category: 'Setup' },
   { code: 'add_company',       label: 'Add Company',           icon: '🏢', category: 'Setup' },
+  { code: 'add_equipment',     label: 'Add Equipment',         icon: '➕', category: 'Setup' },
+
+  // --- USERS ---
   { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },
   { code: 'equipment_access',  label: 'Equipment Access',      icon: '🔐', category: 'Users' },
 ];
-const NAV_CATEGORIES = ['Main', 'Operations', 'Checklists', 'Modules', 'Setup', 'Users'];
+const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Checklists', 'Modules', 'Setup', 'Users'];
 
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
@@ -49,7 +89,6 @@ const UserManagement = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [viewUser, setViewUser] = useState(null);
-  const [userModules, setUserModules] = useState([]);
   const [modLoading, setModLoading] = useState(false);
   const [moduleChecks, setModuleChecks] = useState({});
   const [modSaving, setModSaving] = useState(false);
@@ -125,27 +164,53 @@ const UserManagement = ({ onBack }) => {
 
   const openViewModules = (u) => {
     setViewUser(u);
-    setUserModules([]);
     setModLoading(true);
-    // Default all nav modules to enabled
-    const defaults = {};
-    NAV_MODULES.forEach(m => { defaults[m.code] = true; });
-    setModuleChecks(defaults);
 
-    ApiService.getAdminUserModules(u.id)
-      .then(data => {
-        const modules = Array.isArray(data) ? data : (data?.modules || data?.data || []);
-        setUserModules(modules);
-        // If API returns nav-specific codes, use them to set check state
-        const apiCodes = new Set(modules.map(m => m.code || m.module_code || ''));
-        const hasNavCodes = NAV_MODULES.some(m => apiCodes.has(m.code));
-        if (hasNavCodes) {
+    ApiService.getUserNavAccess(u.id)
+      .then(res => {
+        const modules = Array.isArray(res?.modules) && res.modules.length > 0 ? res.modules : null;
+        if (modules) {
           const checks = {};
-          NAV_MODULES.forEach(m => { checks[m.code] = apiCodes.has(m.code); });
+          NAV_MODULES.forEach(m => {
+            checks[m.code] = modules.includes(m.code);
+          });
           setModuleChecks(checks);
+        } else {
+          // Fallback to legacy getAdminUserModules
+          return ApiService.getAdminUserModules(u.id)
+            .then(data => {
+              const legacyList = Array.isArray(data) ? data : (data?.modules || data?.data || []);
+              const apiCodes = new Set(legacyList.map(m => m.code || m.module_code || ''));
+              const hasNavCodes = NAV_MODULES.some(m => apiCodes.has(m.code));
+              if (hasNavCodes) {
+                const checks = {};
+                NAV_MODULES.forEach(m => { checks[m.code] = apiCodes.has(m.code); });
+                setModuleChecks(checks);
+              } else {
+                const defaults = {};
+                NAV_MODULES.forEach(m => { defaults[m.code] = true; });
+                setModuleChecks(defaults);
+              }
+            });
         }
       })
-      .catch(() => setUserModules([]))
+      .catch(() => {
+        // Fallback to local storage
+        const stored = localStorage.getItem(`nav_access_${u.id}`);
+        try {
+          const parsed = stored ? JSON.parse(stored) : null;
+          if (Array.isArray(parsed)) {
+            const checks = {};
+            NAV_MODULES.forEach(m => { checks[m.code] = parsed.includes(m.code); });
+            setModuleChecks(checks);
+            return;
+          }
+        } catch {}
+        // Default to all true if no config exists
+        const defaults = {};
+        NAV_MODULES.forEach(m => { defaults[m.code] = true; });
+        setModuleChecks(defaults);
+      })
       .finally(() => setModLoading(false));
   };
 
@@ -161,23 +226,8 @@ const UserManagement = ({ onBack }) => {
       // Build an array of enabled module codes (matches API format)
       const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
 
-      // 1. Persist to API — /admin/users/{id}/nav-access
       await ApiService.updateUserNavAccess(userId, enabledCodes);
-
-      // 2. Also cache locally so SafetyDashboard can use it immediately without re-fetching
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
-
-      // 3. Best-effort sync with the legacy /admin/users/{id}/modules endpoint
-      await Promise.allSettled([
-        ...NAV_MODULES.filter(m => moduleChecks[m.code]).map(m =>
-          ApiService.addAdminUserModule(viewUser.id, { module_code: m.code, access_level: 'admin' })
-        ),
-        ...NAV_MODULES.filter(m => !moduleChecks[m.code]).map(m => {
-          const existing = userModules.find(um => (um.code || um.module_code) === m.code);
-          if (existing) return ApiService.removeAdminUserModule(viewUser.id, existing.id || existing.module_id);
-          return Promise.resolve();
-        }),
-      ]);
     } catch (err) {
       console.error('Failed to save nav access via API, falling back to localStorage:', err);
       // Fallback: still save locally so it works offline
@@ -447,31 +497,33 @@ const UserManagement = ({ onBack }) => {
                   {NAV_CATEGORIES.map(cat => (
                     <div key={cat} className="um-module-category">
                       <div className="um-module-cat-label">{cat}</div>
-                      {NAV_MODULES.filter(m => m.category === cat).map(m => (
-                        <label
-                          key={m.code}
-                          className={`um-module-item${moduleChecks[m.code] ? ' assigned' : ''}`}
-                          onClick={() => handleModuleToggle(m.code)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div className="um-mod-check-wrap">
-                            <input
-                              type="checkbox"
-                              className="um-mod-checkbox"
-                              checked={moduleChecks[m.code] || false}
-                              onChange={() => handleModuleToggle(m.code)}
-                              onClick={e => e.stopPropagation()}
-                            />
-                            <div className="um-mod-label">
-                              <span className="um-module-emoji">{m.icon}</span>
-                              <span className="um-module-name">{m.label}</span>
+                      <div className={`um-module-items-wrapper ${cat === 'Modules' ? 'multi-col-grid' : 'single-col-list'}`}>
+                        {NAV_MODULES.filter(m => m.category === cat).map(m => (
+                          <label
+                            key={m.code}
+                            className={`um-module-item${moduleChecks[m.code] ? ' assigned' : ''}`}
+                            onClick={() => handleModuleToggle(m.code)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="um-mod-check-wrap">
+                              <input
+                                type="checkbox"
+                                className="um-mod-checkbox"
+                                checked={moduleChecks[m.code] || false}
+                                onChange={() => handleModuleToggle(m.code)}
+                                onClick={e => e.stopPropagation()}
+                              />
+                              <div className="um-mod-label">
+                                <span className="um-module-emoji">{m.icon}</span>
+                                <span className="um-module-name">{m.label}</span>
+                              </div>
                             </div>
-                          </div>
-                          {moduleChecks[m.code] && (
-                            <span className="um-mod-status-tag">Enabled</span>
-                          )}
-                        </label>
-                      ))}
+                            {moduleChecks[m.code] && (
+                              <span className="um-mod-status-tag">Enabled</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

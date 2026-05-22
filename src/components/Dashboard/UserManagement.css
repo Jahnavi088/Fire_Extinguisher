@@ -503,7 +503,7 @@
 }
 
 .um-modules-modal {
-  max-width: 460px;
+  max-width: 680px;
 }
 
 .um-modal-head {
@@ -721,13 +721,31 @@
 .um-modules-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .um-module-category {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.um-module-items-wrapper {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+}
+
+.um-module-items-wrapper.multi-col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 580px) {
+  .um-module-items-wrapper.multi-col-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .um-module-cat-label {

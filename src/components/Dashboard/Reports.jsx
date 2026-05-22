@@ -607,7 +607,24 @@ ${checklistHtml}
         res = [];
       }
 
-      setData(Array.isArray(res) ? res : (res?.items || res?.reports || res?.inspections || res?.data || []));
+      let finalData = Array.isArray(res) ? res : (res?.items || res?.reports || res?.inspections || res?.data || []);
+      
+      // Do not show pending inspections in Service Reports
+      if (activeTab === 'inspections') {
+         const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+         finalData = finalData.filter(i => {
+            if (approvedLocally.includes(i.id)) return true; // Explicitly approved, show it
+
+            const stStatus = (i.status || '').toUpperCase();
+            const stApprov = (i.approval_status || '').toUpperCase();
+            const stRemarks = (i.remarks || i.overall_remarks || '').toUpperCase();
+            
+            const isPending = stApprov === 'PENDING' || stStatus === 'PENDING' || stRemarks.includes('[PENDING]');
+            return !isPending;
+         });
+      }
+      
+      setData(finalData);
     } catch {
       setData([]);
     } finally {

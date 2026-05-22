@@ -40,7 +40,9 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
     try {
       const payload = {
         inspector_name: ApiService.getUser()?.name || 'Inspector',
-        remarks: 'Submitted via Professional Checklist',
+        remarks: '[PENDING] Submitted via Professional Checklist',
+        status: 'PENDING',
+        approval_status: 'PENDING',
         answers: items.map(item => ({
           checklist_item_id: item.id,
           answer: answers[item.id] === 'True' ? 'true' : (answers[item.id] === 'False' ? 'false' : 'na'),

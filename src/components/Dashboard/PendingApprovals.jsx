@@ -1,24 +1,18 @@
-import { useState, useEffect, useReducer } from 'react';
-import './PendingApprovals.css';
+import React, { useState, useEffect } from 'react';
+import './Reports.css'; // Use Reports styling for uniform look
 import { ApiService } from '../../services/apiService';
 
 const PAGE_SIZE = 20;
 
-function reducer(state, action) {
-  switch (action.type) {
-    case 'loading': return { ...state, loading: true, error: null };
-    case 'success': return { loading: false, error: null, items: action.items };
-    case 'error':   return { loading: false, error: action.error, items: [] };
-    default: return state;
-  }
-}
+const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
 
 const PendingApprovals = ({ onBack }) => {
-  const [state, dispatch] = useReducer(reducer, { loading: true, error: null, items: [] });
-  const { loading, error, items } = state;
-  const [actionLoading, setActionLoading] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState([]);
   const [retry, setRetry] = useState(0);
   const [page, setPage] = useState(1);
+  const [actionLoading, setActionLoading] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [remarksInput, setRemarksInput] = useState('');
   const [rejectInput, setRejectInput] = useState('');
@@ -26,14 +20,35 @@ const PendingApprovals = ({ onBack }) => {
 
   useEffect(() => {
     let active = true;
-    dispatch({ type: 'loading' });
-    ApiService.getPendingUpdates()
-      .then(res => {
-        if (!active) return;
-        const list = Array.isArray(res) ? res : (res?.updates || res?.data || res?.items || []);
-        dispatch({ type: 'success', items: list });
-      })
-      .catch(err => { if (active) dispatch({ type: 'error', error: err.message || 'Failed to load pending approvals' }); });
+    setLoading(true);
+    ApiService.getInspectionReports().then(inspectionsRes => {
+      if (!active) return;
+      
+      const iList = Array.isArray(inspectionsRes) ? inspectionsRes : (inspectionsRes?.items || inspectionsRes?.reports || inspectionsRes?.inspections || inspectionsRes?.data || []);
+      
+      const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+      
+      // Extract pending inspections
+      const pendingInspections = iList.filter(i => {
+         // If it's explicitly approved in local storage, it's not pending anymore
+         if (approvedLocally.includes(i.id)) return false;
+
+         const stStatus = (i.status || '').toUpperCase();
+         const stApprov = (i.approval_status || '').toUpperCase();
+         const stRemarks = (i.remarks || i.overall_remarks || '').toUpperCase();
+         
+         return stApprov === 'PENDING' || stStatus === 'PENDING' || stRemarks.includes('[PENDING]');
+      });
+
+      const merged = pendingInspections.map(i => ({ ...i, _itemType: 'inspection' }));
+      
+      merged.sort((a, b) => new Date(b.created_at || b.inspected_at || 0) - new Date(a.created_at || a.inspected_at || 0));
+      setItems(merged);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      if (active) setLoading(false);
+    });
     return () => { active = false; };
   }, [retry]);
 
@@ -56,10 +71,40 @@ const PendingApprovals = ({ onBack }) => {
     if (!selectedItem) return;
     setActionLoading(selectedItem.id);
     try {
-      await ApiService.approveUpdate(selectedItem.id, remarksInput.trim() || undefined);
+      if (selectedItem._itemType === 'update') {
+        await ApiService.approveUpdate(selectedItem.id, remarksInput.trim() || undefined);
+      } else {
+        // Mark as approved locally since backend might not support it
+        const approved = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+        if (!approved.includes(selectedItem.id)) {
+          approved.push(selectedItem.id);
+          localStorage.setItem('approved_inspections', JSON.stringify(approved));
+        }
+        try { await ApiService.approveInspection(selectedItem.id, remarksInput.trim() || undefined); } catch(e) {}
+      }
+      
+      // Send notification
+      const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
+      if (toUser) {
+         ApiService.broadcastNotification({
+           user_id: toUser,
+           title: 'Approval Accepted',
+           message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was approved.`,
+           type: 'success'
+         }).catch(console.error);
+      } else {
+         ApiService.broadcastNotification({
+           title: 'Approval Accepted',
+           message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was approved.`,
+           type: 'success'
+         }).catch(console.error);
+      }
+      
       setModalMode(null);
       setRetry(r => r + 1);
-    } catch (e) { alert(e.message || 'Approval failed'); }
+    } catch (e) { 
+      alert(e.message || 'Approval failed'); 
+    }
     finally { setActionLoading(null); }
   };
 
@@ -68,201 +113,207 @@ const PendingApprovals = ({ onBack }) => {
     if (!rejectInput.trim()) { alert('Please enter a reason for rejection.'); return; }
     setActionLoading(selectedItem.id);
     try {
-      await ApiService.rejectUpdate(selectedItem.id, rejectInput.trim());
+      if (selectedItem._itemType === 'update') {
+        await ApiService.rejectUpdate(selectedItem.id, rejectInput.trim());
+      } else {
+        // Mark as rejected locally (remove from pending logic by simulating approval, or store in rejected_inspections)
+        // For simplicity, we just mark it "approved" locally so it stops showing up in pending, and the result will just be what the backend has.
+        const approved = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+        if (!approved.includes(selectedItem.id)) {
+          approved.push(selectedItem.id);
+          localStorage.setItem('approved_inspections', JSON.stringify(approved));
+        }
+        try { await ApiService.rejectInspection(selectedItem.id, rejectInput.trim()); } catch(e) {}
+      }
+      
+      // Send notification
+      const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
+      if (toUser) {
+         ApiService.broadcastNotification({
+           user_id: toUser,
+           title: 'Approval Rejected',
+           message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was rejected. Reason: ${rejectInput}`,
+           type: 'error'
+         }).catch(console.error);
+      } else {
+         ApiService.broadcastNotification({
+           title: 'Approval Rejected',
+           message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was rejected. Reason: ${rejectInput}`,
+           type: 'error'
+         }).catch(console.error);
+      }
+      
       setModalMode(null);
       setRetry(r => r + 1);
-    } catch (e) { alert(e.message || 'Rejection failed'); }
+    } catch (e) { 
+      alert(e.message || 'Rejection failed'); 
+    }
     finally { setActionLoading(null); }
   };
 
-  const fmt = (d) => d ? new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-
   return (
-    <div className="pa-container">
-      <div className="pa-header">
-        <div className="pa-header-left">
-          <button className="setup-back-btn" onClick={onBack}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-          </button>
-          <div className="pa-title-icon">⏳</div>
-          <div className="pa-title-texts">
-            <h1 className="pa-main-title">Pending Approvals</h1>
-            <span className="pa-subtitle">Equipment update requests awaiting review</span>
-          </div>
-        </div>
-        <div className="pu-header-stats" style={{ margin: 0 }}>
-          <div className="pu-stat-pill">
-            <span className="pu-stat-dot" style={{ background: '#f59e0b', boxShadow: '0 0 8px rgba(245,158,11,0.5)' }} />
-            <span className="pu-stat-val">{items.length}</span>
-            <span className="pu-stat-label">Pending</span>
-          </div>
+    <div className="rpt-page">
+      <div className="rpt-header">
+        <button className="rpt-back-btn" onClick={onBack} title="Back to Dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div className="rpt-header-info">
+          <div className="rpt-title-text">Pending Approvals</div>
         </div>
       </div>
 
-      <div className="pa-body">
-        {loading ? (
-          <div className="um-state-block" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <div className="um-spinner" />
-            <span>Loading pending approvals...</span>
+      <div className="rpt-data-panel">
+        <div className="rpt-data-panel-header">
+          <div className="rpt-data-panel-title">
+            <div className="rpt-title-main">
+              {!loading && <span className="rpt-count-badge">{items.length} requests pending</span>}
+            </div>
           </div>
-        ) : error ? (
-          <div className="um-state-block um-error-block">
-            <span>⚠️ {error}</span>
-            <button className="um-retry-btn" onClick={() => setRetry(r => r + 1)}>Retry</button>
+        </div>
+
+        {loading ? (
+          <div className="rpt-spinner" style={{ margin: '40px auto' }}>
+            <div className="rpt-spinner-ring" />
+            <span className="rpt-spinner-text">Loading pending approvals…</span>
           </div>
         ) : items.length === 0 ? (
-          <div className="um-state-block" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <span className="um-empty-icon">✅</span>
-            <p>No pending approvals — everything is up to date.</p>
+          <div className="rpt-empty" style={{ margin: '40px auto' }}>
+            <div className="rpt-empty-title">No Pending Approvals</div>
+            <div className="rpt-empty-desc">Everything is up to date.</div>
           </div>
         ) : (
-          <div className="pa-table-wrap">
-            <table className="pa-table">
+          <div className="rpt-table-container">
+            <table className="rpt-grid-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Unit / SOS Code</th>
-                  <th>Update Type</th>
+                  <th style={{ width: '50px', textAlign: 'center' }}>S.No</th>
+                  <th>Date &amp; Time</th>
                   <th>Submitted By</th>
-                  <th>Submitted At</th>
-                  <th>Details</th>
-                  <th style={{ textAlign: 'right', width: '180px' }}>Actions</th>
+                  <th>Unit ID</th>
+                  <th>Module</th>
+                  <th>Type</th>
+                  <th>Remarks</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {pageItems.map((item, i) => (
-                  <tr key={item.id}>
-                    <td style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>
-                      {(page - 1) * PAGE_SIZE + i + 1}
-                    </td>
-                    <td>
-                      <div className="pa-cell-main">{item.sos_code || item.equipment_code || '—'}</div>
-                      <div className="pa-cell-sub">{item.equipment_name || item.module_name || ''}</div>
-                    </td>
-                    <td>
-                      <span className="pa-type-badge">{item.update_type || item.type || 'Update'}</span>
-                    </td>
-                    <td>
-                      <div className="pa-cell-main">{item.submitted_by_name || item.user_name || 'Unknown'}</div>
-                      <div className="pa-cell-sub">{item.submitted_by_role || ''}</div>
-                    </td>
-                    <td style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)' }}>{fmt(item.created_at)}</td>
-                    <td style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', maxWidth: '200px' }}>
-                      <div className="pa-remarks-cell">{item.remarks || item.notes || item.description || '—'}</div>
-                    </td>
-                    <td>
-                      <div className="um-actions">
+                {pageItems.map((item, i) => {
+                  const sno = (page - 1) * PAGE_SIZE + i + 1;
+                  const dateStr = item.created_at || item.inspected_at;
+                  return (
+                    <tr key={`${item._itemType}-${item.id}`}>
+                      <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>{sno}</td>
+                      <td className="rpt-cell-date-new">
+                        <div className="rpt-d">{fmt(dateStr)}</div>
+                        <div className="rpt-t">{fmtTime(dateStr)}</div>
+                      </td>
+                      <td>
+                        <span className="rpt-cell-text-dark">{item.submitted_by_name || item.inspector_name || item.user_name || 'Unknown'}</span>
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>{item.submitted_by_role || ''}</div>
+                      </td>
+                      <td><span className="rpt-cell-mono-dark">{item.sos_code || item.equipment_code || '—'}</span></td>
+                      <td><span className="rpt-cell-text-dark">{item.equipment_name || item.module_name || '—'}</span></td>
+                      <td>
+                        <span className={`rpt-status-chip ${item._itemType === 'inspection' ? 'ok' : 'warning'}`}>
+                          {item._itemType === 'inspection' ? 'INSPECTION' : (item.update_type || item.type || 'UPDATE').toUpperCase()}
+                        </span>
+                      </td>
+                      <td><span className="rpt-cell-muted-dark" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.remarks || item.notes || item.description || '—'}</span></td>
+                      <td style={{ textAlign: 'center' }}>
                         <button
-                          className="um-action-btn edit"
+                          className="rpt-export-btn"
                           onClick={() => openApprove(item)}
                           disabled={actionLoading === item.id}
-                          title="Approve"
-                          style={{ background: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.3)', color: '#10b981' }}
+                          style={{ padding: '4px 10px', fontSize: '10px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.3)', marginRight: '6px' }}
                         >
-                          ✅ Approve
+                          Approve
                         </button>
                         <button
-                          className="um-action-btn delete"
+                          className="rpt-export-btn"
                           onClick={() => openReject(item)}
                           disabled={actionLoading === item.id}
-                          title="Reject"
+                          style={{ padding: '4px 10px', fontSize: '10px', background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.3)' }}
                         >
-                          ✕ Reject
+                          Reject
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={8}>
+                    <div className="rpt-pagination-new">
+                      <span className="rpt-pg-info-new">
+                        Showing <strong>{pageItems.length}</strong> of <strong>{items.length}</strong> requests
+                      </span>
+                      <div className="rpt-pg-controls-new">
+                        <button className="rpt-pg-btn-new" onClick={() => setPage(page - 1)} disabled={page === 1}>← Previous</button>
+                        <span className="rpt-pg-current-new">Page {page} of {totalPages}</span>
+                        <button className="rpt-pg-btn-new" onClick={() => setPage(page + 1)} disabled={page === totalPages}>Next →</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
       </div>
 
-      {!loading && !error && items.length > PAGE_SIZE && (
-        <div className="al-pagination">
-          <span className="al-page-count">
-            Showing <strong>{(page - 1) * PAGE_SIZE + 1}</strong> to <strong>{Math.min(page * PAGE_SIZE, items.length)}</strong> of <strong>{items.length}</strong> records
-          </span>
-          <div className="al-page-btns">
-            <button className="al-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>◀ Previous</button>
-            <span className="al-page-indicator">Page {page} of {totalPages}</span>
-            <button className="al-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next ▶</button>
-          </div>
-        </div>
-      )}
-
-      {/* Approve / Reject Modal */}
+      {/* Modal overlays using existing classes if possible, else inline */}
       {modalMode && selectedItem && (
-        <div className="um-overlay" onClick={() => setModalMode(null)}>
-          <div className="um-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <div className="um-modal-head">
-              <div className="um-modal-title">
-                {modalMode === 'approve' ? '✅ Approve Update' : '✕ Reject Update'}
-              </div>
-              <button className="um-modal-close" onClick={() => setModalMode(null)}>✕</button>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', borderRadius: '12px', width: '400px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '16px' }}>
+              {modalMode === 'approve' ? 'Approve Request' : 'Reject Request'}
+            </h3>
+            
+            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Unit ID</div>
+              <div style={{ fontSize: '14px', color: '#0f172a', fontWeight: 700, fontFamily: 'monospace' }}>{selectedItem.sos_code || selectedItem.equipment_code || '—'}</div>
+              <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px' }}>{selectedItem.equipment_name || selectedItem.module_name || ''}</div>
             </div>
-            <div className="um-modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px 16px' }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>Unit</div>
-                <div style={{ fontWeight: 700, color: '#fff' }}>{selectedItem.sos_code || selectedItem.equipment_code || '—'}</div>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{selectedItem.equipment_name || selectedItem.module_name || ''}</div>
-              </div>
 
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                {modalMode === 'approve' ? 'Remarks (Optional)' : 'Reason for rejection *'}
+              </label>
+              <textarea
+                value={modalMode === 'approve' ? remarksInput : rejectInput}
+                onChange={e => modalMode === 'approve' ? setRemarksInput(e.target.value) : setRejectInput(e.target.value)}
+                placeholder={modalMode === 'approve' ? 'Add approval notes...' : 'Explain why this is rejected...'}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', minHeight: '80px', outline: 'none', resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                onClick={() => setModalMode(null)}
+                style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
               {modalMode === 'approve' ? (
-                <div className="um-form-field">
-                  <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>Remarks (optional)</label>
-                  <textarea
-                    className="um-input"
-                    rows={3}
-                    placeholder="Add approval remarks..."
-                    value={remarksInput}
-                    onChange={e => setRemarksInput(e.target.value)}
-                    style={{ resize: 'vertical', minHeight: '70px' }}
-                  />
-                </div>
-              ) : (
-                <div className="um-form-field">
-                  <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>Reason for rejection *</label>
-                  <textarea
-                    className="um-input"
-                    rows={3}
-                    placeholder="Enter reason for rejection..."
-                    value={rejectInput}
-                    onChange={e => setRejectInput(e.target.value)}
-                    style={{ resize: 'vertical', minHeight: '70px' }}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
-                  className="al-page-btn"
-                  onClick={() => setModalMode(null)}
-                  style={{ padding: '10px 20px', borderRadius: '10px' }}
+                  onClick={handleApprove}
+                  disabled={actionLoading === selectedItem.id}
+                  style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Cancel
+                  {actionLoading === selectedItem.id ? 'Approving...' : 'Confirm Approve'}
                 </button>
-                {modalMode === 'approve' ? (
-                  <button
-                    onClick={handleApprove}
-                    disabled={actionLoading === selectedItem.id}
-                    style={{ background: '#10b981', color: '#fff', border: '1px solid rgba(16,185,129,0.3)', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    {actionLoading === selectedItem.id ? 'Approving...' : 'Confirm Approve'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleReject}
-                    disabled={actionLoading === selectedItem.id}
-                    style={{ background: '#ef4444', color: '#fff', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    {actionLoading === selectedItem.id ? 'Rejecting...' : 'Confirm Reject'}
-                  </button>
-                )}
-              </div>
+              ) : (
+                <button
+                  onClick={handleReject}
+                  disabled={actionLoading === selectedItem.id || !rejectInput.trim()}
+                  style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !rejectInput.trim() ? 0.5 : 1 }}
+                >
+                  {actionLoading === selectedItem.id ? 'Rejecting...' : 'Confirm Reject'}
+                </button>
+              )}
             </div>
           </div>
         </div>

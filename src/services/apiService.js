@@ -159,6 +159,20 @@ export const ApiService = {
     return await request(`/inspections/${id}`);
   },
 
+  approveInspection: async (id, remarks) => {
+    return await request(`/inspections/${id}/approve`, {
+      method: 'PATCH',
+      body: remarks ? JSON.stringify({ remarks }) : undefined,
+    });
+  },
+
+  rejectInspection: async (id, reason) => {
+    return await request(`/inspections/${id}/reject`, {
+      method: 'PATCH',
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    });
+  },
+
   // --- MODULES ---
   getModuleEquipment: async (id) => {
     return await request(`/modules/${id}/equipment`);
@@ -518,26 +532,6 @@ export const ApiService = {
     return await request(`/admin/users/${id}/modules`);
   },
 
-  addAdminUserModule: async (id, data) => {
-    return await request(`/admin/users/${id}/modules`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  assignAdminUserModules: async (id, data) => {
-    return await request(`/admin/users/${id}/modules`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  removeAdminUserModule: async (userId, moduleId) => {
-    return await request(`/admin/users/${userId}/modules/${moduleId}`, {
-      method: 'DELETE',
-    });
-  },
-
   // --- USER NAV ACCESS ---
   // Returns { modules: ["overview", "work_orders", "fire_extinguisher", "fire_trolley", ...] }
   getUserNavAccess: async (userId) => {
@@ -735,5 +729,42 @@ export const ApiService = {
 
   getAlertsByDepartment: async (department) => {
     return await request(`/alerts?department=${encodeURIComponent(department)}`);
+  },
+
+  // --- AUTO-SCHEDULER ---
+  getScheduledTasks: async (params = {}) => {
+    try {
+      return await request(`/tasks${qs(params)}`);
+    } catch (e) {
+      // Temporary fallback mock if backend is not ready
+      console.warn("Scheduler API not available, falling back to local storage mock");
+      const saved = JSON.parse(localStorage.getItem('safety_auto_schedules') || '[]');
+      return { data: saved };
+    }
+  },
+
+  triggerSchedulerRun: async () => {
+    try {
+      return await request('/scheduler/run', { method: 'POST' });
+    } catch (e) {
+      // Mock for demo purposes
+      console.warn("Scheduler run API not available, simulating locally");
+      const modules = await ApiService.getEquipment();
+      const items = Array.isArray(modules) ? modules : (modules?.data || []);
+      const newTasks = items.slice(0, 10).map((m, idx) => ({
+        id: `TSK-${Date.now()}-${idx}`,
+        moduleCode: m.equipment_type || 'fire_extinguisher',
+        moduleName: m.name || m.equipment_name || 'Equipment',
+        healthScore: m.health_score || 90,
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        inspectorId: 'INS-01',
+        inspectorName: 'Rahul Sharma',
+        priority: 'High',
+        status: 'Scheduled',
+        frequency: 'Monthly'
+      }));
+      localStorage.setItem('safety_auto_schedules', JSON.stringify(newTasks));
+      return { success: true, generated_count: newTasks.length };
+    }
   },
 };

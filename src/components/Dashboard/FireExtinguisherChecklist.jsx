@@ -100,7 +100,9 @@ export default function FireExtinguisherChecklist({ selectedEq, equipmentType, d
     try {
       const payload = {
         inspector_name: ApiService.getUser()?.name || 'Inspector',
-        remarks: 'Submitted via Web Dashboard',
+        remarks: '[PENDING] Submitted via Web Dashboard',
+        status: 'PENDING',
+        approval_status: 'PENDING',
         answers: checklistData.map(i => ({
           checklist_item_id: i.id,
           answer: answers[i.id] === 'Yes' ? 'true' : (answers[i.id] === 'No' ? 'false' : 'na'),

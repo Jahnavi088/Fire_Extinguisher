@@ -176,7 +176,8 @@ const CHECKLIST_TYPE_LABELS = {
   wind_sock: { label: 'Wind Sock', icon: '📍' },
 };
 
-const SafetyDashboard = ({ user, onLogout }) => {
+const SafetyDashboard = ({ user, onLogout, navAccess }) => {
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const [activePage, setActivePage] = useState(() => {
     return sessionStorage.getItem('sd_activePage') || 'grid';
   });
@@ -209,7 +210,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [modules, setModules] = useState(STATIC_MODULES);
   // Nav access: array of module codes the user is allowed to see (null = unrestricted)
-  const [navAccessList, setNavAccessList] = useState(null);
+  const [navAccessList, setNavAccessList] = useState(navAccess ?? null);
   const checklists = [];
   const [clState, dispatchCl] = useReducer(
     (s, a) => {
@@ -312,37 +313,14 @@ const SafetyDashboard = ({ user, onLogout }) => {
     );
   }, [modules]);
 
-  // Fetch nav-access list from the API for non-admin users
+  // Sync navAccessList whenever the prop changes (e.g. after admin updates access)
   useEffect(() => {
     const role = (user?.role || '').toLowerCase();
-    if (role === 'superadmin' || role === 'admin') {
-      setNavAccessList(null); // null = unrestricted
-      return;
-    }
-    const userId = user?.id || user?.user_id;
-    if (!userId) return;
-    ApiService.getUserNavAccess(userId)
-      .then(res => {
-        const modules = Array.isArray(res?.modules) ? res.modules : null;
-        setNavAccessList(modules);
-      })
-      .catch(() => {
-        // Fallback: read from localStorage if API unavailable
-        const stored = localStorage.getItem(`nav_access_${userId}`);
-        try {
-          const parsed = stored ? JSON.parse(stored) : null;
-          if (Array.isArray(parsed)) {
-            // New format: array of module codes
-            setNavAccessList(parsed);
-          } else if (parsed && typeof parsed === 'object') {
-            // Old format: {code: true/false} — convert to array
-            setNavAccessList(Object.keys(parsed).filter(k => parsed[k] !== false));
-          } else {
-            setNavAccessList(null);
-          }
-        } catch { setNavAccessList(null); }
-      });
-  }, [user]);
+    let modules = Array.isArray(navAccess) && navAccess.length > 0 ? navAccess : null;
+    // superadmin/admin with no explicit list get unrestricted access
+    if ((role === 'superadmin' || role === 'admin') && !modules) modules = null;
+    setNavAccessList(modules);
+  }, [navAccess, user]);
 
   useEffect(() => {
     if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
@@ -762,7 +740,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             {!navCollapsed && <div className="nav-section-label">Management</div>}
 
             {/* CHECKLISTS DROPDOWN — dynamic from API */}
-            {isNavAllowed('fe_checklist') && (
+            {(isNavAllowed('fe_checklist') || isNavAllowed('fire_extinguisher') || isNavAllowed('sprinkler')) && (
               <>
                 <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
                   <div className="nav-left">
@@ -776,32 +754,34 @@ const SafetyDashboard = ({ user, onLogout }) => {
                   )}
                 </div>
                 <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`} style={{ maxHeight: checklistsDropdownOpen && !navCollapsed ? '320px' : '0', overflowY: 'auto' }}>
-                  {(checklistTypes.length > 0 ? checklistTypes : [{ equipment_type: 'fire_extinguisher' }]).map(ct => {
-                    const meta = CHECKLIST_TYPE_LABELS[ct.equipment_type] || { label: ct.equipment_type.replace(/_/g, ' '), icon: '📋' };
-                    const isActive = activePage === 'equipment-checklist' && selectedChecklistType === ct.equipment_type;
-                    return (
-                      <div
-                        key={ct.equipment_type}
-                        className={`nav-submenu-item ${isActive ? 'active' : ''}`}
-                        onClick={() => {
-                          setSelectedChecklistType(ct.equipment_type);
-                          setActivePage('equipment-checklist');
-                        }}
-                      >
-                        <span className="nav-icon-small">{meta.icon}</span>
-                        <span className="nav-label-small">{meta.label}</span>
-                        {ct.total_items && (
-                          <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>{ct.total_items}</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {(checklistTypes.length > 0 ? checklistTypes : [{ equipment_type: 'fire_extinguisher' }])
+                    .filter(ct => isNavAllowed(ct.equipment_type))
+                    .map(ct => {
+                      const meta = CHECKLIST_TYPE_LABELS[ct.equipment_type] || { label: ct.equipment_type.replace(/_/g, ' '), icon: '📋' };
+                      const isActive = activePage === 'equipment-checklist' && selectedChecklistType === ct.equipment_type;
+                      return (
+                        <div
+                          key={ct.equipment_type}
+                          className={`nav-submenu-item ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            setSelectedChecklistType(ct.equipment_type);
+                            setActivePage('equipment-checklist');
+                          }}
+                        >
+                          <span className="nav-icon-small">{meta.icon}</span>
+                          <span className="nav-label-small">{meta.label}</span>
+                          {ct.total_items && (
+                            <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>{ct.total_items}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </>
             )}
 
             {/* SETUP DROPDOWN */}
-            {(isNavAllowed('add_company') || !navAccessList) && (
+            {(isNavAllowed('add_company') || isNavAllowed('add_equipment')) && (
               <>
                 <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
                   <div className="nav-left">
@@ -821,7 +801,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
                       <span className="nav-label-small">Add Company</span>
                     </div>
                   )}
-                  {!navAccessList && (
+                  {isNavAllowed('add_equipment') && (
                     <div className={`nav-submenu-item ${activePage === 'equipment-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('equipment-onboarding')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><rect x="3" y="3" width="18" height="18" rx="3" /></svg></span>
                       <span className="nav-label-small">Add Equipment</span>
@@ -893,7 +873,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
               <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
                 {/* Onboarding setup banner — admin only, shown while companies are still being set up */}
-                {!navAccessList && adminCompanies.length === 0 && !appLoading && (
+                {isAdmin && adminCompanies.length === 0 && !appLoading && (
                   <div className="onboarding-banner" onClick={() => setActivePage('setup-onboarding')}>
                     <div className="ob-banner-icon">🚀</div>
                     <div className="ob-banner-body">

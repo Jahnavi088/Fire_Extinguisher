@@ -49,14 +49,14 @@
 }
 
 .eob-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: #fff;
   line-height: 1.2;
 }
 
 .eob-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   margin-top: 2px;
 }
@@ -116,7 +116,7 @@
 }
 
 .eob-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   color: #0a2a4a;
   letter-spacing: 1px;
@@ -128,30 +128,134 @@
   margin-left: 3px;
 }
 
-.eob-input,
-.eob-select {
+.eob-input {
   width: 100%;
-  padding: 14px 18px;
+  padding: 10px 14px;
   background: #0d2d4a;
   border: 2px solid transparent;
   border-radius: 10px;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: all 0.3s ease;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
   box-sizing: border-box;
 }
 
-.eob-select {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' stroke='%235fd3f3' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 18px;
-  padding-right: 42px;
+.eob-input:hover {
+  background: #0f3559;
+}
+
+.eob-custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.eob-custom-select.is-open {
+  z-index: 20;
+}
+
+.eob-select-trigger {
+  width: 100%;
+  padding: 10px 14px;
+  background: #0d2d4a;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.eob-select-trigger:hover,
+.eob-select-trigger.open {
+  background: #0f3559;
+}
+
+.eob-field.has-error .eob-select-trigger {
+  border-color: #e74c3c;
+}
+
+.placeholder-text {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+.eob-select-icon {
+  width: 18px;
+  height: 18px;
+  color: #5fd3f3;
+  transition: transform 0.3s ease;
+}
+
+.eob-select-trigger.open .eob-select-icon {
+  transform: rotate(180deg);
+}
+
+.eob-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  background: #0f3559;
+  border-radius: 10px;
+  border: 1px solid rgba(95, 211, 243, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.eob-select-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.eob-select-option {
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.eob-select-option:hover {
+  background: rgba(95, 211, 243, 0.15);
+}
+
+.eob-select-option.selected {
+  background: rgba(95, 211, 243, 0.25);
+  color: #5fd3f3;
+}
+
+/* Scrollbar for Dropdown */
+.eob-select-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+.eob-select-dropdown::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+.eob-select-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+.eob-select-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .eob-input::placeholder {
@@ -186,11 +290,11 @@
 .eob-cert-card {
   background: rgba(255, 255, 255, 0.85);
   border: 1.5px solid rgba(10, 61, 107, 0.2);
-  border-radius: 12px;
-  padding: 20px 24px;
+  border-radius: 10px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .eob-cert-card.has-error {
@@ -200,13 +304,13 @@
 .eob-cert-label {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
 }
 
 .eob-cert-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   margin-top: 1px;
   flex-shrink: 0;
   accent-color: #0a3d6b;
@@ -214,16 +318,16 @@
 }
 
 .eob-cert-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #0a2a4a;
   line-height: 1.4;
 }
 
 .eob-cert-text {
-  font-size: 13px;
+  font-size: 12px;
   color: #3a4a5a;
-  line-height: 1.65;
+  line-height: 1.5;
   margin: 0;
 }
 
