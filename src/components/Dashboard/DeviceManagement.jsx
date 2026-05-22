@@ -8,7 +8,7 @@ function reducer(state, action) {
   switch (action.type) {
     case 'loading': return { ...state, loading: true, error: null };
     case 'success': return { loading: false, error: null, items: action.items, total: action.total };
-    case 'error':   return { loading: false, error: action.error, items: [], total: 0 };
+    case 'error': return { loading: false, error: action.error, items: [], total: 0 };
     default: return state;
   }
 }
@@ -19,7 +19,6 @@ const DeviceManagement = ({ onBack }) => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ is_approved: '', is_active: '' });
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
   const [retry, setRetry] = useState(0);
   const [actionLoading, setActionLoading] = useState(null);
   const [selectedDevice, setSelectedDevice] = useState(null);
@@ -133,34 +132,38 @@ const DeviceManagement = ({ onBack }) => {
     return { emoji: '📱', type: 'default' };
   };
 
+  const pendingCount = items.filter(d => !d.is_approved).length;
+  const approvedCount = items.filter(d => d.is_approved).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="dm-container">
-      <div className="dm-header">
-        <div className="dm-title-section">
-          <button className="setup-back-btn" onClick={onBack}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
+    <div className="ea-page">
+      {/* ── Header ── */}
+      <div className="setup-header">
+        <button className="setup-back-btn" onClick={onBack} title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <div className="setup-header-info" style={{ flex: 1 }}>
+          <div className="setup-header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+              <line x1="12" y1="18" x2="12.01" y2="18" />
             </svg>
-          </button>
-          <div className="dm-title-icon">📱</div>
-          <div className="dm-title-texts">
-            <h1 className="dm-main-title">Device Monitoring Panel</h1>
-            <span className="dm-subtitle">Part 11 Compliance — Authorize inspection terminals</span>
+          </div>
+          <div>
+            <div className="setup-title">FDA Compliance Device Monitoring</div>
+            <div className="setup-subtitle">Part 11 Compliance — Authorize inspection terminals</div>
           </div>
         </div>
-        <div className="pu-header-stats" style={{ margin: '0' }}>
-          <div className="pu-stat-pill">
-            <span className="pu-stat-dot" style={{ background: '#f59e0b', boxShadow: '0 0 8px rgba(245,158,11,0.5)' }} />
-            <span className="pu-stat-val">{items.filter(d => !d.is_approved).length}</span>
-            <span className="pu-stat-label">Pending Units</span>
-          </div>
-        </div>
+
       </div>
 
-      <div className="dm-control-panel">
-        <div className="dm-search-group">
+      <div className="ea-body">
+
+        {/* ── Controls ── */}
+        <div className="dm-control-panel">
           <div className="dm-search-input-wrapper">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -181,226 +184,197 @@ const DeviceManagement = ({ onBack }) => {
             <option value="false">Inactive</option>
           </select>
         </div>
-        <div className="dm-view-toggles">
-          <button className={`dm-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')} title="Grid View (Hardware Cards)">🎴</button>
-          <button className={`dm-toggle-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')} title="Table View (Registry List)">📋</button>
-        </div>
-      </div>
 
-      <div className="um-content-wrap" style={{ flex: 1, padding: '0' }}>
-        {loading ? (
-          <div className="um-state-block" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <div className="um-spinner" />
-            <span>Synchronizing device registry...</span>
-          </div>
-        ) : error ? (
-          <div className="um-state-block um-error-block">
-            <span>⚠️ {error}</span>
-            <button className="um-retry-btn" onClick={() => setRetry(r => r + 1)}>Retry</button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="um-state-block" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <span className="um-empty-icon">📱</span>
-            <p>No device nodes found matching parameters.</p>
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="dm-cards-grid">
-            {filtered.map(device => {
-              const osInfo = getOsInfo(device.os_version);
-              return (
-                <div key={device.id} className="dm-device-card"
-                  style={{ '--card-border-gradient': osInfo.type === 'android' ? 'linear-gradient(90deg, #10b981, #06b6d4)' : 'linear-gradient(90deg, #3b82f6, #6366f1)' }}
-                  onClick={() => openDetail(device.id)}>
-                  <div className="dm-card-top">
-                    <div className={`dm-avatar-frame ${osInfo.type}`}>{osInfo.emoji}</div>
-                    <span className={`dm-card-status-badge ${device.is_approved ? 'dm-badge-approved' : 'dm-badge-pending'}`}>
-                      <span className="dm-dot" />
-                      {device.is_approved ? 'Approved' : 'Pending'}
-                    </span>
-                  </div>
-                  <div className="dm-card-middle">
-                    <div className="dm-card-name" title={device.device_name}>{device.device_name}</div>
-                    <div className="dm-card-inspector">User: <strong>{device.user_name || 'Unassigned'}</strong></div>
-                  </div>
-                  <div className="dm-card-specs">
-                    <div className="dm-spec-item">
-                      <span className="dm-spec-lbl">Model Code</span>
-                      <span className="dm-spec-val">{device.device_model || '—'}</span>
-                    </div>
-                    <div className="dm-spec-item">
-                      <span className="dm-spec-lbl">OS Platform</span>
-                      <span className="dm-spec-val">{device.os_version || '—'}</span>
-                    </div>
-                  </div>
-                  <div className="dm-card-actions" onClick={e => e.stopPropagation()}>
-                    <button className="dm-card-btn specs" onClick={() => openDetail(device.id)} title="Inspect Specs Log">🔍</button>
-                    {device.is_approved
-                      ? <button className="dm-card-btn revoke" onClick={() => revokeDevice(device.id)} disabled={actionLoading === device.id} title="Revoke Node Access">🚫</button>
-                      : <button className="dm-card-btn approve" onClick={() => approveDevice(device.id)} disabled={actionLoading === device.id} title="Authorize Node">✅</button>
-                    }
-                    {isSuperAdmin && (
-                      <button className="dm-card-btn delete" onClick={() => deleteDevice(device.id)} disabled={actionLoading === device.id} title="Purge Node Registration">🗑️</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="dm-table-wrap">
-            <table className="dm-table">
-              <thead>
-                <tr>
-                  <th>Device / Inspector</th>
-                  <th>Model / OS</th>
-                  <th>App Version</th>
-                  <th>Approval</th>
-                  <th>Last Sync</th>
-                  <th style={{ width: '160px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(device => (
-                  <tr key={device.id} onClick={() => openDetail(device.id)} style={{ cursor: 'pointer' }} title="Click to view specifications">
-                    <td>
-                      <div className="um-user-cell">
-                        <div className="um-avatar" style={{ background: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-                          {device.device_name?.charAt(0) || 'D'}
-                        </div>
-                        <div>
-                          <div className="um-name">{device.device_name}</div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>{device.user_name || 'Unassigned'}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '13px', fontWeight: '600' }}>{device.device_model}</div>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{device.os_version}</div>
-                    </td>
-                    <td className="um-mono">{device.app_version}</td>
-                    <td>
-                      <span className={`dm-card-status-badge ${device.is_approved ? 'dm-badge-approved' : 'dm-badge-pending'}`} style={{ padding: '3px 8px', fontSize: '10px' }}>
-                        <span className="dm-dot" />
-                        {device.is_approved ? 'Approved' : 'Pending'}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
-                      {device.last_sync_at ? new Date(device.last_sync_at).toLocaleString() : 'Never'}
-                    </td>
-                    <td>
-                      <div className="um-actions" onClick={e => e.stopPropagation()}>
-                        {device.is_approved
-                          ? <button className="um-action-btn edit" onClick={() => revokeDevice(device.id)} disabled={actionLoading === device.id} style={{ filter: 'grayscale(1)' }} title="Revoke Access">🚫</button>
-                          : <button className="um-action-btn edit" onClick={() => approveDevice(device.id)} disabled={actionLoading === device.id} title="Approve Device">✅</button>
-                        }
-                        {isSuperAdmin && (
-                          <button className="um-action-btn delete" onClick={() => deleteDevice(device.id)} disabled={actionLoading === device.id} title="Delete Registration">🗑️</button>
-                        )}
-                      </div>
-                    </td>
+        {/* ── Content ── */}
+        <div className="dm-content-wrap">
+          {loading ? (
+            <div className="dm-state-block">
+              <div className="dm-spinner" />
+              <span>Synchronizing device registry...</span>
+            </div>
+          ) : error ? (
+            <div className="dm-state-block dm-error-block">
+              <span>⚠️ {error}</span>
+              <button className="dm-retry-btn" onClick={() => setRetry(r => r + 1)}>Retry</button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="dm-state-block">
+              <span className="dm-empty-icon">📱</span>
+              <p>No device nodes found matching parameters.</p>
+            </div>
+          ) : (
+            <div className="dm-table-wrap">
+              <table className="dm-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '220px' }}>Device / Inspector</th>
+                    <th>Model / OS</th>
+                    <th>App Version</th>
+                    <th style={{ width: '130px' }}>Approval</th>
+                    <th style={{ width: '190px' }}>Last Sync</th>
+                    <th style={{ width: '130px', textAlign: 'right' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.map(device => (
+                    <tr key={device.id} onClick={() => openDetail(device.id)} style={{ cursor: 'pointer' }}>
+                      <td>
+                        <div className="dm-cell-user">
+                          <div className="dm-cell-avatar">{device.device_name?.charAt(0) || 'D'}</div>
+                          <div>
+                            <div className="dm-cell-name">{device.device_name}</div>
+                            <div className="dm-cell-sub">{device.user_name || 'Unassigned'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="dm-cell-model">{device.device_model}</div>
+                        <div className="dm-cell-os">{device.os_version}</div>
+                      </td>
+                      <td className="dm-cell-mono">{device.app_version || '—'}</td>
+                      <td>
+                        <span className={`dm-card-status-badge ${device.is_approved ? 'dm-badge-approved' : 'dm-badge-pending'}`} style={{ padding: '3px 9px', fontSize: '10px' }}>
+                          <span className="dm-dot" />
+                          {device.is_approved ? 'Approved' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="dm-cell-date">
+                        {device.last_sync_at ? new Date(device.last_sync_at).toLocaleString() : 'Never'}
+                      </td>
+                      <td>
+                        <div className="dm-table-actions" onClick={e => e.stopPropagation()}>
+                          <button className="dm-action-btn edit" onClick={() => openDetail(device.id)} title="View Specs">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                          {device.is_approved
+                            ? <button className="dm-action-btn revoke" onClick={() => revokeDevice(device.id)} disabled={actionLoading === device.id} title="Revoke Access">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                              </svg>
+                            </button>
+                            : <button className="dm-action-btn approve" onClick={() => approveDevice(device.id)} disabled={actionLoading === device.id} title="Approve Device">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            </button>
+                          }
+                          {isSuperAdmin && (
+                            <button className="dm-action-btn delete" onClick={() => deleteDevice(device.id)} disabled={actionLoading === device.id} title="Delete">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ── Pagination ── */}
+        {!loading && !error && total > PAGE_SIZE && (
+          <div className="dm-pagination">
+            <span className="dm-page-count">
+              Showing <strong>{(page - 1) * PAGE_SIZE + 1}</strong> – <strong>{Math.min(page * PAGE_SIZE, total)}</strong> of <strong>{total}</strong> devices
+            </span>
+            <div className="dm-page-btns">
+              <button className="dm-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>◀ Previous</button>
+              <span className="dm-page-indicator">Page {page} of {totalPages}</span>
+              <button className="dm-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next ▶</button>
+            </div>
           </div>
         )}
       </div>
 
-      {!loading && !error && total > PAGE_SIZE && (
-        <div className="al-pagination">
-          <span className="al-page-count">
-            Showing <strong>{(page - 1) * PAGE_SIZE + 1}</strong> to <strong>{Math.min(page * PAGE_SIZE, total)}</strong> of <strong>{total}</strong> devices
-          </span>
-          <div className="al-page-btns">
-            <button className="al-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>◀ Previous</button>
-            <span className="al-page-indicator">Page {page} of {totalPages}</span>
-            <button className="al-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next ▶</button>
-          </div>
-        </div>
-      )}
-
+      {/* ── Detail Modal ── */}
       {selectedDevice && (
-        <div className="um-overlay" onClick={() => setSelectedDevice(null)}>
-          <div className="um-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', background: '#0b1329' }}>
-            <div className="um-modal-head" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="um-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="dm-overlay" onClick={() => setSelectedDevice(null)}>
+          <div className="dm-modal" onClick={e => e.stopPropagation()}>
+            <div className="dm-modal-head">
+              <div className="dm-modal-title">
                 <span>📱</span> Device Specifications
               </div>
-              <button className="um-modal-close" onClick={() => setSelectedDevice(null)}>✕</button>
+              <button className="dm-modal-close" onClick={() => setSelectedDevice(null)}>✕</button>
             </div>
-            <div className="um-modal-body" style={{ color: '#fff', background: '#0b1329', padding: '24px' }}>
+            <div className="dm-modal-body">
               {detailLoading ? (
-                <div className="um-state-block">
-                  <div className="um-spinner" />
+                <div className="dm-state-block">
+                  <div className="dm-spinner" />
                   <span>Fetching live specs...</span>
                 </div>
               ) : (
-                <div className="dm-phone-frame">
-                  <div className="dm-phone-notch" />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div className="um-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', background: 'rgba(6,182,212,0.1)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.25)' }}>
-                        {selectedDevice.device_name?.charAt(0) || 'D'}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>{selectedDevice.device_name || 'Generic Device'}</div>
-                        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>
-                          Assigned Inspector: <strong style={{ color: '#22d3ee' }}>{selectedDevice.user_name || 'Unassigned'}</strong>
-                        </div>
-                      </div>
-                      <div style={{ marginLeft: 'auto' }}>
-                        <span className={`dm-card-status-badge ${selectedDevice.is_approved ? 'dm-badge-approved' : 'dm-badge-pending'}`}>
-                          <span className="dm-dot" />
-                          {selectedDevice.is_approved ? 'Approved' : 'Pending'}
-                        </span>
+                <>
+                  {/* Identity Row */}
+                  <div className="dm-modal-identity">
+                    <div className="dm-modal-avatar">{selectedDevice.device_name?.charAt(0) || 'D'}</div>
+                    <div className="dm-modal-identity-info">
+                      <div className="dm-modal-device-name">{selectedDevice.device_name || 'Generic Device'}</div>
+                      <div className="dm-modal-device-user">
+                        Inspector: <strong>{selectedDevice.user_name || 'Unassigned'}</strong>
                       </div>
                     </div>
+                    <span className={`dm-card-status-badge ${selectedDevice.is_approved ? 'dm-badge-approved' : 'dm-badge-pending'}`}>
+                      <span className="dm-dot" />
+                      {selectedDevice.is_approved ? 'Approved' : 'Pending'}
+                    </span>
+                  </div>
 
-                    <div className="um-form-grid" style={{ gap: '16px' }}>
-                      {[
-                        { label: 'Device Token (Part 11 UUID)', value: selectedDevice.device_token, mono: true, color: '#22d3ee' },
-                        { label: 'Device Model', value: selectedDevice.device_model },
-                        { label: 'Operating System', value: selectedDevice.os_version },
-                        { label: 'Client App Version', value: selectedDevice.app_version ? `v${selectedDevice.app_version}` : '—', mono: true },
-                        { label: 'Registration Date', value: selectedDevice.created_at ? new Date(selectedDevice.created_at).toLocaleString() : '—' },
-                        { label: 'Last Synchronization', value: selectedDevice.last_sync_at ? new Date(selectedDevice.last_sync_at).toLocaleString() : 'Never' },
-                      ].map(f => (
-                        <div key={f.label} className="um-form-field">
-                          <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: '700' }}>{f.label}</label>
-                          <div className={f.mono ? 'um-mono' : ''} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: f.color || 'inherit', wordBreak: f.mono ? 'break-all' : undefined }}>
-                            {f.value || '—'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '8px' }}>Security & Authorization Status</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '8px', padding: '12px' }}>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Authorized By</div>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginTop: '4px' }}>{selectedDevice.approved_by_name || 'System Auto-Accept'}</div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{selectedDevice.approved_at ? new Date(selectedDevice.approved_at).toLocaleString() : '—'}</div>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '8px', padding: '12px' }}>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>Revocation Reason</div>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: selectedDevice.revocation_reason ? '#f87171' : 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{selectedDevice.revocation_reason || 'No active revocation'}</div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{selectedDevice.revoked_at ? new Date(selectedDevice.revoked_at).toLocaleString() : ''}</div>
-                        </div>
+                  {/* Field Grid */}
+                  <div className="dm-modal-fields">
+                    {[
+                      { label: 'Device Token (Part 11 UUID)', value: selectedDevice.device_token, token: true },
+                      { label: 'Device Model', value: selectedDevice.device_model },
+                      { label: 'Operating System', value: selectedDevice.os_version },
+                      { label: 'Client App Version', value: selectedDevice.app_version ? `v${selectedDevice.app_version}` : '—' },
+                      { label: 'Registration Date', value: selectedDevice.created_at ? new Date(selectedDevice.created_at).toLocaleString() : '—' },
+                      { label: 'Last Synchronization', value: selectedDevice.last_sync_at ? new Date(selectedDevice.last_sync_at).toLocaleString() : 'Never' },
+                    ].map(f => (
+                      <div key={f.label} className="dm-modal-field">
+                        <label className="dm-modal-field-label">{f.label}</label>
+                        <div className={`dm-modal-field-val${f.token ? ' token' : ''}`}>{f.value || '—'}</div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
-                      {selectedDevice.is_approved
-                        ? <button onClick={() => revokeFromDetail(selectedDevice.id)} className="al-page-btn" style={{ background: '#f59e0b', color: '#fff', border: '1px solid rgba(245,158,11,0.3)', padding: '10px 20px', borderRadius: '10px', fontWeight: '700' }} disabled={actionLoading === selectedDevice.id}>Revoke Access</button>
-                        : <button onClick={() => approveFromDetail(selectedDevice.id)} className="al-page-btn" style={{ background: '#10b981', color: '#fff', border: '1px solid rgba(16,185,129,0.3)', padding: '10px 20px', borderRadius: '10px', fontWeight: '700' }} disabled={actionLoading === selectedDevice.id}>Authorize Device</button>
-                      }
-                      {isSuperAdmin && (
-                        <button onClick={() => deleteFromDetail(selectedDevice.id)} className="al-page-btn" style={{ background: '#ef4444', color: '#fff', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 20px', borderRadius: '10px', fontWeight: '700' }} disabled={actionLoading === selectedDevice.id}>Delete Registration</button>
-                      )}
+                  {/* Security Panel */}
+                  <div className="dm-modal-security">
+                    <div className="dm-modal-security-title">Security & Authorization Status</div>
+                    <div className="dm-modal-security-grid">
+                      <div className="dm-modal-security-card">
+                        <div className="dm-modal-security-card-label">Authorized By</div>
+                        <div className="dm-modal-security-card-val">{selectedDevice.approved_by_name || 'System Auto-Accept'}</div>
+                        <div className="dm-modal-security-card-sub">{selectedDevice.approved_at ? new Date(selectedDevice.approved_at).toLocaleString() : '—'}</div>
+                      </div>
+                      <div className="dm-modal-security-card">
+                        <div className="dm-modal-security-card-label">Revocation Reason</div>
+                        <div className="dm-modal-security-card-val" style={{ color: selectedDevice.revocation_reason ? '#f87171' : undefined }}>
+                          {selectedDevice.revocation_reason || 'No active revocation'}
+                        </div>
+                        <div className="dm-modal-security-card-sub">{selectedDevice.revoked_at ? new Date(selectedDevice.revoked_at).toLocaleString() : ''}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  {/* Footer Actions */}
+                  <div className="dm-modal-footer">
+                    {selectedDevice.is_approved
+                      ? <button className="dm-modal-action-btn revoke" onClick={() => revokeFromDetail(selectedDevice.id)} disabled={actionLoading === selectedDevice.id}>Revoke Access</button>
+                      : <button className="dm-modal-action-btn approve" onClick={() => approveFromDetail(selectedDevice.id)} disabled={actionLoading === selectedDevice.id}>Authorize Device</button>
+                    }
+                    {isSuperAdmin && (
+                      <button className="dm-modal-action-btn delete" onClick={() => deleteFromDetail(selectedDevice.id)} disabled={actionLoading === selectedDevice.id}>Delete Registration</button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>

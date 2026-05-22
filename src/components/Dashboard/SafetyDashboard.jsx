@@ -41,35 +41,39 @@ import Reports from './Reports';
 import ChecklistConfig from './ChecklistConfig';
 import WorkOrders from './WorkOrders';
 import AuditLog from './AuditLog';
+import DeviceManagement from './DeviceManagement';
+import AutoScheduler from './AutoScheduler';
+import PendingApprovals from './PendingApprovals';
 import Onboarding from './Onboarding';
+import EquipmentOnboarding from './EquipmentOnboarding';
 
 
 
 const STATIC_MODULES = [
   { module_id: 30, name: 'Fire Extinguishers', code: 'fire_extinguisher', health_score: 100, category: 'fire', image: '/images/fire_extinguisher1.png' },
-  { module_id: 33, name: 'Hose Reels',         code: 'hose_reel',         health_score: 92,  category: 'fire', image: '/images/hosereels1.png' },
-  { module_id: 31, name: 'Sprinklers',          code: 'sprinkler',         health_score: 93,  category: 'fire', image: '/images/sprinkler1.png' },
-  { module_id: 34, name: 'Fire Hydrants',       code: 'hydrant',           health_score: 92,  category: 'fire', image: '/images/hydrant1.png' },
-  { module_id: 35, name: 'Alarm Panels',        code: 'fpca',              health_score: 92,  category: 'fire', image: '/images/firealarm_panel1.png' },
-  { module_id: 36, name: 'Smoke Detectors',     code: 'smoke_detector',    health_score: 92,  category: 'fire', image: '/images/smoke_detector1.png' },
-  { module_id: 37, name: 'Heat Detectors',      code: 'heat_detector',     health_score: 92,  category: 'fire', image: '/images/heatdetector1.png' },
-  { module_id: 55, name: 'Fire Trolleys',       code: 'fire_trolley',      health_score: 100, category: 'fire', image: '/images/fire_trolley1.png' },
-  { module_id: 39, name: 'Emergency Exits',     code: 'emergency_door',    health_score: 92,  category: 'fire', image: '/images/emergency_exitdoor1.png' },
-  { module_id: 38, name: 'Emergency Lighting',  code: 'emergency_light',   health_score: 92,  category: 'fire', image: '/images/emergencylight1.png' },
-  { module_id: 44, name: 'PA Systems',          code: 'pa_system',         health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
-  { module_id: 56, name: 'Wind Socks',          code: 'wind_sock',         health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
-  { module_id: 57, name: 'SCBA Units',          code: 'scba',              health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
-  { module_id: 58, name: 'Ambulances',          code: 'ambulance',         health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
-  { module_id: 45, name: 'First Aid Kits',      code: 'first_aid_kit',     health_score: 93,  category: 'chemical', image: '/images/Firstaid1.png' },
-  { module_id: 46, name: 'Eye Wash Stations',   code: 'eyewash_station',   health_score: 92,  category: 'chemical', image: '/images/eye_wash1.png' },
-  { module_id: 48, name: 'Spill Kits',          code: 'spill_kit',         health_score: 92,  category: 'chemical', image: '/images/spill_kit1.png' },
-  { module_id: 60, name: 'Chemical Showers',    code: 'chemical_shower',   health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
-  { module_id: 49, name: 'PPE Stations',        code: 'ppe_station',       health_score: 94,  category: 'chemical', image: '/images/ppe_station1.png' },
-  { module_id: 42, name: 'CO2 Systems',         code: 'suppression_system',health_score: 94,  category: 'fire',     image: '/images/suppression_system.png' },
-  { module_id: 62, name: 'Safety Signage',      code: 'safety_signage',    health_score: 100, category: 'permit',   image: '/images/signage1.png' },
-  { module_id: 61, name: 'Emergency Comms',     code: 'emergency_comm',    health_score: 100, category: 'permit',   image: '/images/Emergency_call1.png' },
-  { module_id: 41, name: 'Fire Blankets',       code: 'fire_blanket',      health_score: 93,  category: 'fire',     image: '/images/fireblanket1.png' },
-  { module_id: 59, name: 'Muster Points',       code: 'muster_point',      health_score: 100, category: 'permit',   image: '/images/muster_point1.png' },
+  { module_id: 33, name: 'Hose Reels', code: 'hose_reel', health_score: 92, category: 'fire', image: '/images/hosereels1.png' },
+  { module_id: 31, name: 'Sprinklers', code: 'sprinkler', health_score: 93, category: 'fire', image: '/images/sprinkler1.png' },
+  { module_id: 34, name: 'Fire Hydrants', code: 'hydrant', health_score: 92, category: 'fire', image: '/images/hydrant1.png' },
+  { module_id: 35, name: 'Alarm Panels', code: 'fpca', health_score: 92, category: 'fire', image: '/images/firealarm_panel1.png' },
+  { module_id: 36, name: 'Smoke Detectors', code: 'smoke_detector', health_score: 92, category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 37, name: 'Heat Detectors', code: 'heat_detector', health_score: 92, category: 'fire', image: '/images/heatdetector1.png' },
+  { module_id: 55, name: 'Fire Trolleys', code: 'fire_trolley', health_score: 100, category: 'fire', image: '/images/fire_trolley1.png' },
+  { module_id: 39, name: 'Emergency Exits', code: 'emergency_door', health_score: 92, category: 'fire', image: '/images/emergency_exitdoor1.png' },
+  { module_id: 38, name: 'Emergency Lighting', code: 'emergency_light', health_score: 92, category: 'fire', image: '/images/emergencylight1.png' },
+  { module_id: 44, name: 'PA Systems', code: 'pa_system', health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
+  { module_id: 56, name: 'Wind Socks', code: 'wind_sock', health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
+  { module_id: 57, name: 'SCBA Units', code: 'scba', health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
+  { module_id: 58, name: 'Ambulances', code: 'ambulance', health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
+  { module_id: 45, name: 'First Aid Kits', code: 'first_aid_kit', health_score: 93, category: 'chemical', image: '/images/Firstaid1.png' },
+  { module_id: 46, name: 'Eye Wash Stations', code: 'eyewash_station', health_score: 92, category: 'chemical', image: '/images/eye_wash1.png' },
+  { module_id: 48, name: 'Spill Kits', code: 'spill_kit', health_score: 92, category: 'chemical', image: '/images/spill_kit1.png' },
+  { module_id: 60, name: 'Chemical Showers', code: 'chemical_shower', health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
+  { module_id: 49, name: 'PPE Stations', code: 'ppe_station', health_score: 94, category: 'chemical', image: '/images/ppe_station1.png' },
+  { module_id: 42, name: 'CO2 Systems', code: 'suppression_system', health_score: 94, category: 'fire', image: '/images/suppression_system.png' },
+  { module_id: 62, name: 'Safety Signage', code: 'safety_signage', health_score: 100, category: 'permit', image: '/images/signage1.png' },
+  { module_id: 61, name: 'Emergency Comms', code: 'emergency_comm', health_score: 100, category: 'permit', image: '/images/Emergency_call1.png' },
+  { module_id: 41, name: 'Fire Blankets', code: 'fire_blanket', health_score: 93, category: 'fire', image: '/images/fireblanket1.png' },
+  { module_id: 59, name: 'Muster Points', code: 'muster_point', health_score: 100, category: 'permit', image: '/images/muster_point1.png' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
@@ -142,34 +146,34 @@ const MODULE_EMOJI = {
 };
 
 const CHECKLIST_TYPE_LABELS = {
-  ambulance:          { label: 'Ambulance',          icon: '🚑' },
-  chemical_shower:    { label: 'Chemical Shower',    icon: '🚿' },
-  co_detector:        { label: 'CO Detector',        icon: '🌫️' },
-  emergency_comm:     { label: 'Emergency Comm',     icon: '📞' },
-  emergency_light:    { label: 'Emergency Lighting', icon: '🔦' },
-  exit_sign:          { label: 'Exit Sign',          icon: '🚪' },
-  eyewash_station:    { label: 'Eye Wash Station',   icon: '👀' },
-  fire_alarm:         { label: 'Fire Alarm',         icon: '🔔' },
-  fire_blanket:       { label: 'Fire Blanket',       icon: '🧲' },
-  fire_door:          { label: 'Fire Door',          icon: '🚪' },
-  fire_extinguisher:  { label: 'Fire Extinguisher',  icon: '🧯' },
-  fire_trolley:       { label: 'Fire Trolley',       icon: '🛒' },
-  first_aid_kit:      { label: 'First Aid Kit',      icon: '🏥' },
-  fpca:               { label: 'FPCA / Alarm Panel', icon: '🔔' },
-  heat_detector:      { label: 'Heat Detector',      icon: '🌡️' },
-  hose_reel:          { label: 'Hose Reel',          icon: '🧵' },
-  hydrant:            { label: 'Fire Hydrant',       icon: '🚒' },
-  muster_point:       { label: 'Muster Point',       icon: '📌' },
-  pa_system:          { label: 'PA System',          icon: '📢' },
-  ppe_station:        { label: 'PPE Station',        icon: '🦺' },
-  safety_shower:      { label: 'Safety Shower',      icon: '🚰' },
-  scba_unit:          { label: 'SCBA Unit',          icon: '🫁' },
-  signage:            { label: 'Safety Signage',     icon: '⚠️' },
-  smoke_detector:     { label: 'Smoke Detector',     icon: '🌫️' },
-  spill_kit:          { label: 'Spill Kit',          icon: '⚗️' },
-  sprinkler:          { label: 'Sprinkler System',   icon: '🚿' },
+  ambulance: { label: 'Ambulance', icon: '🚑' },
+  chemical_shower: { label: 'Chemical Shower', icon: '🚿' },
+  co_detector: { label: 'CO Detector', icon: '🌫️' },
+  emergency_comm: { label: 'Emergency Comm', icon: '📞' },
+  emergency_light: { label: 'Emergency Lighting', icon: '🔦' },
+  exit_sign: { label: 'Exit Sign', icon: '🚪' },
+  eyewash_station: { label: 'Eye Wash Station', icon: '👀' },
+  fire_alarm: { label: 'Fire Alarm', icon: '🔔' },
+  fire_blanket: { label: 'Fire Blanket', icon: '🧲' },
+  fire_door: { label: 'Fire Door', icon: '🚪' },
+  fire_extinguisher: { label: 'Fire Extinguisher', icon: '🧯' },
+  fire_trolley: { label: 'Fire Trolley', icon: '🛒' },
+  first_aid_kit: { label: 'First Aid Kit', icon: '🏥' },
+  fpca: { label: 'FPCA / Alarm Panel', icon: '🔔' },
+  heat_detector: { label: 'Heat Detector', icon: '🌡️' },
+  hose_reel: { label: 'Hose Reel', icon: '🧵' },
+  hydrant: { label: 'Fire Hydrant', icon: '🚒' },
+  muster_point: { label: 'Muster Point', icon: '📌' },
+  pa_system: { label: 'PA System', icon: '📢' },
+  ppe_station: { label: 'PPE Station', icon: '🦺' },
+  safety_shower: { label: 'Safety Shower', icon: '🚰' },
+  scba_unit: { label: 'SCBA Unit', icon: '🫁' },
+  signage: { label: 'Safety Signage', icon: '⚠️' },
+  smoke_detector: { label: 'Smoke Detector', icon: '🌫️' },
+  spill_kit: { label: 'Spill Kit', icon: '⚗️' },
+  sprinkler: { label: 'Sprinkler System', icon: '🚿' },
   suppression_system: { label: 'Suppression System', icon: '💨' },
-  wind_sock:          { label: 'Wind Sock',          icon: '📍' },
+  wind_sock: { label: 'Wind Sock', icon: '📍' },
 };
 
 const SafetyDashboard = ({ user, onLogout }) => {
@@ -182,6 +186,11 @@ const SafetyDashboard = ({ user, onLogout }) => {
       return s ? JSON.parse(s) : null;
     } catch { return null; }
   });
+  const [appLoading, setAppLoading] = useState(true);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = React.useRef(null);
   const [checkedItems, setCheckedItems] = useState({});
   const [panelVisible, setPanelVisible] = useState(true);
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
@@ -224,6 +233,53 @@ const SafetyDashboard = ({ user, onLogout }) => {
     setWorkOrderPrefill(sosCode);
     setActivePage('work-orders');
   };
+
+  const fetchNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      const d = await ApiService.getNotifications({ limit: 20 });
+      const list = Array.isArray(d) ? d : (d?.notifications || d?.items || d?.data || []);
+      setNotifications(list);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const openNotifPanel = () => {
+    setNotifOpen(v => {
+      if (!v) fetchNotifications();
+      return !v;
+    });
+  };
+
+  const handleMarkRead = async (id) => {
+    try {
+      await ApiService.markNotificationRead([id]);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, is_read: true } : n));
+      setAlertCount(prev => Math.max(0, prev - 1));
+    } catch { /* ignore */ }
+  };
+
+  const handleMarkAllRead = async () => {
+    const unreadIds = notifications.filter(n => !n.read && !n.is_read).map(n => n.id);
+    if (!unreadIds.length) return;
+    try {
+      await ApiService.markNotificationRead(unreadIds);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
+      setAlertCount(0);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handler = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [notifOpen]);
 
   const filterOptions = [
     { label: 'All', icon: '🔍' },
@@ -351,7 +407,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
               const expired = res.expired ?? 0;
               const needsService = res.needs_service ?? 0;
               const dueInspection = res.due_inspection ?? 0;
-              
+
               const issues = expired + needsService + dueInspection;
               score = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
             }
@@ -366,6 +422,8 @@ const SafetyDashboard = ({ user, onLogout }) => {
         }));
       } catch (err) {
         console.error('Failed to fetch module summaries:', err);
+      } finally {
+        setAppLoading(false);
       }
     };
     fetchSummaries();
@@ -537,12 +595,21 @@ const SafetyDashboard = ({ user, onLogout }) => {
       label: 'System & Security',
       items: [
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Audit Logs', code: 'audit_logs', active: activePage === 'audit-logs', onClick: () => setActivePage('audit-logs') },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /><path d="M9 6h6" /></svg>, label: 'Device Monitoring', code: 'device_monitoring', active: activePage === 'device-monitoring', onClick: () => setActivePage('device-monitoring') },
       ],
     },
   ];
 
   return (
     <div className={`dash ${navCollapsed ? 'sidebar-collapsed' : ''} ${!topbarVisible ? 'topbar-hidden' : ''}`} style={{ '--bg': bgColor }}>
+      {appLoading && (
+        <div className="app-loader-overlay">
+          <div className="app-loader-box">
+            <img src="/apitoria-logo.png" alt="Apitoria" className="app-loader-logo" />
+            <span className="app-loader-text">Loading Safety Dashboard…</span>
+          </div>
+        </div>
+      )}
       {/* ── TOPBAR (HEADER AT TOP) ────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar-left">
@@ -556,7 +623,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
                 Emergency Safety Dashboard
               </div>
               <div className="tb-subtitle">
-                Real-time fire &amp; safety monitoring 
+                Real-time fire &amp; safety monitoring
                 <span className="health-info-link" title="Health Calculation: ((Total Assets - (Expired + Needs Service + Due Inspection)) / Total Assets) * 100" style={{ marginLeft: '8px', opacity: 0.7, cursor: 'help', fontSize: '9px', textDecoration: 'underline' }}>
                   Health Logic ⓘ
                 </span>
@@ -608,7 +675,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
           <div className={`tb-clock ${panelVisible ? 'hidden' : ''}`}>
             <span className="tb-time-bold">{currentTime}</span>
           </div>
-          <div className="bell-wrap">
+          <div className="bell-wrap" ref={notifRef} onClick={openNotifPanel} title="Notifications">
             <span className="bell-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -616,15 +683,41 @@ const SafetyDashboard = ({ user, onLogout }) => {
               </svg>
             </span>
             <span className="bell-badge">{alertCount > 99 ? '99+' : alertCount || 0}</span>
+            {notifOpen && (
+              <div className="notif-panel" onClick={e => e.stopPropagation()}>
+                <div className="notif-panel-header">
+                  <span className="notif-panel-title">Notifications</span>
+                  <button className="notif-mark-all-btn" onClick={handleMarkAllRead}>Mark all read</button>
+                </div>
+                <div className="notif-panel-body">
+                  {notifLoading ? (
+                    <div className="notif-loading"><div className="notif-spinner" /><span>Loading…</span></div>
+                  ) : notifications.length === 0 ? (
+                    <div className="notif-empty">No notifications</div>
+                  ) : notifications.map(n => {
+                    const isRead = n.read || n.is_read;
+                    return (
+                      <div key={n.id} className={`notif-item ${isRead ? 'read' : 'unread'}`} onClick={() => !isRead && handleMarkRead(n.id)}>
+                        <div className="notif-item-dot" />
+                        <div className="notif-item-content">
+                          <div className="notif-item-msg">{n.message || n.title || n.body || 'Notification'}</div>
+                          {n.created_at && <div className="notif-item-time">{new Date(n.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <div className={`status-badge ${panelVisible ? 'hidden' : ''}`}>❤️ {preparednessScore}%</div>
-          <button 
-            className="panel-toggle-topbar-btn" 
+          <button
+            className="panel-toggle-topbar-btn"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setPanelVisible(!panelVisible);
-            }} 
+            }}
             title={panelVisible ? "Hide info panel" : "Show info panel"}
             aria-label="Toggle Panel"
           >
@@ -708,7 +801,7 @@ const SafetyDashboard = ({ user, onLogout }) => {
             )}
 
             {/* SETUP DROPDOWN */}
-            {(isNavAllowed('add_company') || isNavAllowed('onboarding')) && (
+            {(isNavAllowed('add_company') || !navAccessList) && (
               <>
                 <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
                   <div className="nav-left">
@@ -722,16 +815,16 @@ const SafetyDashboard = ({ user, onLogout }) => {
                   )}
                 </div>
                 <div className={`nav-submenu ${setupDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-                  {isNavAllowed('onboarding') && (
-                    <div className={`nav-submenu-item ${activePage === 'setup-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('setup-onboarding')}>
-                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg></span>
-                      <span className="nav-label-small">Onboarding</span>
-                    </div>
-                  )}
                   {isNavAllowed('add_company') && (
                     <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg></span>
                       <span className="nav-label-small">Add Company</span>
+                    </div>
+                  )}
+                  {!navAccessList && (
+                    <div className={`nav-submenu-item ${activePage === 'equipment-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('equipment-onboarding')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><rect x="3" y="3" width="18" height="18" rx="3" /></svg></span>
+                      <span className="nav-label-small">Add Equipment</span>
                     </div>
                   )}
                 </div>
@@ -799,13 +892,24 @@ const SafetyDashboard = ({ user, onLogout }) => {
           <div className="content-area">
             <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
               <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
+                {/* Onboarding setup banner — admin only, shown while companies are still being set up */}
+                {!navAccessList && adminCompanies.length === 0 && !appLoading && (
+                  <div className="onboarding-banner" onClick={() => setActivePage('setup-onboarding')}>
+                    <div className="ob-banner-icon">🚀</div>
+                    <div className="ob-banner-body">
+                      <div className="ob-banner-title">Complete Your Setup</div>
+                      <div className="ob-banner-desc">Configure your company, users and equipment access to get started.</div>
+                    </div>
+                    <button className="ob-banner-btn">Start Onboarding →</button>
+                  </div>
+                )}
                 <div className="eq-grid">
                   {filteredModules.map((mod) => (
                     <div key={mod.module_id} className={`eq-card ${getStatus(mod)}`} onClick={() => handleOpenModule(mod)}>
                       <div className="eq-icon">
                         {mod.image
                           ? <img src={mod.image} alt={mod.name} className={`eq-card-img eq-img-${mod.code}`}
-                              onError={e => { e.target.style.display = 'none'; e.target.parentElement.textContent = MODULE_EMOJI[mod.code] || '📦'; }} />
+                            onError={e => { e.target.style.display = 'none'; e.target.parentElement.textContent = MODULE_EMOJI[mod.code] || '📦'; }} />
                           : (MODULE_EMOJI[mod.code] || '📦')}
                       </div>
                       <div className="eq-info-wrap">
@@ -991,30 +1095,25 @@ const SafetyDashboard = ({ user, onLogout }) => {
             {/* ── PENDING APPROVALS ── */}
             <section className={`page ${activePage === 'pending-updates' ? 'active' : ''}`}>
               {activePage === 'pending-updates' && (
-                <div style={{ padding: '32px', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-                  <h2 style={{ color: '#fff', marginBottom: '8px' }}>Pending Approvals</h2>
-                  <p>No pending approvals at this time.</p>
-                  <button className="setup-back-btn" style={{ marginTop: '24px' }} onClick={() => setActivePage('grid')}>← Back to Overview</button>
-                </div>
+                <PendingApprovals onBack={() => setActivePage('grid')} />
               )}
             </section>
 
             {/* ── AUTO-SCHEDULER ── */}
             <section className={`page ${activePage === 'auto-scheduler' ? 'active' : ''}`}>
               {activePage === 'auto-scheduler' && (
-                <div style={{ padding: '32px', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
-                  <h2 style={{ color: '#fff', marginBottom: '8px' }}>Auto-Scheduler</h2>
-                  <p>Automated inspection scheduling coming soon.</p>
-                  <button className="setup-back-btn" style={{ marginTop: '24px' }} onClick={() => setActivePage('grid')}>← Back to Overview</button>
-                </div>
+                <AutoScheduler modules={modules} onBack={() => setActivePage('grid')} />
               )}
             </section>
 
             {/* ── AUDIT LOGS ── */}
             <section className={`page ${activePage === 'audit-logs' ? 'active' : ''}`}>
               {activePage === 'audit-logs' && <AuditLog onBack={() => setActivePage('grid')} />}
+            </section>
+
+            {/* ── DEVICE MONITORING ── */}
+            <section className={`page ${activePage === 'device-monitoring' ? 'active' : ''}`}>
+              {activePage === 'device-monitoring' && <DeviceManagement onBack={() => setActivePage('grid')} />}
             </section>
 
             {/* ── FIRE EXTINGUISHER CHECKLIST (legacy) ── */}
@@ -1038,6 +1137,16 @@ const SafetyDashboard = ({ user, onLogout }) => {
             <section className={`page ${activePage === 'setup-onboarding' ? 'active' : ''}`}>
               {activePage === 'setup-onboarding' && (
                 <Onboarding onBack={() => setActivePage('grid')} onNavigate={setActivePage} />
+              )}
+            </section>
+
+            {/* ── EQUIPMENT ONBOARDING ── */}
+            <section className={`page ${activePage === 'equipment-onboarding' ? 'active' : ''}`}>
+              {activePage === 'equipment-onboarding' && (
+                <EquipmentOnboarding
+                  onBack={() => setActivePage('grid')}
+                  onSuccess={() => setActivePage('grid')}
+                />
               )}
             </section>
 

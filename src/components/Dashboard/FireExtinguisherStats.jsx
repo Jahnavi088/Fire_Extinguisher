@@ -139,6 +139,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showInspections, setShowInspections] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -249,8 +250,9 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
           </div>
           <span className="fe-score-badge" 
-            title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
-            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
+            title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100. Click to toggle inspection history panel."
+            onClick={() => setShowInspections(!showInspections)}
+            style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
             {summary?.readiness_score ?? 0}%
           </span>
 
@@ -258,7 +260,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-search-box">
               <input
                 type="text"
-                placeholder="Search SOS Code, location, or building..."
+                placeholder="Search SOS code..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="fe-search-input"
@@ -268,12 +270,6 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
               )}
             </div>
           </div>
-          <button
-            className="fe-compliance-btn"
-            onClick={() => alert('Compliance History — coming soon')}
-          >
-            📋 COMPLIANCE HISTORY
-          </button>
         </div>
 
         {/* KPI cards */}
@@ -416,7 +412,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
           </div>
         </div>
 
-        <InspectionHistoryPanel moduleId={modId} />
+        {showInspections && <InspectionHistoryPanel moduleId={modId} />}
       </div>
     );
   }
@@ -443,7 +439,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-search-box">
               <input
                 type="text"
-                placeholder="Search within this list..."
+                placeholder="Search SOS code..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);

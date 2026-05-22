@@ -1,49 +1,11 @@
-.wo-stats-bar {
-  display: flex;
-  gap: 20px;
-  padding: 0 0 24px;
-  margin-top: 12px;
-}
-
-.wo-stat-card {
-  flex: 1;
-  background: var(--surface);
-  padding: 24px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
-}
-
-.wo-stat-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--border2);
-}
-
-.wo-stat-val {
-  font-size: 32px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1;
-}
-
-.wo-stat-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-}
+/* ── WorkOrders Table — styled to match EquipmentAccess ──────────── */
 
 .wo-table-wrap {
-  background: var(--surface);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  overflow-x: auto;
+  flex: 1;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
 }
 
 .wo-table {
@@ -53,42 +15,43 @@
 }
 
 .wo-table th {
-  background: rgba(255, 255, 255, 0.04);
-  padding: 16px;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--blue);
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-  letter-spacing: 1px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  color: #212529;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  border: 1px solid #dee2e6;
+  white-space: nowrap;
 }
 
 .wo-table td {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #495057;
+  background: #fff;
+  border: 1px solid #dee2e6;
   vertical-align: middle;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.wo-table tr:last-child td {
-  border-bottom: none;
 }
 
 .wo-table tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background-color: #f1f3f5;
+}
+
+.wo-table tr:last-child td {
+  border-bottom: 1px solid #dee2e6;
 }
 
 .wo-task-title {
   font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: #1e293b;
   margin-bottom: 4px;
 }
 
 .wo-task-desc {
   font-size: 12px;
-  color: var(--text3);
+  color: #64748b;
   max-width: 350px;
   white-space: nowrap;
   overflow: hidden;
@@ -96,17 +59,19 @@
 }
 
 .wo-code {
-  font-family: var(--font-mono);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--blue);
+  font-family: monospace;
+  background: #e9ecef;
+  color: #0d6efd;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
+  border: 1px solid #dee2e6;
 }
 
+/* ── Badges ───────────────────────────────────────────────────────── */
 .wo-badge {
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
@@ -117,69 +82,111 @@
 
 /* Priorities */
 .p-high {
-  background: rgba(220, 53, 69, 0.15);
-  color: #ff6b6b;
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.25);
 }
 
 .p-medium {
-  background: rgba(255, 152, 0, 0.15);
-  color: #ffb84d;
-  border: 1px solid rgba(255, 152, 0, 0.3);
+  background: rgba(255, 152, 0, 0.1);
+  color: #fd7e14;
+  border: 1px solid rgba(255, 152, 0, 0.25);
 }
 
 .p-low {
-  background: rgba(46, 204, 113, 0.15);
-  color: #2ecc71;
-  border: 1px solid rgba(46, 204, 113, 0.3);
+  background: rgba(25, 135, 84, 0.1);
+  color: #198754;
+  border: 1px solid rgba(25, 135, 84, 0.25);
 }
 
 /* Status */
 .s-open {
-  background: rgba(52, 152, 219, 0.2);
-  color: #5fd3f3;
-  border: 1px solid rgba(52, 152, 219, 0.3);
+  background: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+  border: 1px solid rgba(13, 110, 253, 0.25);
 }
 
 .s-progress {
-  background: rgba(155, 89, 182, 0.2);
-  color: #d1b3ff;
-  border: 1px solid rgba(155, 89, 182, 0.3);
+  background: rgba(111, 66, 193, 0.1);
+  color: #6f42c1;
+  border: 1px solid rgba(111, 66, 193, 0.25);
 }
 
 .s-completed {
-  background: rgba(46, 204, 113, 0.25);
-  color: #2ecc71;
-  border: 1px solid rgba(46, 204, 113, 0.3);
+  background: rgba(25, 135, 84, 0.1);
+  color: #198754;
+  border: 1px solid rgba(25, 135, 84, 0.25);
 }
 
-.wo-action-select {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  font-size: 12px;
-  font-weight: 700;
+/* ── Row Actions ──────────────────────────────────────────────────── */
+.wo-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.um-action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
   color: #fff;
-  background: var(--surface2);
+  flex-shrink: 0;
+}
+
+.um-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.um-action-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.um-action-btn.edit {
+  background: #facc15;
+  color: #000;
+}
+
+.um-action-btn.delete {
+  background: #ef4444;
+}
+
+/* ── Action Select ────────────────────────────────────────────────── */
+.wo-action-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+  background: #fff;
   cursor: pointer;
   outline: none;
   transition: all 0.2s;
 }
 
 .wo-action-select:hover {
-  border-color: var(--border2);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: #adb5bd;
+  background: #f8f9fa;
 }
 
 .wo-action-select option {
-  background: #034E84;
-  color: #fff;
+  background: #fff;
+  color: #212529;
 }
 
+/* ── Empty state ──────────────────────────────────────────────────── */
 .wo-empty {
   padding: 80px !important;
   text-align: center;
-  color: var(--text3);
+  color: #6c757d;
   font-size: 15px;
   letter-spacing: 0.5px;
 }

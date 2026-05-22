@@ -163,7 +163,7 @@ export default function AutoScheduler({ modules, onBack }) {
           Back
         </button>
         <div className="as-header-info">
-          <div className="as-title">Auto-Scheduled Compliance Planner</div>
+          <div className="as-title">Auto-Scheduler</div>
           <div className="as-subtitle">Standardized code frequency & smart visual workload distribution</div>
         </div>
         <button className="as-run-btn" onClick={handleRunScheduler} title="Optimize Schedules">
@@ -253,37 +253,6 @@ export default function AutoScheduler({ modules, onBack }) {
             </div>
           </div>
 
-          {/* Right Column: Predefined Standards Legend */}
-          <div className="as-right-column">
-            <div className="as-rules-list-card" style={{ height: '100%' }}>
-              <h3>Compliance Standards (NFPA Code)</h3>
-              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '-8px', marginBottom: '16px' }}>
-                Inspection frequencies & defaults assigned according to standard building safety codes:
-              </p>
-              <div className="as-rules-list" style={{ maxHeight: 'none' }}>
-                {STATIC_COMPLIANCE_RULES.map((rule) => {
-                  const mod = essentialModules.find(m => m.code === rule.moduleCode);
-                  if (!mod) return null;
-                  return (
-                    <div key={rule.moduleCode} className="as-rule-item">
-                      <div className="as-rule-details">
-                        <div className="as-rule-header-row">
-                          <span style={{ marginRight: '4px' }}>{MODULE_EMOJIS[rule.moduleCode] || '📦'}</span>
-                          <strong>{mod.name}</strong>
-                        </div>
-                        <div className="as-rule-desc">
-                          🔄 Frequency: <strong>{rule.frequency}</strong> • 👤 Inspector: {INSPECTORS[rule.inspectorIdx].name}
-                        </div>
-                      </div>
-                      <span className={`as-priority-tag ${rule.priority.toLowerCase()}`} style={{ height: 'fit-content' }}>
-                        {rule.priority}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
 
         </div>
       </div>

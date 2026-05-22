@@ -143,7 +143,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">{module?.name || 'Fire Trolley'} Fleet Monitor</div>
           </div>
@@ -264,7 +264,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">{listCfg.title}</div>
             <div className="fe-header-sub">{listLoading ? 'Fetching units…' : `${listTotal} units found`}</div>
@@ -310,7 +310,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🛒</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>{u.sos_code || 'Unit Details'}</div>

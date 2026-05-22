@@ -217,6 +217,14 @@ export const ApiService = {
     return await request(`/reports/equipment-status${qs(params)}`);
   },
 
+  getExpiryScheduleReports: async (params = {}) => {
+    return await request(`/reports/expiry${qs(params)}`);
+  },
+
+  getCriticalAlertsReports: async (params = {}) => {
+    return await request(`/reports/alerts${qs(params)}`);
+  },
+
   // --- SYNC ---
   registerDevice: async (data) => {
     return await request('/devices/register', {

@@ -177,7 +177,7 @@ const PPEStationStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">PPE Station Fleet Monitor</div>
           </div>
@@ -280,7 +280,7 @@ const PPEStationStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div className="fe-header-info">
             <div className="fe-header-title">{listCfg.title}</div>
             <div className="fe-header-sub">{listTotal} units found</div>
@@ -322,7 +322,7 @@ const PPEStationStats = ({ module, onBack, onRaiseWorkOrder }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🦺</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>

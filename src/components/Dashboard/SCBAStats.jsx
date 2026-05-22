@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './FireExtinguisherStats.css';
 import { ApiService } from '../../services/apiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import BackBtn from './BackBtn';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -190,7 +191,7 @@ const SCBAStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={onBack}>Back</BackBtn>
+          <BackBtn onClick={onBack} />
           <div className="fe-header-info"><div className="fe-header-title">SCBA Fleet Monitor</div></div>
           <span className="fe-score-badge" 
             title="Health Calculation: ((Total Units - (Expired + Needs Service + Due Inspection)) / Total Units) * 100"
@@ -268,7 +269,7 @@ const SCBAStats = ({ module, onBack, onRaiseWorkOrder }) => {
     return (
       <div className="fe-page">
         <div className="fe-header">
-          <BackBtn onClick={goBack}>Back</BackBtn>
+          <BackBtn onClick={goBack} />
           <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} units found</div></div>
         </div>
         {listLoading ? <Spinner /> : (
@@ -300,7 +301,7 @@ const SCBAStats = ({ module, onBack, onRaiseWorkOrder }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack} />
         <span className="fe-header-icon">🫁</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>

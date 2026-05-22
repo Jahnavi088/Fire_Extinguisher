@@ -248,21 +248,10 @@
 /* Rules Tab View */
 .as-rules-grid {
   display: grid;
-  grid-template-columns: 1.8fr 1fr;
+  grid-template-columns: 1fr;
   gap: 24px;
 }
 
-@media (max-width: 1024px) {
-  .as-rules-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.as-right-column {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
 
 .as-form-card,
 .as-rules-list-card {

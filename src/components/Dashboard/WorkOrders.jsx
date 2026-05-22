@@ -7,6 +7,7 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [editOrder, setEditOrder] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', equipment_id: '', priority: 'medium', assignee: '' });
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,52 +36,70 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
     }
   };
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    setEditOrder(null);
+    setForm({ title: '', description: '', equipment_id: '', priority: 'medium', assignee: '' });
+    setShowModal(true);
+  };
+
+  const openEdit = (wo) => {
+    setEditOrder(wo);
+    setForm({
+      title: wo.title || '',
+      description: wo.description || '',
+      equipment_id: String(wo.equipment_id || ''),
+      priority: wo.priority || 'medium',
+      assignee: wo.assignee || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
     if (!form.title.trim() || !form.equipment_id.trim()) return;
     setSubmitting(true);
     try {
-      let numericId = null;
-      const eqInput = form.equipment_id.trim();
-
-      // If it looks like a number, check if it's already an integer database ID
-      if (/^\d+$/.test(eqInput)) {
-        numericId = parseInt(eqInput, 10);
+      if (editOrder) {
+        await ApiService.updateWorkOrder(editOrder.id, {
+          title: form.title,
+          description: form.description,
+          priority: form.priority,
+          assignee: form.assignee,
+        });
+        setWorkOrders(prev => prev.map(wo => wo.id === editOrder.id ? { ...wo, ...form } : wo));
       } else {
-        // Look up by SOS Code
-        try {
-          const eqDetails = await ApiService.getEquipmentBySosCode(eqInput);
-          if (eqDetails && eqDetails.id) {
-            numericId = eqDetails.id;
-          }
-        } catch (lookupErr) {
-          console.warn('Failed lookup by SOS Code, trying Admin Equipment lookup...', lookupErr);
+        let numericId = null;
+        const eqInput = form.equipment_id.trim();
+
+        if (/^\d+$/.test(eqInput)) {
+          numericId = parseInt(eqInput, 10);
+        } else {
           try {
-            const adminEqDetails = await ApiService.getAdminEquipmentBySosCode(eqInput);
-            if (adminEqDetails && adminEqDetails.id) {
-              numericId = adminEqDetails.id;
+            const eqDetails = await ApiService.getEquipmentBySosCode(eqInput);
+            if (eqDetails && eqDetails.id) numericId = eqDetails.id;
+          } catch (lookupErr) {
+            console.warn('Failed lookup by SOS Code, trying Admin Equipment lookup...', lookupErr);
+            try {
+              const adminEqDetails = await ApiService.getAdminEquipmentBySosCode(eqInput);
+              if (adminEqDetails && adminEqDetails.id) numericId = adminEqDetails.id;
+            } catch (adminLookupErr) {
+              console.error('Admin equipment lookup failed too:', adminLookupErr);
             }
-          } catch (adminLookupErr) {
-            console.error('Admin equipment lookup failed too:', adminLookupErr);
           }
         }
+
+        if (!numericId) {
+          throw new Error(`Equipment with SOS Code/Reference "${eqInput}" could not be found. Please check the code and try again.`);
+        }
+
+        await ApiService.createWorkOrder({ ...form, equipment_id: numericId });
+        loadOrders();
       }
 
-      if (!numericId) {
-        throw new Error(`Equipment with SOS Code/Reference "${eqInput}" could not be found. Please check the code and try again.`);
-      }
-
-      const payload = {
-        ...form,
-        equipment_id: numericId
-      };
-
-      await ApiService.createWorkOrder(payload);
-      alert('Work Order created successfully!');
       setShowModal(false);
+      setEditOrder(null);
       setForm({ title: '', description: '', equipment_id: '', priority: 'medium', assignee: '' });
-      loadOrders();
     } catch (e) {
-      alert('Failed to create work order: ' + e.message);
+      alert((editOrder ? 'Failed to update' : 'Failed to create') + ' work order: ' + e.message);
     } finally {
       setSubmitting(false);
     }
@@ -138,28 +157,13 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
             <div className="setup-subtitle">Maintenance Management — Track and resolve system deficiencies</div>
           </div>
         </div>
-        <button className="ea-add-nav-btn" onClick={() => setShowModal(true)}>
+        <button className="ea-add-nav-btn" onClick={openCreate}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Create Work Order
         </button>
-      </div>
-
-      <div className="wo-stats-bar">
-        <div className="wo-stat-card">
-          <span className="wo-stat-val">{workOrders.filter(w => w.status === 'open').length}</span>
-          <span className="wo-stat-label">Open Tasks</span>
-        </div>
-        <div className="wo-stat-card">
-          <span className="wo-stat-val">{workOrders.filter(w => w.status === 'in progress').length}</span>
-          <span className="wo-stat-label">In Progress</span>
-        </div>
-        <div className="wo-stat-card">
-          <span className="wo-stat-val">{workOrders.filter(w => w.status === 'completed').length}</span>
-          <span className="wo-stat-label">Completed</span>
-        </div>
       </div>
 
       <div className="ea-body">
@@ -171,7 +175,7 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
         ) : error ? (
           <div className="ea-error-bar">⚠️ {error}</div>
         ) : (
-          <div className="wo-table-wrap">
+          <div className="ea-table-wrap">
             <table className="wo-table">
               <thead>
                 <tr>
@@ -198,42 +202,32 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
                     <td><span className={`wo-badge ${priorityClass(wo.priority)}`}>{wo.priority?.toUpperCase()}</span></td>
                     <td>{wo.assignee || 'Unassigned'}</td>
                     <td><span className={`wo-badge ${statusClass(wo.status || 'open')}`}>{(wo.status || 'open').toUpperCase()}</span></td>
-                    <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <select
-                        className="wo-action-select"
-                        value={wo.status || 'open'}
-                        onChange={e => handleStatusChange(wo.id, e.target.value)}
-                        style={{ flex: 1 }}
-                      >
-                        <option value="open">Set Open</option>
-                        <option value="in progress">Set Progress</option>
-                        <option value="completed">Complete</option>
-                      </select>
-                      <button
-                        className="wo-delete-btn"
-                        onClick={() => handleDelete(wo.id)}
-                        title="Delete Work Order"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#dc3545',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '4px',
-                          borderRadius: '4px',
-                          transition: 'background 0.2s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69, 0.15)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                      </button>
+                    <td>
+                      <div className="wo-actions">
+                        <select
+                          className="wo-action-select"
+                          value={wo.status || 'open'}
+                          onChange={e => handleStatusChange(wo.id, e.target.value)}
+                        >
+                          <option value="open">Set Open</option>
+                          <option value="in progress">Set Progress</option>
+                          <option value="completed">Complete</option>
+                        </select>
+                        <button className="um-action-btn edit" onClick={() => openEdit(wo)} title="Edit Work Order">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                        <button className="um-action-btn delete" onClick={() => handleDelete(wo.id)} title="Delete Work Order">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6" /><path d="M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -244,11 +238,11 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
       </div>
 
       {showModal && (
-        <div className="cm-modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="cm-modal-overlay" onClick={() => { setShowModal(false); setEditOrder(null); }}>
           <div className="cm-modal-card" onClick={e => e.stopPropagation()}>
             <div className="cm-modal-header">
               <span className="cm-modal-icon">🛠️</span>
-              <span className="cm-modal-title">New Work Order</span>
+              <span className="cm-modal-title">{editOrder ? 'Edit Work Order' : 'New Work Order'}</span>
             </div>
             <div className="cm-modal-body">
               <div className="cm-field">
@@ -256,11 +250,13 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
                 <input className="cm-input" type="text" placeholder="e.g. Recharge Fire Extinguisher"
                   value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
               </div>
-              <div className="cm-field">
-                <label className="cm-label">Equipment ID / Reference</label>
-                <input className="cm-input" type="text" placeholder="e.g. FE-001"
-                  value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} />
-              </div>
+              {!editOrder && (
+                <div className="cm-field">
+                  <label className="cm-label">Equipment ID / Reference</label>
+                  <input className="cm-input" type="text" placeholder="e.g. FE-001"
+                    value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} />
+                </div>
+              )}
               <div className="cm-field">
                 <label className="cm-label">Description</label>
                 <textarea className="cm-input" rows="3" placeholder="Describe the maintenance required..."
@@ -283,9 +279,9 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
               </div>
             </div>
             <div className="cm-modal-actions">
-              <button className="cm-cancel-btn" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="cm-save-btn" onClick={handleCreate} disabled={submitting || !form.title.trim()}>
-                {submitting ? 'Creating...' : 'Create Work Order'}
+              <button className="cm-cancel-btn" onClick={() => { setShowModal(false); setEditOrder(null); }}>Cancel</button>
+              <button className="cm-save-btn" onClick={handleSave} disabled={submitting || !form.title.trim()}>
+                {submitting ? (editOrder ? 'Saving...' : 'Creating...') : (editOrder ? 'Save Changes' : 'Create Work Order')}
               </button>
             </div>
           </div>

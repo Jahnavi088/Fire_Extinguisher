@@ -155,8 +155,12 @@
 
 .fe-header-search {
   margin-left: auto;
-  max-width: 350px;
+  max-width: 220px;
   width: 100%;
+}
+
+.fe-score-badge + .fe-header-search {
+  margin-left: 0;
 }
 
 .fe-search-box {
@@ -166,8 +170,8 @@
   border: 1.5px solid #000000;
   border-radius: 10px;
   padding: 0 12px;
-  width: 320px;
-  height: 38px;
+  width: 200px;
+  height: 34px;
   transition: all 0.2s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -280,6 +284,7 @@
 
 /* ── Score Badge (header right) ──────────────────────────────────────────── */
 .fe-score-badge {
+  margin-left: auto;
   padding: 5px 18px;
   border-radius: 99px;
   font-size: 18px;
@@ -287,36 +292,26 @@
   font-variant-numeric: tabular-nums;
   border: 1.5px solid;
   letter-spacing: -0.3px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fe-score-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* ── Compliance History Button ───────────────────────────────────────────── */
 .fe-compliance-btn {
-  flex-shrink: 0;
-  padding: 7px 14px;
-  border-radius: 8px;
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-  transition: background 0.15s, border-color 0.15s;
-  font-family: var(--font);
-}
-
-.fe-compliance-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.6);
+  display: none !important;
 }
 
 /* ── KPI Cards Grid ──────────────────────────────────────────────────────── */
 .fe-kpi-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 14px;
-  padding: 20px 24px 0;
+  gap: 10px;
+  padding: 4px 24px 0;
 }
 
 @media (max-width: 1200px) {
@@ -335,31 +330,31 @@
   position: relative;
   background: #045A97;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  padding: 14px 10px;
+  border-radius: 10px;
+  padding: 8px 10px 6px;
   cursor: pointer;
   text-align: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
 }
 
 .fe-kpi-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   background: #09538F;
   border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
 .fe-kpi-emoji {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: block;
 }
 
 .fe-kpi-value {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1.1;
   letter-spacing: -0.2px;
@@ -369,31 +364,31 @@
 }
 
 .fe-kpi-label {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.7) !important;
-  letter-spacing: 0.5px;
-  margin-top: 6px;
+  letter-spacing: 0.4px;
+  margin-top: 3px;
   display: block;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
 .fe-detail-val {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 900;
   color: #ffffff !important;
   letter-spacing: 0.5px;
 }
 
 .fe-kpi-cta {
-  font-size: 13px;
+  font-size: 10.5px;
   font-weight: 800;
-  margin-top: 12px;
+  margin-top: 5px;
   display: block;
   color: #ffffff !important;
   opacity: 0.9;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   transition: opacity 0.15s;
 }
 

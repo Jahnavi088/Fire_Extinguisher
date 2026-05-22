@@ -36,15 +36,14 @@ function App() {
 
   if (isLoading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh', 
-        background: 'rgb(144,194,244)',
-        color: '#045A97'
-      }}>
-        <div className="loader"></div>
+      <div className="refresher-loading-container">
+        <div className="circular-loader-container">
+          <div className="circular-spinner"></div>
+          <div className="circular-logo-wrapper">
+            <img src="/apitoria-logo.png" alt="Apitoria" className="circular-logo" />
+          </div>
+        </div>
+        <div className="refresher-text">Initializing SOS Platform...</div>
       </div>
     );
   }

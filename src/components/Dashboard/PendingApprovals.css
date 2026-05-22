@@ -1,0 +1,138 @@
+.pa-container {
+  background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.1), transparent), var(--background, #0b1329);
+  height: 100%;
+  color: var(--text, #fff);
+  display: flex;
+  flex-direction: column;
+  animation: 0.3s fe-fade;
+}
+
+.pa-header {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+}
+
+.pa-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pa-title-icon {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+}
+
+.pa-title-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pa-main-title {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #fff, #fcd34d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.pa-subtitle {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pa-body {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 32px;
+}
+
+.pa-table-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pa-table thead tr {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pa-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.pa-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s;
+}
+
+.pa-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pa-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.pa-cell-main {
+  font-weight: 600;
+  color: #fff;
+  font-size: 13px;
+}
+
+.pa-cell-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+.pa-type-badge {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.pa-remarks-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
