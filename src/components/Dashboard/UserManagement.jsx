@@ -16,9 +16,6 @@ const NAV_MODULES = [
   { code: 'audit_logs',        label: 'Audit Logs',            icon: '📝', category: 'System & Security' },
   { code: 'device_monitoring', label: 'Device Monitoring',     icon: '🖥️', category: 'System & Security' },
 
-  // --- CHECKLISTS ---
-  { code: 'fe_checklist',      label: 'FE Checklist',          icon: '🧯', category: 'Checklists' },
-
   // --- EQUIPMENT MODULES ---
   { code: 'fire_extinguisher', label: 'Fire Extinguishers',    icon: '🧯', category: 'Modules' },
   { code: 'hose_reel',         label: 'Hose Reels',            icon: '🧵', category: 'Modules' },
@@ -54,7 +51,7 @@ const NAV_MODULES = [
   { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },
   { code: 'equipment_access',  label: 'Equipment Access',      icon: '🔐', category: 'Users' },
 ];
-const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Checklists', 'Modules', 'Setup', 'Users'];
+const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Modules', 'Setup', 'Users'];
 
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },

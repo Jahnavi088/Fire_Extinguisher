@@ -35,7 +35,22 @@ const CompanyManagement = ({ onBack }) => {
     setLoading(true);
     try {
       const data = await ApiService.getAdminCompanies();
-      setCompanies(Array.isArray(data) ? data : (data?.companies || data?.data || []));
+      const list = Array.isArray(data) ? data : (data?.companies || data?.data || []);
+      
+      // Fetch detailed records for each company to get full data (like logo, address, email)
+      const detailedCompanies = await Promise.all(
+        list.map(async (c) => {
+          try {
+            const detail = await ApiService.getAdminCompanyById(c.id || c.company_id);
+            return { ...c, ...(detail?.data || detail || {}) };
+          } catch (e) {
+            console.warn(`Failed to fetch full details for company ${c.id}`, e);
+            return c;
+          }
+        })
+      );
+      
+      setCompanies(detailedCompanies);
       setError(null);
     } catch (err) {
       setError('Failed to load companies. Please try again.');

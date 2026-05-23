@@ -108,11 +108,19 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
       alert('Please select both a user and an equipment module.');
       return;
     }
+    const moduleId = selectedModule.module_id || selectedModule.id;
+    const alreadyAssigned = assignments.some(
+      a => a.userId === selectedUser.id && String(a.moduleId) === String(moduleId)
+    );
+    if (alreadyAssigned) {
+      alert(`${selectedUser.name || selectedUser.username} already has access to ${selectedModule.name}.`);
+      return;
+    }
     setSaving(true);
     try {
-      const moduleId = selectedModule.module_id || selectedModule.id;
       await ApiService.addAdminUserModule(selectedUser.id, {
-        module_ids: [moduleId],
+        module_id: moduleId,
+        access_level: accessLevel,
       });
       dispatch({
         type: 'add',
@@ -372,27 +380,44 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </div>
-                    {moduleDropdownOpen && (
-                      <div className="ea-dropdown-options">
-                        {modules.map(m => {
-                          const mId = m.module_id || m.id;
-                          const selId = selectedModule?.module_id || selectedModule?.id;
-                          return (
-                            <div
-                              key={mId}
-                              className={`ea-option ${selId === mId ? 'selected' : ''}`}
-                              onClick={() => { setSelectedModule(m); setModuleDropdownOpen(false); }}
-                            >
-                              <div className="ea-option-main">
-                                <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
-                                <span className="ea-option-name">{m.name}</span>
+                    {moduleDropdownOpen && (() => {
+                      const assignedModuleIds = selectedUser
+                        ? assignments.filter(a => String(a.userId) === String(selectedUser.id)).map(a => String(a.moduleId))
+                        : [];
+                      const selId = selectedModule?.module_id || selectedModule?.id;
+                      return (
+                        <div className="ea-dropdown-options">
+                          {modules.map(m => {
+                            const mId = m.module_id || m.id;
+                            const isSelected = String(selId) === String(mId);
+                            const isAssigned = assignedModuleIds.includes(String(mId));
+                            const isChecked = isAssigned || isSelected;
+                            return (
+                              <div
+                                key={mId}
+                                className={`ea-option ${isSelected ? 'selected' : ''} ${isAssigned ? 'already-assigned' : ''}`}
+                                onClick={() => { if (!isAssigned) { setSelectedModule(m); setModuleDropdownOpen(false); } }}
+                              >
+                                <div className="ea-option-row">
+                                  <input
+                                    type="checkbox"
+                                    className="ea-module-checkbox"
+                                    checked={isChecked}
+                                    readOnly
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
+                                  <span className="ea-option-name">{m.name}</span>
+                                </div>
+                                {isAssigned && (
+                                  <span className="ea-assigned-label">Assigned</span>
+                                )}
                               </div>
-                              {selId === mId && <span className="ea-check">✓</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

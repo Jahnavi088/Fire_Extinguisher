@@ -140,28 +140,6 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
         <div className="sb-nav-group">
           {!navCollapsed && <div className="nav-section-label">Management</div>}
 
-          {/* Checklists dropdown */}
-          <div className={`nav-item dropdown-toggle ${checklistOpen ? 'open' : ''}`} onClick={e => { e.stopPropagation(); setChecklistOpen(!checklistOpen); }}>
-            <div className="nav-left">
-              <span className="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                </svg>
-              </span>
-              {!navCollapsed && <span className="nav-label">Checklists</span>}
-            </div>
-            {!navCollapsed && (
-              <svg className={`nav-chevron ${checklistOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            )}
-          </div>
-          <div className={`nav-submenu ${checklistOpen && !navCollapsed ? 'open' : ''}`}>
-            <div className={`nav-submenu-item ${activePage === 'fe-checklist' ? 'active' : ''}`} onClick={() => setActivePage('fe-checklist')}>
-              <span className="nav-icon-small">🧯</span>
-              <span className="nav-label-small">Fire Extinguisher</span>
-            </div>
-          </div>
 
           {/* Setup dropdown */}
           <div className={`nav-item dropdown-toggle ${setupOpen ? 'open' : ''}`} onClick={e => { e.stopPropagation(); setSetupOpen(!setupOpen); }}>
@@ -187,6 +165,10 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
             <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
               <span className="nav-icon-small">🏢</span>
               <span className="nav-label-small">Add Company</span>
+            </div>
+            <div className={`nav-submenu-item ${activePage === 'setup-modules' ? 'active' : ''}`} onClick={() => setActivePage('setup-modules')}>
+              <span className="nav-icon-small">⚙️</span>
+              <span className="nav-label-small">Module Config</span>
             </div>
           </div>
 

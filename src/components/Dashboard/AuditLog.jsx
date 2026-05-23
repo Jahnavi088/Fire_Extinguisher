@@ -25,6 +25,7 @@ const AuditLog = ({ onBack }) => {
   const [filters, setFilters] = useState({ table_name: '', action: '', start_date: '', end_date: '' });
   const [search, setSearch] = useState('');
   const [retry, setRetry] = useState(0);
+  const [selectedAudit, setSelectedAudit] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +130,75 @@ const AuditLog = ({ onBack }) => {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasActiveFilters = filters.table_name || filters.action || filters.start_date || filters.end_date || search;
+
+  const IGNORED_DIFF_KEYS = new Set([
+    'id', 'created_at', 'updated_at', 'sync_event_id', 'sync_device_id', 
+    'sync_received_at', 'inspected_at', 'equipment_id'
+  ]);
+
+  const getChangedFields = (action, oldVals, newVals) => {
+    let o = oldVals || {};
+    let n = newVals || {};
+    if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
+    if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
+
+    const keys = new Set([...Object.keys(o), ...Object.keys(n)]);
+    const changed = [];
+    for (const k of keys) {
+      if (IGNORED_DIFF_KEYS.has(k)) continue;
+      if (action === 'UPDATE') {
+        if (JSON.stringify(o[k]) !== JSON.stringify(n[k])) {
+          changed.push(k);
+        }
+      } else {
+        changed.push(k);
+      }
+    }
+    return changed.length > 0 ? changed.join(', ') : 'No tracked fields changed';
+  };
+
+  const renderDiff = (action, oldVals, newVals) => {
+    let o = oldVals || {};
+    let n = newVals || {};
+    if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
+    if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
+
+    if (action === 'UPDATE') {
+      const keys = new Set([...Object.keys(o), ...Object.keys(n)]);
+      const changes = [];
+      for (const k of keys) {
+        if (IGNORED_DIFF_KEYS.has(k)) continue;
+        const strO = JSON.stringify(o[k]);
+        const strN = JSON.stringify(n[k]);
+        if (strO !== strN) {
+          changes.push(
+            <div key={k} className="al-diff-field-row">
+              <span className="al-diff-key">{k}:</span>
+              <span className="al-diff-val-removed">{o[k] === undefined ? 'null' : typeof o[k] === 'object' ? JSON.stringify(o[k]) : String(o[k])}</span>
+              <span className="al-diff-arrow">→</span>
+              <span className="al-diff-val-added">{n[k] === undefined ? 'null' : typeof n[k] === 'object' ? JSON.stringify(n[k]) : String(n[k])}</span>
+            </div>
+          );
+        }
+      }
+      return changes.length > 0 ? <div className="al-diff-fields">{changes}</div> : <div className="al-diff-no-changes">No changes detected (or only system fields changed)</div>;
+    } else {
+      const vals = action === 'INSERT' ? n : o;
+      const entries = Object.entries(vals).filter(([k]) => !IGNORED_DIFF_KEYS.has(k));
+      return (
+        <div className="al-diff-fields">
+          {entries.map(([k, v]) => (
+            <div key={k} className="al-diff-field-row">
+              <span className="al-diff-key">{k}:</span>
+              <span className={action === 'INSERT' ? 'al-diff-val-added' : 'al-diff-val-removed'}>
+                {v === null ? 'null' : typeof v === 'object' ? JSON.stringify(v) : String(v)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="ea-page">
@@ -236,45 +306,58 @@ const AuditLog = ({ onBack }) => {
             <table className="al-table">
               <thead>
                 <tr>
-                  <th style={{ width: '180px' }}>Signed Timestamp</th>
-                  <th style={{ width: '150px' }}>Registry Module</th>
-                  <th style={{ width: '110px' }}>Sign-off Action</th>
-                  <th style={{ width: '180px' }}>Authorized Operator</th>
-                  <th>Verifiable Changes Diff</th>
+                  <th>Timestamp</th>
+                  <th>Module</th>
+                  <th>Action</th>
+                  <th>Record</th>
+                  <th>Performed By</th>
+                  <th>Changed Fields</th>
+                  <th>View Details</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(row => (
-                  <tr key={row.id}>
-                    <td className="al-td-timestamp">{fmtDate(row.changed_at)}</td>
-                    <td>
-                      <span className={`al-module-badge ${moduleClass(row.table_name)}`}>
-                        {moduleIcon(row.table_name)} {row.table_name}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`al-action-pill ${actionClass(row.action)}`}>{actionLabel(row.action)}</span>
-                    </td>
-                    <td>
-                      <div className="al-td-operator">{row.changed_by_user || 'System Node'}</div>
-                      <div className="al-td-operator-id">ID: {row.changed_by_id || 'System'}</div>
-                    </td>
-                    <td>
-                      <div className="al-changes-inline">
-                        {row.action === 'UPDATE' ? (
-                          <>
-                            <div className="al-diff-removed">- {JSON.stringify(row.old_values)}</div>
-                            <div className="al-diff-added">+ {JSON.stringify(row.new_values)}</div>
-                          </>
-                        ) : (
-                          <div className={row.action === 'INSERT' ? 'al-diff-added' : 'al-diff-removed'}>
-                            {JSON.stringify(row.new_values || row.old_values)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(row => {
+                  let n = row.new_values || {};
+                  let o = row.old_values || {};
+                  if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
+                  if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
+                  const recId = row.record_id || n.id || o.id || 'N/A';
+                  
+                  return (
+                    <tr key={row.id}>
+                      <td className="al-td-timestamp" style={{ whiteSpace: 'nowrap' }}>{fmtDate(row.changed_at)}</td>
+                      <td>
+                        <span className={`al-module-badge ${moduleClass(row.table_name)}`}>
+                          {moduleIcon(row.table_name)} {row.table_name.charAt(0).toUpperCase() + row.table_name.slice(1).toLowerCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`al-action-pill ${actionClass(row.action)}`}>{actionLabel(row.action)}</span>
+                      </td>
+                      <td style={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {row.table_name.charAt(0).toUpperCase() + row.table_name.slice(1).toLowerCase()} #{recId}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <div className="al-td-operator">{row.changed_by_user || 'System'}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                          {getChangedFields(row.action, row.old_values, row.new_values)}
+                        </div>
+                      </td>
+                      <td>
+                        <button 
+                          onClick={() => setSelectedAudit(row)}
+                          style={{
+                            padding: '4px 12px', background: '#e2e8f0', color: '#334155', 
+                            border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px'
+                          }}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -303,6 +386,35 @@ const AuditLog = ({ onBack }) => {
           </div>
         )}
       </div>
+
+      {selectedAudit && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1000, 
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(2px)'
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '12px', padding: '24px', 
+            width: '90%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', color: '#0f172a', fontWeight: 800 }}>Audit Record Details</h2>
+                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                  {fmtDate(selectedAudit.changed_at)} • {selectedAudit.table_name.charAt(0).toUpperCase() + selectedAudit.table_name.slice(1).toLowerCase()} #{selectedAudit.record_id || 'N/A'} • {actionLabel(selectedAudit.action)}
+                </div>
+              </div>
+              <button onClick={() => setSelectedAudit(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>✕</button>
+            </div>
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              {renderDiff(selectedAudit.action, selectedAudit.old_values, selectedAudit.new_values)}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

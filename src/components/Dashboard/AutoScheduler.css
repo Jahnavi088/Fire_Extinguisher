@@ -183,6 +183,11 @@
   font-weight: 700;
 }
 
+.as-status-badge.pending {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
 .as-status-badge.scheduled {
   background: #e0f2fe;
   color: #0369a1;

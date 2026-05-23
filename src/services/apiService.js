@@ -429,7 +429,38 @@ export const ApiService = {
       },
       body: formData,
     });
-    return handleResponse(response);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
+    return result;
+  },
+
+  // --- ADMIN WORK ORDERS ---
+  getWorkOrders: async () => {
+    return await request('/admin/work-orders');
+  },
+
+  getWorkOrderById: async (id) => {
+    return await request(`/admin/work-orders/${id}`);
+  },
+
+  createWorkOrder: async (data) => {
+    return await request('/admin/work-orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateWorkOrder: async (id, data) => {
+    return await request(`/admin/work-orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteWorkOrder: async (id) => {
+    return await request(`/admin/work-orders/${id}`, {
+      method: 'DELETE',
+    });
   },
 
   // --- ADMIN CHECKLISTS ---
@@ -530,6 +561,19 @@ export const ApiService = {
 
   getAdminUserModules: async (id) => {
     return await request(`/admin/users/${id}/modules`);
+  },
+
+  addAdminUserModule: async (userId, data) => {
+    return await request(`/admin/users/${userId}/modules`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  removeAdminUserModule: async (userId, moduleId) => {
+    return await request(`/admin/users/${userId}/modules/${moduleId}`, {
+      method: 'DELETE',
+    });
   },
 
   // --- USER NAV ACCESS ---

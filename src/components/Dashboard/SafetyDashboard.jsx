@@ -42,10 +42,11 @@ import ChecklistConfig from './ChecklistConfig';
 import WorkOrders from './WorkOrders';
 import AuditLog from './AuditLog';
 import DeviceManagement from './DeviceManagement';
-import AutoScheduler from './AutoScheduler';
 import PendingApprovals from './PendingApprovals';
 import Onboarding from './Onboarding';
 import EquipmentOnboarding from './EquipmentOnboarding';
+import ModuleManagement from './ModuleManagement';
+import AutoScheduler from './AutoScheduler';
 
 
 
@@ -207,6 +208,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
     () => sessionStorage.getItem('sd_checklistType') || null
   );
   const [searchFilter, setSearchFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [modules, setModules] = useState(STATIC_MODULES);
   // Nav access: array of module codes the user is allowed to see (null = unrestricted)
@@ -739,46 +741,6 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
             {/* MANAGEMENT section */}
             {!navCollapsed && <div className="nav-section-label">Management</div>}
 
-            {/* CHECKLISTS DROPDOWN — dynamic from API */}
-            {(isNavAllowed('fe_checklist') || isNavAllowed('fire_extinguisher') || isNavAllowed('sprinkler')) && (
-              <>
-                <div className={`nav-item dropdown-toggle ${checklistsDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setChecklistsDropdownOpen(!checklistsDropdownOpen); }}>
-                  <div className="nav-left">
-                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg></span>
-                    {!navCollapsed && <span className="nav-label">Checklists</span>}
-                  </div>
-                  {!navCollapsed && (
-                    <svg className={`nav-chevron ${checklistsDropdownOpen ? 'rotated' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  )}
-                </div>
-                <div className={`nav-submenu ${checklistsDropdownOpen && !navCollapsed ? 'open' : ''}`} style={{ maxHeight: checklistsDropdownOpen && !navCollapsed ? '320px' : '0', overflowY: 'auto' }}>
-                  {(checklistTypes.length > 0 ? checklistTypes : [{ equipment_type: 'fire_extinguisher' }])
-                    .filter(ct => isNavAllowed(ct.equipment_type))
-                    .map(ct => {
-                      const meta = CHECKLIST_TYPE_LABELS[ct.equipment_type] || { label: ct.equipment_type.replace(/_/g, ' '), icon: '📋' };
-                      const isActive = activePage === 'equipment-checklist' && selectedChecklistType === ct.equipment_type;
-                      return (
-                        <div
-                          key={ct.equipment_type}
-                          className={`nav-submenu-item ${isActive ? 'active' : ''}`}
-                          onClick={() => {
-                            setSelectedChecklistType(ct.equipment_type);
-                            setActivePage('equipment-checklist');
-                          }}
-                        >
-                          <span className="nav-icon-small">{meta.icon}</span>
-                          <span className="nav-label-small">{meta.label}</span>
-                          {ct.total_items && (
-                            <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>{ct.total_items}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </>
-            )}
 
             {/* SETUP DROPDOWN */}
             {(isNavAllowed('add_company') || isNavAllowed('add_equipment')) && (
@@ -883,8 +845,70 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
                     <button className="ob-banner-btn">Start Onboarding →</button>
                   </div>
                 )}
+                
+                {/* Summary White Card */}
+                <div className="overview-summary-card">
+                   <div className="osc-section" style={{ flex: 1, alignItems: 'flex-start' }}>
+                      <span className="osc-label">Equipment Status:</span>
+                      <div className="osc-cards-wrapper">
+                        <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
+                          <span className="osc-symbol">✅</span> 
+                          <span className="osc-text">Healthy</span>
+                          <span className="osc-count">{statusCounts.healthy}</span>
+                        </button>
+                        <button className={`osc-small-card warning ${statusFilter === 'warning' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}>
+                          <span className="osc-symbol">⚠️</span> 
+                          <span className="osc-text">Warning</span>
+                          <span className="osc-count">{statusCounts.warning}</span>
+                        </button>
+                        <button className={`osc-small-card critical ${statusFilter === 'critical' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}>
+                          <span className="osc-symbol">🚨</span> 
+                          <span className="osc-text">Critical</span>
+                          <span className="osc-count">{statusCounts.critical}</span>
+                        </button>
+                      </div>
+                   </div>
+
+                   <div className="osc-divider"></div>
+                   
+                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                      <span className="osc-label">Readiness Score:</span>
+                      <div className="osc-sys-health" style={{ minWidth: '120px', flexDirection: 'column', gap: '4px', paddingTop: '4px' }}>
+                        <svg width="140" height="80" viewBox="0 0 112 64" fill="none" role="img">
+                          <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
+                          <path d="M10 58 A46 46 0 0 1 102 58" 
+                                stroke={preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'} 
+                                strokeWidth="10" strokeLinecap="round" fill="none" 
+                                strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
+                          <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '22px' }}>{preparednessScore}%</text>
+                        </svg>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            fontWeight: '800', 
+                            marginTop: '2px',
+                            color: preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c' 
+                        }}>
+                            {preparednessScore >= 80 ? 'System Healthy' : preparednessScore >= 50 ? 'System Warning' : 'System Critical'}
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="osc-divider"></div>
+                   
+                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                      <span className="osc-label">Pending Approvals:</span>
+                      <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '32px', fontWeight: '900', color: '#f39c12', marginTop: '12px' }}>
+                        <span className="osc-symbol" style={{ fontSize: '36px' }}>📋</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+                          <span style={{ lineHeight: '1' }}>5</span>
+                          <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+
                 <div className="eq-grid">
-                  {filteredModules.map((mod) => (
+                  {filteredModules.filter(m => statusFilter === 'all' || getStatus(m) === statusFilter).map((mod) => (
                     <div key={mod.module_id} className={`eq-card ${getStatus(mod)}`} onClick={() => handleOpenModule(mod)}>
                       <div className="eq-icon">
                         {mod.image
@@ -1084,6 +1108,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
               {activePage === 'auto-scheduler' && (
                 <AutoScheduler modules={modules} onBack={() => setActivePage('grid')} />
               )}
+            </section>
+
+            {/* ── MODULE MANAGEMENT ── */}
+            <section className={`page ${activePage === 'setup-modules' ? 'active' : ''}`}>
+              {activePage === 'setup-modules' && <ModuleManagement onBack={() => setActivePage('grid')} />}
             </section>
 
             {/* ── AUDIT LOGS ── */}

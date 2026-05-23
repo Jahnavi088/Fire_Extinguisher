@@ -25,8 +25,21 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
     setLoading(true);
     try {
       const res = await ApiService.getWorkOrders();
-      const items = res?.items || (Array.isArray(res) ? res : res?.work_orders || res?.data || []);
-      setWorkOrders(items);
+      const list = res?.items || (Array.isArray(res) ? res : res?.work_orders || res?.data || []);
+      
+      const detailedOrders = await Promise.all(
+        list.map(async (wo) => {
+          try {
+            const detail = await ApiService.getWorkOrderById(wo.id);
+            return { ...wo, ...(detail?.data || detail || {}) };
+          } catch (e) {
+            console.warn(`Failed to fetch details for work order ${wo.id}`, e);
+            return wo;
+          }
+        })
+      );
+      
+      setWorkOrders(detailedOrders);
       setError(null);
     } catch (e) {
       setError('Failed to load work orders.');
@@ -213,13 +226,13 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
                           <option value="in progress">Set Progress</option>
                           <option value="completed">Complete</option>
                         </select>
-                        <button className="um-action-btn edit" onClick={() => openEdit(wo)} title="Edit Work Order">
+                        <button className="wo-action-btn-icon edit" onClick={() => openEdit(wo)} title="Edit Work Order">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
-                        <button className="um-action-btn delete" onClick={() => handleDelete(wo.id)} title="Delete Work Order">
+                        <button className="wo-action-btn-icon delete" onClick={() => handleDelete(wo.id)} title="Delete Work Order">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
