@@ -7,6 +7,7 @@ import SortIndicator from './SortIndicator';
 import { sortItems } from '../../services/sorting';
 import BackBtn from './BackBtn';
 import InspectionHistoryPanel from './InspectionHistoryPanel';
+import EquipmentHistoryPanel from './EquipmentHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -652,6 +653,9 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             </div>
           </div>
 
+          <div style={{ gridColumn: '1 / -1' }}>
+            <EquipmentHistoryPanel equipmentId={u.sos_code || u.equipment_code || u.id} />
+          </div>
         </div>
       )}
     </div>

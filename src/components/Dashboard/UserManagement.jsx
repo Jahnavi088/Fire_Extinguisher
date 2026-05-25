@@ -144,7 +144,7 @@ const UserManagement = ({ onBack }) => {
     }
   };
 
-  const openEdit = (u) => {
+  const openEdit = async (u) => {
     setEditUser(u);
     setForm({ 
       name: u.name || '', 
@@ -157,6 +157,22 @@ const UserManagement = ({ onBack }) => {
     });
     setFormError('');
     setShowForm(true);
+
+    try {
+      const fullUser = await ApiService.getAdminUserById(u.id);
+      const actualUser = fullUser.user || fullUser.data || fullUser;
+      setForm({
+        name: actualUser.name || '',
+        username: actualUser.username || '',
+        email: actualUser.email || '',
+        password: '',
+        role: actualUser.role || 'user',
+        status: actualUser.status || 'active',
+        company_id: actualUser.company_id || ''
+      });
+    } catch (err) {
+      console.error('Failed to fetch full user details:', err);
+    }
   };
 
   const openViewModules = (u) => {

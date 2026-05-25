@@ -20,9 +20,27 @@ async function loadNavAccess(userId) {
   }
 }
 
+async function loadEquipmentAccess(userId) {
+  try {
+    const res = await ApiService.getAdminUserModules(userId);
+    const modules = Array.isArray(res?.modules) ? res.modules : (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : null));
+    if (modules) localStorage.setItem(`eq_access_${userId}`, JSON.stringify(modules));
+    return modules;
+  } catch {
+    try {
+      const stored = localStorage.getItem(`eq_access_${userId}`);
+      const parsed = stored ? JSON.parse(stored) : null;
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [navAccess, setNavAccess] = useState(null);
+  const [equipmentAccess, setEquipmentAccess] = useState(null);
   const [isLoading, setIsLoading] = useState(() => !!localStorage.getItem('auth_token'));
 
   useEffect(() => {
@@ -34,7 +52,10 @@ function App() {
           const u = userData.user || userData;
           setUser(u);
           const userId = u?.id || u?.user_id;
-          if (userId) setNavAccess(await loadNavAccess(userId));
+          if (userId) {
+            setNavAccess(await loadNavAccess(userId));
+            setEquipmentAccess(await loadEquipmentAccess(userId));
+          }
         } catch (error) {
           console.error('Session restoration failed:', error);
           localStorage.removeItem('auth_token');
@@ -52,12 +73,16 @@ function App() {
     // Fetch nav-access BEFORE setting user so the dashboard
     // renders with the correct restriction already in place (no flash).
     const access = userId ? await loadNavAccess(userId) : null;
+    const eqAccess = userId ? await loadEquipmentAccess(userId) : null;
     setNavAccess(access);
+    setEquipmentAccess(eqAccess);
     setUser(u);
   };
 
   const handleLogout = () => {
     setUser(null);
+    setNavAccess(null);
+    setEquipmentAccess(null);
     setNavAccess(null);
     localStorage.removeItem('auth_token');
   };
@@ -81,7 +106,7 @@ function App() {
       {!user ? (
         <Login onLogin={handleLogin} />
       ) : (
-        <DashboardHome user={user} onLogout={handleLogout} navAccess={navAccess} />
+        <DashboardHome user={user} onLogout={handleLogout} navAccess={navAccess} equipmentAccess={equipmentAccess} />
       )}
     </div>
   );

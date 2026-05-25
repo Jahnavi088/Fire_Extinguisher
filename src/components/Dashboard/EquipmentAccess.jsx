@@ -47,6 +47,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [view, setView] = useState('list'); // 'list' or 'form'
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedModule, setSelectedModule] = useState(null);
@@ -57,6 +58,10 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const modules = availableModules.length > 0 ? availableModules : [];
 
@@ -166,6 +171,16 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     setLevelDropdownOpen(false);
   };
 
+  const filteredAssignments = assignments.filter(a => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      a.userName.toLowerCase().includes(q) ||
+      a.moduleName.toLowerCase().includes(q) ||
+      getLevelLabel(a.level).toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="ea-page">
       <div className="setup-header">
@@ -212,6 +227,24 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
               </div>
             ) : (
               <>
+                <div className="ea-toolbar">
+                  <div className="ea-search-wrap">
+                    <svg className="ea-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      type="text"
+                      className="ea-search"
+                      placeholder="Search by user, module, level..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                      <button className="ea-search-clear" onClick={() => setSearchQuery('')}>×</button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="ea-table-wrap" onScroll={onScroll}>
                   <table className="ea-table">
                     <thead>
@@ -225,7 +258,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                       </tr>
                     </thead>
                     <tbody>
-                      {assignments.length > 0 ? assignments
+                      {filteredAssignments.length > 0 ? filteredAssignments
                         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                         .map((a, idx) => {
                           const dateObj = new Date(a.date);
@@ -277,7 +310,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                           );
                         }) : (
                         <tr>
-                          <td colSpan="5" className="ea-empty">
+                          <td colSpan="6" className="ea-empty">
                             {error ? 'Could not load assignments.' : 'No access assignments found.'}
                           </td>
                         </tr>
@@ -285,8 +318,8 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan="5">
-                          {assignments.length > itemsPerPage && (
+                        <td colSpan="6">
+                          {filteredAssignments.length > itemsPerPage && (
                             <div className="ea-pagination">
                               <button
                                 className="ea-pg-btn"
@@ -296,12 +329,12 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                                 ← Previous
                               </button>
                               <span className="ea-pg-info">
-                                Page <strong>{currentPage}</strong> of {Math.ceil(assignments.length / itemsPerPage)}
+                                Page <strong>{currentPage}</strong> of {Math.ceil(filteredAssignments.length / itemsPerPage)}
                               </span>
                               <button
                                 className="ea-pg-btn"
-                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(assignments.length / itemsPerPage), p + 1))}
-                                disabled={currentPage === Math.ceil(assignments.length / itemsPerPage)}
+                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredAssignments.length / itemsPerPage), p + 1))}
+                                disabled={currentPage === Math.ceil(filteredAssignments.length / itemsPerPage)}
                               >
                                 Next →
                               </button>
@@ -434,7 +467,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                       </svg>
                     </div>
                     {levelDropdownOpen && (
-                      <div className="ea-dropdown-options">
+                      <div className="ea-dropdown-options level-dropdown">
                         {ACCESS_LEVELS.map(level => (
                           <div
                             key={level.value}

@@ -7,7 +7,7 @@ const PAGE_SIZE = 20;
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
 
-const PendingApprovals = ({ onBack }) => {
+const PendingApprovals = ({ user, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [retry, setRetry] = useState(0);
@@ -21,28 +21,51 @@ const PendingApprovals = ({ onBack }) => {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    ApiService.getInspectionReports().then(inspectionsRes => {
+    const today = new Date();
+    const endDateStr = today.toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    Promise.allSettled([
+      ApiService.getInspectionReports({
+        start_date: startDateStr,
+        end_date: endDateStr
+      }),
+      ApiService.getPendingUpdates().catch(() => [])
+    ]).then(([inspectionsRes, updatesRes]) => {
       if (!active) return;
       
-      const iList = Array.isArray(inspectionsRes) ? inspectionsRes : (inspectionsRes?.items || inspectionsRes?.reports || inspectionsRes?.inspections || inspectionsRes?.data || []);
+      const rawInspections = inspectionsRes.status === 'fulfilled' ? inspectionsRes.value : [];
+      const rawUpdates = updatesRes.status === 'fulfilled' ? updatesRes.value : [];
+      
+      const iList = Array.isArray(rawInspections) ? rawInspections : (rawInspections?.items || rawInspections?.reports || rawInspections?.inspections || rawInspections?.data || []);
+      const uList = Array.isArray(rawUpdates) ? rawUpdates : (rawUpdates?.items || rawUpdates?.updates || rawUpdates?.data || []);
       
       const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
       
       // Extract pending inspections
       const pendingInspections = iList.filter(i => {
-         // If it's explicitly approved in local storage, it's not pending anymore
          if (approvedLocally.includes(i.id)) return false;
-
          const stStatus = (i.status || '').toUpperCase();
          const stApprov = (i.approval_status || '').toUpperCase();
          const stRemarks = (i.remarks || i.overall_remarks || '').toUpperCase();
          
          return stApprov === 'PENDING' || stStatus === 'PENDING' || stRemarks.includes('[PENDING]');
-      });
+      }).map(i => ({ ...i, _itemType: 'inspection' }));
 
-      const merged = pendingInspections.map(i => ({ ...i, _itemType: 'inspection' }));
-      
+      // Extract pending updates
+      const pendingUpdates = uList.filter(u => {
+         if (approvedLocally.includes(u.id)) return false;
+         const stStatus = (u.status || '').toUpperCase();
+         const stApprov = (u.approval_status || '').toUpperCase();
+         
+         return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
+      }).map(u => ({ ...u, _itemType: 'update' }));
+
+      const merged = [...pendingInspections, ...pendingUpdates];
       merged.sort((a, b) => new Date(b.created_at || b.inspected_at || 0) - new Date(a.created_at || a.inspected_at || 0));
+      
       setItems(merged);
       setLoading(false);
     }).catch(err => {
@@ -67,12 +90,18 @@ const PendingApprovals = ({ onBack }) => {
     setModalMode('reject');
   };
 
+  const isSuperadminOrAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+
   const handleApprove = async () => {
     if (!selectedItem) return;
     setActionLoading(selectedItem.id);
     try {
       if (selectedItem._itemType === 'update') {
-        await ApiService.approveUpdate(selectedItem.id, remarksInput.trim() || undefined);
+        if (isSuperadminOrAdmin) {
+          await ApiService.adminApproveUpdate(selectedItem.id, remarksInput.trim() || undefined);
+        } else {
+          await ApiService.supervisorApproveUpdate(selectedItem.id, remarksInput.trim() || undefined);
+        }
       } else {
         // Mark as approved locally since backend might not support it
         const approved = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
@@ -114,7 +143,11 @@ const PendingApprovals = ({ onBack }) => {
     setActionLoading(selectedItem.id);
     try {
       if (selectedItem._itemType === 'update') {
-        await ApiService.rejectUpdate(selectedItem.id, rejectInput.trim());
+        if (isSuperadminOrAdmin) {
+          await ApiService.adminRejectUpdate(selectedItem.id, rejectInput.trim());
+        } else {
+          await ApiService.supervisorRejectUpdate(selectedItem.id, rejectInput.trim());
+        }
       } else {
         // Mark as rejected locally (remove from pending logic by simulating approval, or store in rejected_inspections)
         // For simplicity, we just mark it "approved" locally so it stops showing up in pending, and the result will just be what the backend has.

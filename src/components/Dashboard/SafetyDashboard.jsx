@@ -177,7 +177,7 @@ const CHECKLIST_TYPE_LABELS = {
   wind_sock: { label: 'Wind Sock', icon: '📍' },
 };
 
-const SafetyDashboard = ({ user, onLogout, navAccess }) => {
+const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const [activePage, setActivePage] = useState(() => {
     return sessionStorage.getItem('sd_activePage') || 'grid';
@@ -213,6 +213,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
   const [modules, setModules] = useState(STATIC_MODULES);
   // Nav access: array of module codes the user is allowed to see (null = unrestricted)
   const [navAccessList, setNavAccessList] = useState(navAccess ?? null);
+  const [equipmentAccessList, setEquipmentAccessList] = useState(equipmentAccess ?? null);
   const checklists = [];
   const [clState, dispatchCl] = useReducer(
     (s, a) => {
@@ -297,18 +298,20 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
     return modules.length > 0 ? Math.round(total / modules.length) : 0;
   }, [modules]);
 
+  const getStatus = (mod) => {
+    const score = mod.health_score ?? 0;
+    if (score >= 80) return 'healthy'; // green
+    if (score >= 50) return 'warning'; // amber
+    return 'critical'; // red
+  };
+
   const statusCounts = useMemo(() => {
     return modules.reduce(
       (acc, m) => {
-        if (m.health_colour === 'green') { acc.healthy++; }
-        else if (m.health_colour === 'amber') { acc.warning++; }
-        else if (m.health_colour === 'red' || m.health_colour === 'critical') { acc.critical++; }
-        else {
-          const score = m.health_score || 0;
-          if (score >= 80) acc.healthy++;
-          else if (score >= 50) acc.warning++;
-          else acc.critical++;
-        }
+        const status = getStatus(m);
+        if (status === 'healthy') acc.healthy++;
+        else if (status === 'warning') acc.warning++;
+        else if (status === 'critical') acc.critical++;
         return acc;
       },
       { healthy: 0, warning: 0, critical: 0 }
@@ -317,12 +320,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
 
   // Sync navAccessList whenever the prop changes (e.g. after admin updates access)
   useEffect(() => {
-    const role = (user?.role || '').toLowerCase();
-    let modules = Array.isArray(navAccess) && navAccess.length > 0 ? navAccess : null;
-    // superadmin/admin with no explicit list get unrestricted access
-    if ((role === 'superadmin' || role === 'admin') && !modules) modules = null;
-    setNavAccessList(modules);
-  }, [navAccess, user]);
+    const mods = Array.isArray(navAccess) && navAccess.length > 0 ? navAccess : null;
+    setNavAccessList(mods);
+  }, [navAccess]);
+
+  useEffect(() => {
+    const eqMods = Array.isArray(equipmentAccess) && equipmentAccess.length > 0 ? equipmentAccess : null;
+    setEquipmentAccessList(eqMods);
+  }, [equipmentAccess]);
 
   useEffect(() => {
     if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
@@ -453,14 +458,27 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
     };
   }, []);
 
-  // Filter the grid cards by nav-access module codes when user is restricted
+  // Filter the grid cards by equipment-access module codes when user is restricted
   const filteredModules = useMemo(() => {
-    if (!navAccessList) return modules; // admins see all
-    // Map nav-access module codes to STATIC_MODULES codes
-    // The API returns codes like "fire_extinguisher", "fire_trolley", "overview", "work_orders"
-    // STATIC_MODULES use the same codes, so we just filter by presence
-    return modules.filter(m => navAccessList.includes(m.code));
-  }, [modules, navAccessList]);
+    if (!equipmentAccessList && !navAccessList) return modules;
+
+    const allowedCodes = new Set();
+
+    if (equipmentAccessList) {
+      equipmentAccessList.forEach(m => {
+        const code = typeof m === 'string' ? m : (m.code || m.module_code);
+        if (code) allowedCodes.add(code);
+      });
+    }
+
+    if (navAccessList) {
+      navAccessList.forEach(code => {
+        if (code) allowedCodes.add(code);
+      });
+    }
+
+    return modules.filter(m => allowedCodes.has(m.code));
+  }, [modules, equipmentAccessList, navAccessList]);
 
   const totalItems = useMemo(() => {
     return activeChecklistItems.length;
@@ -472,13 +490,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
 
   const progressPct = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
 
-  const getStatus = (mod) => {
-    if (mod.health_colour === 'green') return 'healthy';
-    if (mod.health_colour === 'amber') return 'warning';
-    if (mod.health_colour === 'red' || mod.health_colour === 'critical') return 'critical';
-    const score = mod.health_score || 0;
-    return score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
-  };
+  // getStatus helper is defined at the top of the component for hoisting safety.
 
   const toggleCheck = (id) => setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -547,7 +559,12 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
   // navAccess: null = unrestricted (admin/superadmin), array = allowed module codes
   const isNavAllowed = (code) => {
     if (!navAccessList) return true; // admins see everything
-    return navAccessList.includes(code);
+    if (navAccessList.includes(code)) return true;
+    if (equipmentAccessList) {
+      const allowedCodes = equipmentAccessList.map(m => typeof m === 'string' ? m : (m.code || m.module_code));
+      if (allowedCodes.includes(code)) return true;
+    }
+    return false;
   };
 
   const navGroups = [
@@ -583,11 +600,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
   return (
     <div className={`dash ${navCollapsed ? 'sidebar-collapsed' : ''} ${!topbarVisible ? 'topbar-hidden' : ''}`} style={{ '--bg': bgColor }}>
       {appLoading && (
-        <div className="app-loader-overlay">
-          <div className="app-loader-box">
-            <img src="/apitoria-logo.png" alt="Apitoria" className="app-loader-logo" />
-            <span className="app-loader-text">Loading Safety Dashboard…</span>
+        <div className="refresher-loading-container" style={{ position: 'fixed', inset: 0, zIndex: 99999 }}>
+          <div className="circular-loader-container">
+            <div className="circular-spinner"></div>
+            <div className="circular-logo-wrapper">
+              <img src="/apitoria-logo.png" alt="Apitoria" className="circular-logo" />
+            </div>
           </div>
+          <div className="refresher-text">Loading Safety Dashboard…</div>
         </div>
       )}
       {/* ── TOPBAR (HEADER AT TOP) ────────────────────────────────────────── */}
@@ -743,7 +763,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
 
 
             {/* SETUP DROPDOWN */}
-            {(isNavAllowed('add_company') || isNavAllowed('add_equipment')) && (
+            {((user?.role === 'superadmin') || isNavAllowed('add_equipment')) && (
               <>
                 <div className={`nav-item dropdown-toggle ${setupDropdownOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); setSetupDropdownOpen(!setupDropdownOpen); }}>
                   <div className="nav-left">
@@ -757,7 +777,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
                   )}
                 </div>
                 <div className={`nav-submenu ${setupDropdownOpen && !navCollapsed ? 'open' : ''}`}>
-                  {isNavAllowed('add_company') && (
+                  {user?.role === 'superadmin' && (
                     <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg></span>
                       <span className="nav-label-small">Add Company</span>
@@ -834,8 +854,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
           <div className="content-area">
             <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
               <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
-                {/* Onboarding setup banner — admin only, shown while companies are still being set up */}
-                {isAdmin && adminCompanies.length === 0 && !appLoading && (
+                {/* Onboarding setup banner — superadmin only, shown while companies are still being set up */}
+                {user?.role === 'superadmin' && adminCompanies.length === 0 && !appLoading && (
                   <div className="onboarding-banner" onClick={() => setActivePage('setup-onboarding')}>
                     <div className="ob-banner-icon">🚀</div>
                     <div className="ob-banner-body">
@@ -845,66 +865,66 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
                     <button className="ob-banner-btn">Start Onboarding →</button>
                   </div>
                 )}
-                
+
                 {/* Summary White Card */}
                 <div className="overview-summary-card">
-                   <div className="osc-section" style={{ flex: 1, alignItems: 'flex-start' }}>
-                      <span className="osc-label">Equipment Status:</span>
-                      <div className="osc-cards-wrapper">
-                        <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
-                          <span className="osc-symbol">✅</span> 
-                          <span className="osc-text">Healthy</span>
-                          <span className="osc-count">{statusCounts.healthy}</span>
-                        </button>
-                        <button className={`osc-small-card warning ${statusFilter === 'warning' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}>
-                          <span className="osc-symbol">⚠️</span> 
-                          <span className="osc-text">Warning</span>
-                          <span className="osc-count">{statusCounts.warning}</span>
-                        </button>
-                        <button className={`osc-small-card critical ${statusFilter === 'critical' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}>
-                          <span className="osc-symbol">🚨</span> 
-                          <span className="osc-text">Critical</span>
-                          <span className="osc-count">{statusCounts.critical}</span>
-                        </button>
-                      </div>
-                   </div>
+                  <div className="osc-section" style={{ flex: 1, alignItems: 'flex-start' }}>
+                    <span className="osc-label">Equipment Status:</span>
+                    <div className="osc-cards-wrapper">
+                      <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
+                        <span className="osc-symbol">✅</span>
+                        <span className="osc-text">Healthy</span>
+                        <span className="osc-count">{statusCounts.healthy}</span>
+                      </button>
+                      <button className={`osc-small-card warning ${statusFilter === 'warning' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}>
+                        <span className="osc-symbol">⚠️</span>
+                        <span className="osc-text">Warning</span>
+                        <span className="osc-count">{statusCounts.warning}</span>
+                      </button>
+                      <button className={`osc-small-card critical ${statusFilter === 'critical' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}>
+                        <span className="osc-symbol">🚨</span>
+                        <span className="osc-text">Critical</span>
+                        <span className="osc-count">{statusCounts.critical}</span>
+                      </button>
+                    </div>
+                  </div>
 
-                   <div className="osc-divider"></div>
-                   
-                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
-                      <span className="osc-label">Readiness Score:</span>
-                      <div className="osc-sys-health" style={{ minWidth: '120px', flexDirection: 'column', gap: '4px', paddingTop: '4px' }}>
-                        <svg width="140" height="80" viewBox="0 0 112 64" fill="none" role="img">
-                          <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
-                          <path d="M10 58 A46 46 0 0 1 102 58" 
-                                stroke={preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'} 
-                                strokeWidth="10" strokeLinecap="round" fill="none" 
-                                strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
-                          <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '22px' }}>{preparednessScore}%</text>
-                        </svg>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            fontWeight: '800', 
-                            marginTop: '2px',
-                            color: preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c' 
-                        }}>
-                            {preparednessScore >= 80 ? 'System Healthy' : preparednessScore >= 50 ? 'System Warning' : 'System Critical'}
-                        </div>
-                      </div>
-                   </div>
+                  <div className="osc-divider"></div>
 
-                   <div className="osc-divider"></div>
-                   
-                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
-                      <span className="osc-label">Pending Approvals:</span>
-                      <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '32px', fontWeight: '900', color: '#f39c12', marginTop: '12px' }}>
-                        <span className="osc-symbol" style={{ fontSize: '36px' }}>📋</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
-                          <span style={{ lineHeight: '1' }}>5</span>
-                          <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
-                        </div>
+                  <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                    <span className="osc-label">Readiness Score:</span>
+                    <div className="osc-sys-health" style={{ minWidth: '120px', flexDirection: 'column', gap: '4px', paddingTop: '4px' }}>
+                      <svg width="140" height="80" viewBox="0 0 112 64" fill="none" role="img">
+                        <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
+                        <path d="M10 58 A46 46 0 0 1 102 58"
+                          stroke={preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'}
+                          strokeWidth="10" strokeLinecap="round" fill="none"
+                          strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
+                        <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '22px' }}>{preparednessScore}%</text>
+                      </svg>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: '800',
+                        marginTop: '2px',
+                        color: preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'
+                      }}>
+                        {preparednessScore >= 80 ? 'System Healthy' : preparednessScore >= 50 ? 'System Warning' : 'System Critical'}
                       </div>
-                   </div>
+                    </div>
+                  </div>
+
+                  <div className="osc-divider"></div>
+
+                  <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                    <span className="osc-label">Pending Approvals:</span>
+                    <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '32px', fontWeight: '900', color: '#f39c12', marginTop: '12px' }}>
+                      <span className="osc-symbol" style={{ fontSize: '36px' }}>📋</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+                        <span style={{ lineHeight: '1' }}>5</span>
+                        <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="eq-grid">
@@ -1099,7 +1119,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess }) => {
             {/* ── PENDING APPROVALS ── */}
             <section className={`page ${activePage === 'pending-updates' ? 'active' : ''}`}>
               {activePage === 'pending-updates' && (
-                <PendingApprovals onBack={() => setActivePage('grid')} />
+                <PendingApprovals user={user} onBack={() => setActivePage('grid')} />
               )}
             </section>
 

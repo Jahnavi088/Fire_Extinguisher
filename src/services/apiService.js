@@ -260,32 +260,54 @@ export const ApiService = {
 
   // --- UPDATE WORKFLOW ---
   createEquipmentUpdate: async (id, data) => {
-    return await request(`/extinguishers/${id}/updates`, {
+    return await request(`/equipment/${id}/updates`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   getEquipmentUpdates: async (id) => {
-    return await request(`/extinguishers/${id}/updates`);
+    return await request(`/equipment/${id}/updates`);
   },
 
   getPendingUpdates: async () => {
     return await request('/updates/pending');
   },
 
-  approveUpdate: async (id, remarks) => {
-    return await request(`/updates/${id}/approve`, {
+  supervisorApproveUpdate: async (id, remarks) => {
+    return await request(`/updates/${id}/supervisor-approve`, {
       method: 'PATCH',
-      body: remarks ? JSON.stringify({ remarks }) : undefined,
+      body: JSON.stringify({ review_remarks: remarks }),
     });
   },
 
-  rejectUpdate: async (id, reason) => {
-    return await request(`/updates/${id}/reject`, {
+  adminApproveUpdate: async (id, remarks) => {
+    return await request(`/updates/${id}/admin-approve`, {
       method: 'PATCH',
-      body: reason ? JSON.stringify({ reason }) : undefined,
+      body: JSON.stringify({ review_remarks: remarks }),
     });
+  },
+
+  supervisorRejectUpdate: async (id, reason) => {
+    return await request(`/updates/${id}/supervisor-reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ review_remarks: reason }),
+    });
+  },
+
+  adminRejectUpdate: async (id, reason) => {
+    return await request(`/updates/${id}/admin-reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ review_remarks: reason }),
+    });
+  },
+
+  getNotifications: async (params = {}) => {
+    return await request(`/notifications${qs(params)}`);
+  },
+
+  getEquipmentHistory: async (id) => {
+    return await request(`/equipment/${id}/history`);
   },
 
   // --- LEGACY FIRE ---
