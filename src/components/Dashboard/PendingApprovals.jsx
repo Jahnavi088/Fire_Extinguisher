@@ -7,7 +7,7 @@ const PAGE_SIZE = 20;
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
 
-const PendingApprovals = ({ user, onBack }) => {
+const PendingApprovals = ({ user, onBack, allowedModules }) => {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [retry, setRetry] = useState(0);
@@ -17,6 +17,7 @@ const PendingApprovals = ({ user, onBack }) => {
   const [remarksInput, setRemarksInput] = useState('');
   const [rejectInput, setRejectInput] = useState('');
   const [modalMode, setModalMode] = useState(null); // 'approve' | 'reject'
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -46,12 +47,11 @@ const PendingApprovals = ({ user, onBack }) => {
       
       // Extract pending inspections
       const pendingInspections = iList.filter(i => {
-         if (approvedLocally.includes(i.id)) return false;
          const stStatus = (i.status || '').toUpperCase();
          const stApprov = (i.approval_status || '').toUpperCase();
-         const stRemarks = (i.remarks || i.overall_remarks || '').toUpperCase();
          
-         return stApprov === 'PENDING' || stStatus === 'PENDING' || stRemarks.includes('[PENDING]');
+         const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
+         return !isApproved;
       }).map(i => ({ ...i, _itemType: 'inspection' }));
 
       // Extract pending updates
@@ -63,7 +63,11 @@ const PendingApprovals = ({ user, onBack }) => {
          return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
       }).map(u => ({ ...u, _itemType: 'update' }));
 
-      const merged = [...pendingInspections, ...pendingUpdates];
+      let merged = [...pendingInspections, ...pendingUpdates];
+      if (allowedModules) {
+        const allowedIds = new Set(allowedModules.map(m => String(m.module_id)));
+        merged = merged.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
+      }
       merged.sort((a, b) => new Date(b.created_at || b.inspected_at || 0) - new Date(a.created_at || a.inspected_at || 0));
       
       setItems(merged);
@@ -75,8 +79,17 @@ const PendingApprovals = ({ user, onBack }) => {
     return () => { active = false; };
   }, [retry]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const pageItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const filteredItems = items.filter(item => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const subName = (item.submitted_by_name || item.inspector_name || item.user_name || '').toLowerCase();
+    const unitCode = (item.sos_code || item.equipment_code || '').toLowerCase();
+    const modName = (item.equipment_name || item.module_name || '').toLowerCase();
+    return subName.includes(q) || unitCode.includes(q) || modName.includes(q);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const pageItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const openApprove = (item) => {
     setSelectedItem(item);
@@ -201,9 +214,28 @@ const PendingApprovals = ({ user, onBack }) => {
         <div className="rpt-data-panel-header">
           <div className="rpt-data-panel-title">
             <div className="rpt-title-main">
-              {!loading && <span className="rpt-count-badge">{items.length} requests pending</span>}
+              {!loading && <span className="rpt-count-badge">{filteredItems.length} requests pending</span>}
             </div>
           </div>
+          {!loading && items.length > 0 && (
+            <div className="rpt-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input 
+                type="text" 
+                placeholder="Search requests..." 
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  fontSize: '11px',
+                  outline: 'none',
+                  width: '180px',
+                  background: 'rgba(255,255,255,0.8)'
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -226,7 +258,6 @@ const PendingApprovals = ({ user, onBack }) => {
                   <th>Submitted By</th>
                   <th>Unit ID</th>
                   <th>Module</th>
-                  <th>Type</th>
                   <th>Remarks</th>
                   <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
@@ -248,28 +279,30 @@ const PendingApprovals = ({ user, onBack }) => {
                       </td>
                       <td><span className="rpt-cell-mono-dark">{item.sos_code || item.equipment_code || '—'}</span></td>
                       <td><span className="rpt-cell-text-dark">{item.equipment_name || item.module_name || '—'}</span></td>
-                      <td>
-                        <span className={`rpt-status-chip ${item._itemType === 'inspection' ? 'ok' : 'warning'}`}>
-                          {item._itemType === 'inspection' ? 'INSPECTION' : (item.update_type || item.type || 'UPDATE').toUpperCase()}
-                        </span>
-                      </td>
                       <td><span className="rpt-cell-muted-dark" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.remarks || item.notes || item.description || '—'}</span></td>
                       <td style={{ textAlign: 'center' }}>
                         <button
                           className="rpt-export-btn"
                           onClick={() => openApprove(item)}
                           disabled={actionLoading === item.id}
-                          style={{ padding: '4px 10px', fontSize: '10px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.3)', marginRight: '6px' }}
+                          style={{ padding: '4px 8px', fontSize: '10px', background: '#16a34a', color: '#fff', border: 'none', marginRight: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                          Approve
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>Approve</span>
                         </button>
                         <button
                           className="rpt-export-btn"
                           onClick={() => openReject(item)}
                           disabled={actionLoading === item.id}
-                          style={{ padding: '4px 10px', fontSize: '10px', background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.3)' }}
+                          style={{ padding: '4px 8px', fontSize: '10px', background: '#dc2626', color: '#fff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                          Reject
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                          <span>Reject</span>
                         </button>
                       </td>
                     </tr>

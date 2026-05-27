@@ -43,9 +43,8 @@ const NAV_MODULES = [
   { code: 'muster_point',      label: 'Muster Points',         icon: '📌', category: 'Modules' },
 
   // --- SETUP ---
-  { code: 'onboarding',        label: 'Onboarding',            icon: '🚀', category: 'Setup' },
   { code: 'add_company',       label: 'Add Company',           icon: '🏢', category: 'Setup' },
-  { code: 'add_equipment',     label: 'Add Equipment',         icon: '➕', category: 'Setup' },
+  { code: 'add_equipment',     label: 'Onboarding',            icon: '🚀', category: 'Setup' },
 
   // --- USERS ---
   { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },

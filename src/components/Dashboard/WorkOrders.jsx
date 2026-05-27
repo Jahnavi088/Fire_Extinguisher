@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './WorkOrders.css';
 import { ApiService } from '../../services/apiService';
 
-const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
+const WorkOrders = ({ onBack, prefill, clearPrefill, allowedModules }) => {
   const [workOrders, setWorkOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,9 +24,20 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await ApiService.getWorkOrders();
+      const [res, eqResRaw] = await Promise.all([
+        ApiService.getWorkOrders(),
+        ApiService.getEquipment().catch(() => [])
+      ]);
       const list = res?.items || (Array.isArray(res) ? res : res?.work_orders || res?.data || []);
+      const eqList = Array.isArray(eqResRaw) ? eqResRaw : (eqResRaw?.items || eqResRaw?.data || []);
       
+      // Build a map of equipment to lookup module_id for work orders that only have equipment_id
+      const eqMap = new Map();
+      eqList.forEach(eq => {
+         if (eq.id) eqMap.set(String(eq.id), eq);
+         if (eq.sos_code) eqMap.set(eq.sos_code, eq);
+      });
+
       const detailedOrders = await Promise.all(
         list.map(async (wo) => {
           try {
@@ -38,8 +49,49 @@ const WorkOrders = ({ onBack, prefill, clearPrefill }) => {
           }
         })
       );
+
+      let finalOrders = detailedOrders;
+      if (allowedModules) {
+        const allowedIds = new Set(allowedModules.map(m => String(m.module_id || m.id)));
+        const allowedCodes = new Set(allowedModules.map(m => m.code || m.module_code));
+        finalOrders = finalOrders.filter(wo => {
+          let modId = wo.module_id;
+          let modCode = wo.module_code;
+          
+          // If no direct module info, check equipment lookup map
+          if (!modId && !modCode && wo.equipment_id) {
+             const eq = eqMap.get(String(wo.equipment_id));
+             if (eq) {
+                modId = eq.module_id;
+                modCode = eq.module_code;
+             }
+          }
+          
+          if (modId && allowedIds.has(String(modId))) return true;
+          if (modCode && allowedCodes.has(modCode)) return true;
+          
+          // Fallback: guess by SOS code prefix if available
+          if (!modId && !modCode && wo.equipment_id) {
+             const eqIdStr = String(wo.equipment_id);
+             const match = eqIdStr.match(/^([A-Z]+)-/i);
+             if (match) {
+               const prefix = match[1].toUpperCase();
+               const hasPrefixMatch = allowedModules.some(m => {
+                 if (!m.code && !m.module_code) return false;
+                 const code = m.code || m.module_code;
+                 const expectedPrefix = code.split('_').map(w => w[0]).join('').toUpperCase();
+                 return expectedPrefix === prefix;
+               });
+               if (hasPrefixMatch) return true;
+             }
+          }
+          
+          // Completely hide if it doesn't match allowed modules
+          return false;
+        });
+      }
       
-      setWorkOrders(detailedOrders);
+      setWorkOrders(finalOrders);
       setError(null);
     } catch (e) {
       setError('Failed to load work orders.');

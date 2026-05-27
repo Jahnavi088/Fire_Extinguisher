@@ -4,7 +4,7 @@ import './SafetyDashboard.css'; // Reusing dashboard styles for consistency or c
 
 const MODULE_IDS = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-const ModuleManagement = ({ onBack }) => {
+const ModuleManagement = ({ onBack, allowedModules }) => {
   const [modules, setModules] = useState([]);
   const [weights, setWeights] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +26,14 @@ const ModuleManagement = ({ onBack }) => {
       const mods = Array.isArray(modulesRes) ? modulesRes : (modulesRes?.data || []);
       const wgts = Array.isArray(weightsRes) ? weightsRes : (weightsRes?.data || []);
       
-      // Filter modules to only those in the specified IDs
-      const filteredMods = mods.filter(m => MODULE_IDS.includes(m.id || m.module_id));
+      // Filter modules to only those in the specified IDs, and if allowedModules is passed, restrict further
+      let allowedIds = MODULE_IDS;
+      if (allowedModules) {
+        const allowedSet = new Set(allowedModules.map(m => m.id || m.module_id));
+        allowedIds = MODULE_IDS.filter(id => allowedSet.has(id));
+      }
+      
+      const filteredMods = mods.filter(m => allowedIds.includes(m.id || m.module_id));
       setModules(filteredMods);
       setWeights(wgts);
     } catch (err) {
@@ -103,7 +109,7 @@ const ModuleManagement = ({ onBack }) => {
               </tr>
             </thead>
             <tbody>
-              {MODULE_IDS.map(id => {
+              { (allowedModules ? MODULE_IDS.filter(id => (new Set(allowedModules.map(m => m.id || m.module_id))).has(id)) : MODULE_IDS).map(id => {
                 const mod = modules.find(m => (m.id || m.module_id) === id) || { id, name: `Module ${id}`, code: `mod_${id}`, is_active: false };
                 const weight = getWeightForModule(id);
                 

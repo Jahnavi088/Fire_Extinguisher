@@ -128,7 +128,16 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
               >
                 <div className="nav-left">
                   <span className="nav-icon">{item.icon}</span>
-                  {!navCollapsed && <span className="nav-label">{item.label}</span>}
+                  {!navCollapsed && (
+                    <span className="nav-label">
+                      {item.label}
+                      {item.badge > 0 && (
+                        <span style={{ fontSize: '11px', opacity: 0.7, marginLeft: '6px' }}>
+                          ({item.badge})
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </div>
                 {navCollapsed && <div className="sidenav-tip">{item.label}</div>}
               </div>

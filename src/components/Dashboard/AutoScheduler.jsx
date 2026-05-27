@@ -386,22 +386,18 @@ export default function AutoScheduler({ modules, onBack }) {
             <table className="as-table">
               <thead>
                 <tr>
-                  <th>Task ID</th>
                   <th>Equipment</th>
-                  <th>Type</th>
-                  <th>Building / Zone</th>
-                  <th>Shift</th>
+                  <th>Location</th>
                   <th>Operator</th>
-                  <th>Due</th>
-                  <th>Priority</th>
+                  <th>Due Date</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {tabSchedules.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="as-empty-row">
+                    <td colSpan="6" className="as-empty-row">
                       {schedules.length === 0
                         ? 'No inspections yet. Click "Generate Schedule" to start.'
                         : 'No tasks match the current filters.'}
@@ -410,7 +406,6 @@ export default function AutoScheduler({ modules, onBack }) {
                 ) : (
                   tabSchedules.map(s => (
                     <tr key={s.id}>
-                      <td><span className="as-task-id">{s.taskId}</span></td>
                       <td>
                         <div className="as-equip-cell">
                           <span className="as-equip-emoji">{MODULE_EMOJIS[s.moduleCode] || '📦'}</span>
@@ -420,35 +415,29 @@ export default function AutoScheduler({ modules, onBack }) {
                           </div>
                         </div>
                       </td>
-                      <td><span className="as-type-tag">{s.equipmentType || '—'}</span></td>
                       <td>
                         <div className="as-loc-cell">
-                          <span>{s.building || '—'}</span>
+                          <span style={{ fontWeight: 500, color: '#334155' }}>{s.building || '—'}</span>
                           <span className="as-zone-tag">{s.zone || '—'}</span>
                         </div>
                       </td>
-                      <td><span className="as-shift-badge">Shift {s.shift || '—'}</span></td>
                       <td>
                         <div className="as-operator-cell">
                           <div className="as-operator-avatar">{(s.assignedOperator || 'U')[0]}</div>
-                          <span>{s.assignedOperator || '—'}</span>
+                          <span style={{ fontWeight: 500, color: '#334155' }}>{s.assignedOperator || '—'}</span>
                         </div>
                       </td>
                       <td>
                         <div className="as-due-cell">
-                          <div>{s.dueDate}</div>
-                          <div className="as-due-time">{s.dueTime}</div>
+                          <div style={{ fontWeight: 600, color: '#475569' }}>{s.dueDate}</div>
                         </div>
-                      </td>
-                      <td>
-                        <span className={`as-priority-tag ${(s.priority || '').toLowerCase()}`}>{s.priority}</span>
                       </td>
                       <td>
                         <span className={`as-status-badge ${statusClass(s.status)}`}>{s.status}</span>
                       </td>
                       <td>
-                        <div className="as-action-row">
-                          <button className="as-btn-view" onClick={() => setSelectedTask(s)}>View Details</button>
+                        <div className="as-action-row" style={{ justifyContent: 'flex-end' }}>
+                          <button className="as-btn-view" onClick={() => setSelectedTask(s)}>View</button>
                           {s.status === 'Pending' && (
                             <button className="as-action-btn start" onClick={() => handleStatusChange(s.id, 'In Progress')}>Start</button>
                           )}

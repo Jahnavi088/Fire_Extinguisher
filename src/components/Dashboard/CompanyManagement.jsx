@@ -132,9 +132,13 @@ const CompanyManagement = ({ onBack }) => {
 
       const companyId = company?.data?.id || company?.id;
       if (addForm.logo && companyId) {
-        const formData = new FormData();
-        formData.append('logo', addForm.logo);
-        await ApiService.uploadCompanyLogo(companyId, formData);
+        try {
+          const formData = new FormData();
+          formData.append('logo', addForm.logo);
+          await ApiService.uploadCompanyLogo(companyId, formData);
+        } catch (uploadErr) {
+          alert(`Company created, but logo upload failed: ${uploadErr.message}`);
+        }
       }
 
       await fetchCompanies();
@@ -208,8 +212,6 @@ const CompanyManagement = ({ onBack }) => {
 
     setSaving(true);
     try {
-      // Only include name/company_ref in payload if they changed, to avoid
-      // server-side uniqueness check false positives on the same record.
       const payload = {
         email: editForm.email.trim(),
         address: editForm.address.trim(),
@@ -221,9 +223,13 @@ const CompanyManagement = ({ onBack }) => {
       await ApiService.updateAdminCompany(editTarget.id, payload);
 
       if (editForm.logo) {
-        const formData = new FormData();
-        formData.append('logo', editForm.logo);
-        await ApiService.uploadCompanyLogo(editTarget.id, formData);
+        try {
+          const formData = new FormData();
+          formData.append('logo', editForm.logo);
+          await ApiService.uploadCompanyLogo(editTarget.id, formData);
+        } catch (uploadErr) {
+          alert(`Company updated, but logo upload failed: ${uploadErr.message}`);
+        }
       }
 
       await fetchCompanies();

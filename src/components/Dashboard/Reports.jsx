@@ -333,7 +333,7 @@ const ComingSoon = ({ tab }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const Reports = ({ onBack }) => {
+const Reports = ({ onBack, allowedModules }) => {
   const [activeTab, setActiveTab] = useState('inspections');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -613,15 +613,18 @@ ${checklistHtml}
       if (activeTab === 'inspections') {
          const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
          finalData = finalData.filter(i => {
-            if (approvedLocally.includes(i.id)) return true; // Explicitly approved, show it
-
             const stStatus = (i.status || '').toUpperCase();
             const stApprov = (i.approval_status || '').toUpperCase();
-            const stRemarks = (i.remarks || i.overall_remarks || '').toUpperCase();
             
-            const isPending = stApprov === 'PENDING' || stStatus === 'PENDING' || stRemarks.includes('[PENDING]');
-            return !isPending;
+            const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
+            return isApproved;
          });
+      }
+
+      // Filter out records for modules the user doesn't have access to
+      if (allowedModules) {
+        const allowedIds = new Set(allowedModules.map(m => String(m.module_id)));
+        finalData = finalData.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
       }
       
       setData(finalData);
@@ -758,20 +761,30 @@ ${checklistHtml}
     ];
   }, [data, activeTab, filter.dateRange]);
 
-  const CATEGORIES = [
-    { id: 'all', label: 'All Modules' },
-    { id: '30',  label: 'Fire Extinguishers' },
-    { id: '31',  label: 'Sprinklers' },
-    { id: '39',  label: 'Emergency Exits' },
-    { id: '38',  label: 'Emergency Lighting' },
-    { id: '29',  label: 'Fire NOC' },
-    { id: '23',  label: 'Trained Personnel' },
-    { id: '34',  label: 'Fire Hydrants' },
-    { id: '33',  label: 'Fire Hose Reels' },
-    { id: '35',  label: 'Fire Alarms' },
-    { id: '36',  label: 'Smoke Detectors' },
-    { id: '59',  label: 'Muster Points' },
-  ];
+  const CATEGORIES = useMemo(() => {
+    const base = [{ id: 'all', label: 'All Modules' }];
+    if (!allowedModules) {
+      return [
+        ...base,
+        { id: '30',  label: 'Fire Extinguishers' },
+        { id: '31',  label: 'Sprinklers' },
+        { id: '39',  label: 'Emergency Exits' },
+        { id: '38',  label: 'Emergency Lighting' },
+        { id: '29',  label: 'Fire NOC' },
+        { id: '23',  label: 'Trained Personnel' },
+        { id: '34',  label: 'Fire Hydrants' },
+        { id: '33',  label: 'Fire Hose Reels' },
+        { id: '35',  label: 'Fire Alarms' },
+        { id: '36',  label: 'Smoke Detectors' },
+        { id: '59',  label: 'Muster Points' },
+      ];
+    }
+    const mapped = allowedModules.map(m => ({
+      id: String(m.module_id),
+      label: m.name
+    }));
+    return [...base, ...mapped];
+  }, [allowedModules]);
 
   const currentType = REPORT_TYPES.find(r => r.id === activeTab);
   const currentCat = CATEGORIES.find(c => c.id === filter.module) || CATEGORIES[0];

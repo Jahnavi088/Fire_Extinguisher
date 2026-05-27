@@ -18,7 +18,7 @@ const fmtDate = (d) => {
   return `${t.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })} ${t.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`;
 };
 
-const AuditLog = ({ onBack }) => {
+const AuditLog = ({ onBack, allowedModules }) => {
   const [state, dispatch] = useReducer(reducer, { loading: true, error: null, items: [], total: 0 });
   const { loading, error, items, total } = state;
   const [page, setPage] = useState(1);
@@ -37,9 +37,35 @@ const AuditLog = ({ onBack }) => {
   }, [page, filters, retry]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return items;
+    let result = items;
+    
+    // Security restriction based on allowedModules
+    if (allowedModules) {
+      const allowedModuleIds = new Set(allowedModules.map(m => String(m.module_id || m.id)));
+      result = result.filter(r => {
+        // Only apply restriction to equipment or checklist related tables
+        if (r.table_name === 'equipment' || r.table_name === 'checklists') {
+           // We try to extract module ID if available in old or new values
+           let vals = {};
+           try {
+             if (r.new_values && typeof r.new_values === 'string') vals = { ...vals, ...JSON.parse(r.new_values) };
+             else if (r.new_values) vals = { ...vals, ...r.new_values };
+             
+             if (r.old_values && typeof r.old_values === 'string') vals = { ...vals, ...JSON.parse(r.old_values) };
+             else if (r.old_values) vals = { ...vals, ...r.old_values };
+           } catch(e) {}
+           
+           if (vals.module_id) {
+              return allowedModuleIds.has(String(vals.module_id));
+           }
+        }
+        return true;
+      });
+    }
+
+    if (!search.trim()) return result;
     const q = search.toLowerCase();
-    return items.filter(r =>
+    return result.filter(r =>
       (r.changed_by_user || '').toLowerCase().includes(q) ||
       (r.table_name || '').toLowerCase().includes(q) ||
       (r.action || '').toLowerCase().includes(q) ||
@@ -47,7 +73,7 @@ const AuditLog = ({ onBack }) => {
       JSON.stringify(r.new_values || {}).toLowerCase().includes(q) ||
       JSON.stringify(r.old_values || {}).toLowerCase().includes(q)
     );
-  }, [items, search]);
+  }, [items, search, allowedModules]);
 
   const clearFilters = () => {
     setFilters({ table_name: '', action: '', start_date: '', end_date: '' });

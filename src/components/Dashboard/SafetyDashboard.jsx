@@ -194,7 +194,6 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = React.useRef(null);
   const [checkedItems, setCheckedItems] = useState({});
-  const [panelVisible, setPanelVisible] = useState(true);
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
   const [currentTime, setCurrentTime] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -203,6 +202,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [shiftData, setShiftData] = useState({ icon: '🌅', name: 'Day Shift', time: '06:00 - 14:00', staff: 12 });
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [pendingRawItems, setPendingRawItems] = useState([]);
   const [checklistTypes, setChecklistTypes] = useState([]);
   const [selectedChecklistType, setSelectedChecklistType] = useState(
     () => sessionStorage.getItem('sd_checklistType') || null
@@ -293,30 +293,12 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     { label: 'Permits', icon: '📋' },
   ];
 
-  const preparednessScore = useMemo(() => {
-    const total = modules.reduce((sum, m) => sum + (m.health_score || 0), 0);
-    return modules.length > 0 ? Math.round(total / modules.length) : 0;
-  }, [modules]);
-
   const getStatus = (mod) => {
     const score = mod.health_score ?? 0;
     if (score >= 80) return 'healthy'; // green
     if (score >= 50) return 'warning'; // amber
     return 'critical'; // red
   };
-
-  const statusCounts = useMemo(() => {
-    return modules.reduce(
-      (acc, m) => {
-        const status = getStatus(m);
-        if (status === 'healthy') acc.healthy++;
-        else if (status === 'warning') acc.warning++;
-        else if (status === 'critical') acc.critical++;
-        return acc;
-      },
-      { healthy: 0, warning: 0, critical: 0 }
-    );
-  }, [modules]);
 
   // Sync navAccessList whenever the prop changes (e.g. after admin updates access)
   useEffect(() => {
@@ -364,6 +346,43 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     ApiService.getAlertsSummary()
       .then((d) => setAlertCount(d.total_alerts || 0))
       .catch(() => setAlertCount(0));
+
+    // Fetch pending approvals count
+    const today = new Date();
+    const endDateStr = today.toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    Promise.allSettled([
+      ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }),
+      ApiService.getPendingUpdates().catch(() => [])
+    ]).then(([inspectionsRes, updatesRes]) => {
+      let pendingItems = [];
+      const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+      
+      if (inspectionsRes.status === 'fulfilled') {
+        const raw = inspectionsRes.value;
+        const iList = Array.isArray(raw) ? raw : (raw?.items || raw?.reports || raw?.inspections || raw?.data || []);
+        pendingItems = pendingItems.concat(iList.filter(i => {
+          const stStatus = (i.status || '').toUpperCase();
+          const stApprov = (i.approval_status || '').toUpperCase();
+          return !(stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id));
+        }).map(i => ({ ...i, _itemType: 'inspection' })));
+      }
+      
+      if (updatesRes.status === 'fulfilled') {
+        const raw = updatesRes.value;
+        const uList = Array.isArray(raw) ? raw : (raw?.items || raw?.updates || raw?.data || []);
+        pendingItems = pendingItems.concat(uList.filter(u => {
+          if (approvedLocally.includes(u.id)) return false;
+          const stStatus = (u.status || '').toUpperCase();
+          const stApprov = (u.approval_status || '').toUpperCase();
+          return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
+        }).map(u => ({ ...u, _itemType: 'update' })));
+      }
+      setPendingRawItems(pendingItems);
+    }).catch(() => setPendingRawItems([]));
 
     ApiService.getChecklists()
       .then(d => {
@@ -480,6 +499,31 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     return modules.filter(m => allowedCodes.has(m.code));
   }, [modules, equipmentAccessList, navAccessList]);
 
+  const pendingApprovalsCount = useMemo(() => {
+    if (!pendingRawItems) return 0;
+    const allowedIds = new Set(filteredModules.map(m => String(m.module_id)));
+    const finalItems = pendingRawItems.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
+    return finalItems.length;
+  }, [pendingRawItems, filteredModules]);
+
+  const preparednessScore = useMemo(() => {
+    const total = filteredModules.reduce((sum, m) => sum + (m.health_score || 0), 0);
+    return filteredModules.length > 0 ? Math.round(total / filteredModules.length) : 0;
+  }, [filteredModules]);
+
+  const statusCounts = useMemo(() => {
+    return filteredModules.reduce(
+      (acc, m) => {
+        const status = getStatus(m);
+        if (status === 'healthy') acc.healthy++;
+        else if (status === 'warning') acc.warning++;
+        else if (status === 'critical') acc.critical++;
+        return acc;
+      },
+      { healthy: 0, warning: 0, critical: 0 }
+    );
+  }, [filteredModules]);
+
   const totalItems = useMemo(() => {
     return activeChecklistItems.length;
   }, [activeChecklistItems]);
@@ -584,7 +628,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       items: [
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Service Reports', code: 'reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>, label: 'Work Orders', code: 'work_orders', active: activePage === 'work-orders', onClick: () => setActivePage('work-orders') },
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Pending Approvals', code: 'pending_updates', active: activePage === 'pending-updates', onClick: () => setActivePage('pending-updates') },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Pending Approvals', code: 'pending_updates', badge: pendingApprovalsCount, active: activePage === 'pending-updates', onClick: () => setActivePage('pending-updates') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Auto-Scheduler', code: 'auto_scheduler', active: activePage === 'auto-scheduler', onClick: () => setActivePage('auto-scheduler') },
       ],
     },
@@ -634,7 +678,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
 
         <div className="tb-actions">
-          {activePage === 'grid' && (
+          {activePage === 'grid' && filteredModules.length > 10 && (
             <div className="topbar-search">
               <div className="search-group">
                 <div className="custom-select-wrap">
@@ -672,7 +716,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             </div>
           )}
 
-          <div className={`tb-clock ${panelVisible ? 'hidden' : ''}`}>
+          <div className="tb-clock">
             <span className="tb-time-bold">{currentTime}</span>
           </div>
           <div className="bell-wrap" ref={notifRef} onClick={openNotifPanel} title="Notifications">
@@ -710,22 +754,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               </div>
             )}
           </div>
-          <div className={`status-badge ${panelVisible ? 'hidden' : ''}`}>❤️ {preparednessScore}%</div>
-          <button
-            className="panel-toggle-topbar-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setPanelVisible(!panelVisible);
-            }}
-            title={panelVisible ? "Hide info panel" : "Show info panel"}
-            aria-label="Toggle Panel"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="15" y1="3" x2="15" y2="21" />
-            </svg>
-          </button>
+          <div className="status-badge">❤️ {preparednessScore}%</div>
         </div>
       </header>
 
@@ -749,9 +778,28 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                   <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => { })}>
                     <div className="nav-left">
                       <span className="nav-icon">{item.icon}</span>
-                      {!navCollapsed && <span className="nav-label">{item.label}</span>}
+                      {!navCollapsed && (
+                        <span className="nav-label" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                          {item.label}
+                          {item.badge ? (
+                            <span style={{ 
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-18px',
+                              background: '#dc2626', 
+                              color: 'white', 
+                              fontSize: '9px', 
+                              fontWeight: 'bold', 
+                              padding: '2px 5px', 
+                              borderRadius: '10px', 
+                              lineHeight: 1
+                            }}>
+                              {item.badge}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
                     </div>
-                    {!navCollapsed && item.badge && <span className="nav-badge">{item.badge}</span>}
                     {navCollapsed && <div className="sidenav-tip">{item.label}</div>}
                   </div>
                 ))}
@@ -786,7 +834,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                   {isNavAllowed('add_equipment') && (
                     <div className={`nav-submenu-item ${activePage === 'equipment-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('equipment-onboarding')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><rect x="3" y="3" width="18" height="18" rx="3" /></svg></span>
-                      <span className="nav-label-small">Add Equipment</span>
+                      <span className="nav-label-small">Onboarding</span>
                     </div>
                   )}
                 </div>
@@ -849,7 +897,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         </aside>
 
         {/* ── MAIN CONTENT AREA (MIDDLE + RIGHT PANEL) ─────────────────────── */}
-        <main className={`main ${!panelVisible ? 'panel-hidden' : ''}`}>
+        <main className="main">
           {/* MIDDLE COLUMN: PAGES */}
           <div className="content-area">
             <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
@@ -917,12 +965,27 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
                     <span className="osc-label">Pending Approvals:</span>
-                    <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '32px', fontWeight: '900', color: '#f39c12', marginTop: '12px' }}>
-                      <span className="osc-symbol" style={{ fontSize: '36px' }}>📋</span>
+                    <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '24px', fontWeight: '900', color: '#f39c12', marginTop: '8px' }}>
+                      <span className="osc-symbol" style={{ fontSize: '28px' }}>📋</span>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
-                        <span style={{ lineHeight: '1' }}>5</span>
-                        <span style={{ fontSize: '12px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                        <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
+                        <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
                       </div>
+                      <svg 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        style={{ width: '18px', height: '18px', color: '#adb5bd', marginLeft: '4px', cursor: 'pointer', transition: 'color 0.2s' }}
+                        onClick={() => setActivePage('pending-updates')}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#adb5bd'}
+                        title="View Pending Approvals"
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -1099,13 +1162,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
             {/* ── REPORTS ── */}
             <section className={`page ${activePage === 'reports' ? 'active' : ''}`}>
-              {activePage === 'reports' && <Reports onBack={() => setActivePage('grid')} />}
+              {activePage === 'reports' && <Reports onBack={() => setActivePage('grid')} allowedModules={filteredModules} />}
             </section>
 
             {/* ── WORK ORDERS ── */}
             <section className={`page ${activePage === 'work-orders' ? 'active' : ''}`}>
               {activePage === 'work-orders' && (
                 <WorkOrders
+                  allowedModules={filteredModules}
                   onBack={() => {
                     setActivePage('grid');
                     setWorkOrderPrefill(null);
@@ -1119,25 +1183,25 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── PENDING APPROVALS ── */}
             <section className={`page ${activePage === 'pending-updates' ? 'active' : ''}`}>
               {activePage === 'pending-updates' && (
-                <PendingApprovals user={user} onBack={() => setActivePage('grid')} />
+                <PendingApprovals user={user} onBack={() => setActivePage('grid')} allowedModules={filteredModules} />
               )}
             </section>
 
             {/* ── AUTO-SCHEDULER ── */}
             <section className={`page ${activePage === 'auto-scheduler' ? 'active' : ''}`}>
               {activePage === 'auto-scheduler' && (
-                <AutoScheduler modules={modules} onBack={() => setActivePage('grid')} />
+                <AutoScheduler modules={filteredModules} onBack={() => setActivePage('grid')} />
               )}
             </section>
 
             {/* ── MODULE MANAGEMENT ── */}
             <section className={`page ${activePage === 'setup-modules' ? 'active' : ''}`}>
-              {activePage === 'setup-modules' && <ModuleManagement onBack={() => setActivePage('grid')} />}
+              {activePage === 'setup-modules' && <ModuleManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} />}
             </section>
 
             {/* ── AUDIT LOGS ── */}
             <section className={`page ${activePage === 'audit-logs' ? 'active' : ''}`}>
-              {activePage === 'audit-logs' && <AuditLog onBack={() => setActivePage('grid')} />}
+              {activePage === 'audit-logs' && <AuditLog onBack={() => setActivePage('grid')} allowedModules={filteredModules} />}
             </section>
 
             {/* ── DEVICE MONITORING ── */}
@@ -1189,7 +1253,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── USERS: MANAGE ── */}
             <section className={`page ${activePage === 'users-manage' ? 'active' : ''}`}>
               {activePage === 'users-manage' && (
-                <UserManagement onBack={() => setActivePage('grid')} />
+                <UserManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} />
               )}
             </section>
 
@@ -1197,21 +1261,12 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               {activePage === 'users-equipment-access' && (
                 <EquipmentAccess
                   onBack={() => setActivePage('grid')}
-                  availableModules={STATIC_MODULES}
+                  availableModules={filteredModules}
                 />
               )}
             </section>
 
           </div>
-
-          {/* RIGHT COLUMN: INFO PANEL */}
-          <RightPanel
-            panelVisible={panelVisible}
-            setPanelVisible={setPanelVisible}
-            currentTime={currentTime}
-            preparednessScore={preparednessScore}
-            statusCounts={statusCounts}
-          />
         </main>
       </div>
     </div>

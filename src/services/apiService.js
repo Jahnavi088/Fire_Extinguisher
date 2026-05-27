@@ -443,17 +443,10 @@ export const ApiService = {
   },
 
   uploadCompanyLogo: async (id, formData) => {
-    const token = localStorage.getItem('auth_token');
-    const response = await fetch(`${BASE_URL}/admin/companies/${id}/logo`, {
+    return await request(`/admin/companies/${id}/logo`, {
       method: 'POST',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
       body: formData,
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || result.message || `HTTP error! status: ${response.status}`);
-    return result;
   },
 
   // --- ADMIN WORK ORDERS ---
