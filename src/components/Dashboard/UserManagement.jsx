@@ -4,51 +4,51 @@ import './UserManagement.css';
 
 const NAV_MODULES = [
   // --- MAIN ---
-  { code: 'overview',          label: 'Overview',              icon: '🏠', category: 'Main' },
+  { code: 'overview', label: 'Overview', icon: '🏠', category: 'Main' },
 
   // --- OPERATIONS ---
-  { code: 'reports',           label: 'Service Reports',       icon: '📄', category: 'Operations' },
-  { code: 'work_orders',       label: 'Work Orders',           icon: '🔧', category: 'Operations' },
-  { code: 'pending_updates',   label: 'Pending Approvals',     icon: '⏳', category: 'Operations' },
-  { code: 'auto_scheduler',    label: 'Auto-Scheduler',        icon: '📅', category: 'Operations' },
+  { code: 'reports', label: 'Service Reports', icon: '📄', category: 'Operations' },
+  { code: 'work_orders', label: 'Work Orders', icon: '🔧', category: 'Operations' },
+  { code: 'pending_updates', label: 'Pending Approvals', icon: '⏳', category: 'Operations' },
+  { code: 'auto_scheduler', label: 'Auto-Scheduler', icon: '📅', category: 'Operations' },
 
   // --- SYSTEM & SECURITY ---
-  { code: 'audit_logs',        label: 'Audit Logs',            icon: '📝', category: 'System & Security' },
-  { code: 'device_monitoring', label: 'Device Monitoring',     icon: '🖥️', category: 'System & Security' },
+  { code: 'audit_logs', label: 'Audit Logs', icon: '📝', category: 'System & Security' },
+  { code: 'device_monitoring', label: 'Device Monitoring', icon: '🖥️', category: 'System & Security' },
 
   // --- EQUIPMENT MODULES ---
-  { code: 'fire_extinguisher', label: 'Fire Extinguishers',    icon: '🧯', category: 'Modules' },
-  { code: 'hose_reel',         label: 'Hose Reels',            icon: '🧵', category: 'Modules' },
-  { code: 'sprinkler',         label: 'Sprinklers',            icon: '🚿', category: 'Modules' },
-  { code: 'hydrant',           label: 'Fire Hydrants',         icon: '🚒', category: 'Modules' },
-  { code: 'fpca',              label: 'Alarm Panels',          icon: '🔔', category: 'Modules' },
-  { code: 'smoke_detector',    label: 'Smoke Detectors',       icon: '🌫️', category: 'Modules' },
-  { code: 'heat_detector',     label: 'Heat Detectors',        icon: '🌡️', category: 'Modules' },
-  { code: 'fire_trolley',      label: 'Fire Trolleys',         icon: '🛒', category: 'Modules' },
-  { code: 'emergency_door',    label: 'Emergency Exits',       icon: '🚪', category: 'Modules' },
-  { code: 'emergency_light',   label: 'Emergency Lighting',    icon: '🔦', category: 'Modules' },
-  { code: 'pa_system',         label: 'PA Systems',            icon: '📢', category: 'Modules' },
-  { code: 'wind_sock',         label: 'Wind Socks',            icon: '📍', category: 'Modules' },
-  { code: 'scba',              label: 'SCBA Units',            icon: '🫁', category: 'Modules' },
-  { code: 'ambulance',         label: 'Ambulances',            icon: '🚑', category: 'Modules' },
-  { code: 'first_aid_kit',     label: 'First Aid Kits',        icon: '🏥', category: 'Modules' },
-  { code: 'eyewash_station',   label: 'Eye Wash Stations',     icon: '👀', category: 'Modules' },
-  { code: 'spill_kit',         label: 'Spill Kits',            icon: '⚗️', category: 'Modules' },
-  { code: 'chemical_shower',   label: 'Chemical Showers',      icon: '🚿', category: 'Modules' },
-  { code: 'ppe_station',       label: 'PPE Stations',          icon: '🦺', category: 'Modules' },
-  { code: 'suppression_system',label: 'CO2 Systems',           icon: '💨', category: 'Modules' },
-  { code: 'safety_signage',    label: 'Safety Signage',        icon: '⚠️', category: 'Modules' },
-  { code: 'emergency_comm',    label: 'Emergency Comms',       icon: '📞', category: 'Modules' },
-  { code: 'fire_blanket',      label: 'Fire Blankets',         icon: '🧲', category: 'Modules' },
-  { code: 'muster_point',      label: 'Muster Points',         icon: '📌', category: 'Modules' },
+  { code: 'fire_extinguisher', label: 'Fire Extinguishers', icon: '🧯', category: 'Modules' },
+  { code: 'hose_reel', label: 'Hose Reels', icon: '🧵', category: 'Modules' },
+  { code: 'sprinkler', label: 'Sprinklers', icon: '🚿', category: 'Modules' },
+  { code: 'hydrant', label: 'Fire Hydrants', icon: '🚒', category: 'Modules' },
+  { code: 'fpca', label: 'Alarm Panels', icon: '🔔', category: 'Modules' },
+  { code: 'smoke_detector', label: 'Smoke Detectors', icon: '🌫️', category: 'Modules' },
+  { code: 'heat_detector', label: 'Heat Detectors', icon: '🌡️', category: 'Modules' },
+  { code: 'fire_trolley', label: 'Fire Trolleys', icon: '🛒', category: 'Modules' },
+  { code: 'emergency_door', label: 'Emergency Exits', icon: '🚪', category: 'Modules' },
+  { code: 'emergency_light', label: 'Emergency Lighting', icon: '🔦', category: 'Modules' },
+  { code: 'pa_system', label: 'PA Systems', icon: '📢', category: 'Modules' },
+  { code: 'wind_sock', label: 'Wind Socks', icon: '📍', category: 'Modules' },
+  { code: 'scba', label: 'SCBA Units', icon: '🫁', category: 'Modules' },
+  { code: 'ambulance', label: 'Ambulances', icon: '🚑', category: 'Modules' },
+  { code: 'first_aid_kit', label: 'First Aid Kits', icon: '🏥', category: 'Modules' },
+  { code: 'eyewash_station', label: 'Eye Wash Stations', icon: '👀', category: 'Modules' },
+  { code: 'spill_kit', label: 'Spill Kits', icon: '⚗️', category: 'Modules' },
+  { code: 'chemical_shower', label: 'Chemical Showers', icon: '🚿', category: 'Modules' },
+  { code: 'ppe_station', label: 'PPE Stations', icon: '🦺', category: 'Modules' },
+  { code: 'suppression_system', label: 'CO2 Systems', icon: '💨', category: 'Modules' },
+  { code: 'safety_signage', label: 'Safety Signage', icon: '⚠️', category: 'Modules' },
+  { code: 'emergency_comm', label: 'Emergency Comms', icon: '📞', category: 'Modules' },
+  { code: 'fire_blanket', label: 'Fire Blankets', icon: '🧲', category: 'Modules' },
+  { code: 'muster_point', label: 'Muster Points', icon: '📌', category: 'Modules' },
 
   // --- SETUP ---
-  { code: 'add_company',       label: 'Add Company',           icon: '🏢', category: 'Setup' },
-  { code: 'add_equipment',     label: 'Onboarding',            icon: '🚀', category: 'Setup' },
+  { code: 'add_company', label: 'Add Company', icon: '🏢', category: 'Setup' },
+  { code: 'add_equipment', label: 'Onboarding', icon: '🚀', category: 'Setup' },
 
   // --- USERS ---
-  { code: 'user_manage',       label: 'Manage Users',          icon: '👥', category: 'Users' },
-  { code: 'equipment_access',  label: 'Equipment Access',      icon: '🔐', category: 'Users' },
+  { code: 'user_manage', label: 'Manage Users', icon: '👥', category: 'Users' },
+  { code: 'equipment_access', label: 'Equipment Access', icon: '🔐', category: 'Users' },
 ];
 const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Modules', 'Setup', 'Users'];
 
@@ -145,14 +145,14 @@ const UserManagement = ({ onBack }) => {
 
   const openEdit = async (u) => {
     setEditUser(u);
-    setForm({ 
-      name: u.name || '', 
-      username: u.username || '', 
-      email: u.email || '', 
-      password: '', 
-      role: u.role || 'user', 
+    setForm({
+      name: u.name || '',
+      username: u.username || '',
+      email: u.email || '',
+      password: '',
+      role: u.role || 'user',
       status: u.status || 'active',
-      company_id: u.company_id || '' 
+      company_id: u.company_id || ''
     });
     setFormError('');
     setShowForm(true);
@@ -217,7 +217,7 @@ const UserManagement = ({ onBack }) => {
             setModuleChecks(checks);
             return;
           }
-        } catch {}
+        } catch { }
         // Default to all true if no config exists
         const defaults = {};
         NAV_MODULES.forEach(m => { defaults[m.code] = true; });
@@ -262,12 +262,12 @@ const UserManagement = ({ onBack }) => {
         if (form.password.trim()) payload.password = form.password;
         await ApiService.updateAdminUser(editUser.id, payload);
       } else {
-        await ApiService.createAdminUser({ 
-          name: form.name, 
-          username: form.username, 
-          email: form.email, 
-          password: form.password, 
-          role: form.role, 
+        await ApiService.createAdminUser({
+          name: form.name,
+          username: form.username,
+          email: form.email,
+          password: form.password,
+          role: form.role,
           status: form.status,
           company_id: form.company_id
         });
@@ -291,10 +291,10 @@ const UserManagement = ({ onBack }) => {
           </svg>
         </button>
         <div className="setup-header-info" style={{ flex: 1 }}>
-          <div className="setup-header-icon">👥</div>
+
           <div>
             <div className="setup-title">User Management</div>
-            <div className="setup-subtitle">Manage system users and role-based access</div>
+
           </div>
         </div>
         <div className="um-search-wrap">

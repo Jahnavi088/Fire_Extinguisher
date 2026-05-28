@@ -941,17 +941,17 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
                   <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
                     <span className="osc-label">Readiness Score:</span>
-                    <div className="osc-sys-health" style={{ minWidth: '120px', flexDirection: 'column', gap: '4px', paddingTop: '4px' }}>
-                      <svg width="140" height="80" viewBox="0 0 112 64" fill="none" role="img">
+                    <div className="osc-sys-health" style={{ minWidth: '150px', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
+                      <svg width="190" height="110" viewBox="0 0 112 64" fill="none" role="img">
                         <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
                         <path d="M10 58 A46 46 0 0 1 102 58"
                           stroke={preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'}
                           strokeWidth="10" strokeLinecap="round" fill="none"
                           strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
-                        <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '22px' }}>{preparednessScore}%</text>
+                        <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '26px' }}>{preparednessScore}%</text>
                       </svg>
                       <div style={{
-                        fontSize: '13px',
+                        fontSize: '15px',
                         fontWeight: '800',
                         marginTop: '2px',
                         color: preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'

@@ -236,7 +236,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
           </div>
           <div>
             <div className="eob-title">Equipment Onboarding</div>
-            <div className="eob-subtitle">Register and deploy new safety equipment to the system</div>
+
           </div>
         </div>
         {loadingData && (

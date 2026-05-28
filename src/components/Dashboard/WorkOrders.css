@@ -231,3 +231,43 @@
   letter-spacing: 0.5px;
   background: rgba(248, 250, 252, 0.5) !important;
 }
+
+/* ── Redesigned Header Overrides (Transparent & Borderless) ── */
+.ea-page .setup-header {
+  background: transparent;
+  padding: 16px 24px 8px 24px;
+  border-bottom: none;
+  position: relative;
+  box-shadow: none;
+}
+
+.ea-page .setup-back-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1e293b;
+}
+
+.ea-page .setup-back-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+.ea-page .setup-title {
+  color: #0f172a;
+}
+
+.ea-page .setup-subtitle {
+  color: #475569;
+}
+
+.ea-page .ea-add-nav-btn {
+  background: #0284c7;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+}
+
+.ea-page .ea-add-nav-btn:hover {
+  background: #0369a1;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+  opacity: 1;
+}

@@ -2,7 +2,7 @@ import { useState, useEffect, useReducer, useMemo } from 'react';
 import './AuditLog.css';
 import { ApiService } from '../../services/apiService';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 function reducer(state, action) {
   switch (action.type) {
@@ -38,26 +38,26 @@ const AuditLog = ({ onBack, allowedModules }) => {
 
   const filtered = useMemo(() => {
     let result = items;
-    
+
     // Security restriction based on allowedModules
     if (allowedModules) {
       const allowedModuleIds = new Set(allowedModules.map(m => String(m.module_id || m.id)));
       result = result.filter(r => {
         // Only apply restriction to equipment or checklist related tables
         if (r.table_name === 'equipment' || r.table_name === 'checklists') {
-           // We try to extract module ID if available in old or new values
-           let vals = {};
-           try {
-             if (r.new_values && typeof r.new_values === 'string') vals = { ...vals, ...JSON.parse(r.new_values) };
-             else if (r.new_values) vals = { ...vals, ...r.new_values };
-             
-             if (r.old_values && typeof r.old_values === 'string') vals = { ...vals, ...JSON.parse(r.old_values) };
-             else if (r.old_values) vals = { ...vals, ...r.old_values };
-           } catch(e) {}
-           
-           if (vals.module_id) {
-              return allowedModuleIds.has(String(vals.module_id));
-           }
+          // We try to extract module ID if available in old or new values
+          let vals = {};
+          try {
+            if (r.new_values && typeof r.new_values === 'string') vals = { ...vals, ...JSON.parse(r.new_values) };
+            else if (r.new_values) vals = { ...vals, ...r.new_values };
+
+            if (r.old_values && typeof r.old_values === 'string') vals = { ...vals, ...JSON.parse(r.old_values) };
+            else if (r.old_values) vals = { ...vals, ...r.old_values };
+          } catch (e) { }
+
+          if (vals.module_id) {
+            return allowedModuleIds.has(String(vals.module_id));
+          }
         }
         return true;
       });
@@ -158,15 +158,15 @@ const AuditLog = ({ onBack, allowedModules }) => {
   const hasActiveFilters = filters.table_name || filters.action || filters.start_date || filters.end_date || search;
 
   const IGNORED_DIFF_KEYS = new Set([
-    'id', 'created_at', 'updated_at', 'sync_event_id', 'sync_device_id', 
+    'id', 'created_at', 'updated_at', 'sync_event_id', 'sync_device_id',
     'sync_received_at', 'inspected_at', 'equipment_id'
   ]);
 
   const getChangedFields = (action, oldVals, newVals) => {
     let o = oldVals || {};
     let n = newVals || {};
-    if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
-    if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
+    if (typeof o === 'string') try { o = JSON.parse(o); } catch { }
+    if (typeof n === 'string') try { n = JSON.parse(n); } catch { }
 
     const keys = new Set([...Object.keys(o), ...Object.keys(n)]);
     const changed = [];
@@ -186,8 +186,8 @@ const AuditLog = ({ onBack, allowedModules }) => {
   const renderDiff = (action, oldVals, newVals) => {
     let o = oldVals || {};
     let n = newVals || {};
-    if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
-    if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
+    if (typeof o === 'string') try { o = JSON.parse(o); } catch { }
+    if (typeof n === 'string') try { n = JSON.parse(n); } catch { }
 
     if (action === 'UPDATE') {
       const keys = new Set([...Object.keys(o), ...Object.keys(n)]);
@@ -246,7 +246,7 @@ const AuditLog = ({ onBack, allowedModules }) => {
           </div>
           <div>
             <div className="setup-title">FDA Compliance Audit Logs</div>
-            <div className="setup-subtitle">Part 11 Electronic Signature Immutable Ledger</div>
+
           </div>
         </div>
         <div className="pu-header-stats" style={{ margin: '0' }}>
@@ -345,10 +345,10 @@ const AuditLog = ({ onBack, allowedModules }) => {
                 {filtered.map(row => {
                   let n = row.new_values || {};
                   let o = row.old_values || {};
-                  if (typeof n === 'string') try { n = JSON.parse(n); } catch {}
-                  if (typeof o === 'string') try { o = JSON.parse(o); } catch {}
+                  if (typeof n === 'string') try { n = JSON.parse(n); } catch { }
+                  if (typeof o === 'string') try { o = JSON.parse(o); } catch { }
                   const recId = row.record_id || n.id || o.id || 'N/A';
-                  
+
                   return (
                     <tr key={row.id}>
                       <td className="al-td-timestamp" style={{ whiteSpace: 'nowrap' }}>{fmtDate(row.changed_at)}</td>
@@ -372,10 +372,10 @@ const AuditLog = ({ onBack, allowedModules }) => {
                         </div>
                       </td>
                       <td>
-                        <button 
+                        <button
                           onClick={() => setSelectedAudit(row)}
                           style={{
-                            padding: '4px 12px', background: '#e2e8f0', color: '#334155', 
+                            padding: '4px 12px', background: '#e2e8f0', color: '#334155',
                             border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px'
                           }}>
                           View
@@ -415,13 +415,13 @@ const AuditLog = ({ onBack, allowedModules }) => {
 
       {selectedAudit && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1000, 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(2px)'
         }}>
           <div style={{
-            background: 'white', borderRadius: '12px', padding: '24px', 
+            background: 'white', borderRadius: '12px', padding: '24px',
             width: '90%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto',
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
           }}>

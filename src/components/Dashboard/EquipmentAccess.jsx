@@ -190,7 +190,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
           </svg>
         </button>
         <div className="setup-header-info" style={{ flex: 1 }}>
-          <div className="setup-header-icon">🔐</div>
+
           <div>
             <div className="setup-title">{view === 'list' ? (isSuperAdmin ? 'Module Permissions' : 'Equipment Access') : 'Assign New Access'}</div>
             <div className="setup-subtitle">
@@ -201,12 +201,30 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
           </div>
         </div>
         {view === 'list' && (
-          <button className="ea-add-nav-btn" onClick={() => setView('form')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
-            </svg>
-            Assign Access
-          </button>
+          <div className="setup-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="ea-search-wrap">
+              <svg className="ea-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                className="ea-search"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button className="ea-search-clear" onClick={() => setSearchQuery('')}>×</button>
+              )}
+            </div>
+            
+            <button className="ea-add-nav-btn" onClick={() => setView('form')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
+              </svg>
+              Assign Access
+            </button>
+          </div>
         )}
       </div>
 
@@ -227,23 +245,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
               </div>
             ) : (
               <>
-                <div className="ea-toolbar">
-                  <div className="ea-search-wrap">
-                    <svg className="ea-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    <input
-                      type="text"
-                      className="ea-search"
-                      placeholder="Search by user, module, level..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    {searchQuery && (
-                      <button className="ea-search-clear" onClick={() => setSearchQuery('')}>×</button>
-                    )}
-                  </div>
-                </div>
+
 
                 <div className="ea-table-wrap" onScroll={onScroll}>
                   <table className="ea-table">

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './Reports.css'; // Use Reports styling for uniform look
+import './PendingApprovals.css'; // Premium drawer & layout styles
 import { ApiService } from '../../services/apiService';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -18,6 +19,11 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
   const [rejectInput, setRejectInput] = useState('');
   const [modalMode, setModalMode] = useState(null); // 'approve' | 'reject'
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Detailed view drawer states
+  const [detailItem, setDetailItem] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailedChecklist, setDetailedChecklist] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +85,83 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     return () => { active = false; };
   }, [retry]);
 
+  const handleViewChecklist = async (item) => {
+    if (!item) return;
+    console.log('=== PendingApprovals: handleViewChecklist clicked ===', item);
+    setDetailItem(item);
+    setDetailedChecklist([]);
+    
+    if (item._itemType === 'inspection') {
+      setDetailLoading(true);
+      try {
+        // 1. Fetch detailed inspection responses
+        const inspectionRes = await ApiService.getInspectionById(item.id);
+        const answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+
+        // 2. Fetch the checklist definition for this module to map full question texts
+        const moduleId = item.module_id || 30; // default to fire extinguishers (30)
+        const checklistRes = await ApiService.getModuleChecklists(moduleId);
+        const checklistItems = Array.isArray(checklistRes) ? checklistRes : (checklistRes?.items || checklistRes?.data || checklistRes?.checklist_items || []);
+
+        // 3. Map answers to standard questions
+        const parseAnswer = (val) => {
+          if (val === undefined || val === null) return 'N/A';
+          const str = String(val).toLowerCase().trim();
+          if (val === true || str === 'true' || str === 'yes' || str === 'pass' || str === 'ok' || str === '1' || str === 'y') return 'Yes';
+          if (val === false || str === 'false' || str === 'no' || str === 'fail' || str === 'nok' || str === '0' || str === 'n') return 'No';
+          if (str === 'na' || str === 'n/a') return 'N/A';
+          return 'N/A';
+        };
+
+        let mapped = [];
+        if (checklistItems.length > 0) {
+          mapped = checklistItems.map(clItem => {
+            const ans = answersList.find(a => {
+              const aId = a.checklist_item_id !== undefined ? a.checklist_item_id :
+                          a.checklist_id !== undefined ? a.checklist_id :
+                          a.item_id !== undefined ? a.item_id :
+                          a.question_id !== undefined ? a.question_id :
+                          a.id !== undefined ? a.id : null;
+              return aId !== null && String(aId) === String(clItem.id);
+            });
+            const rawAns = ans ? (ans.answer !== undefined ? ans.answer : ans.value !== undefined ? ans.value : ans.status !== undefined ? ans.status : ans.result !== undefined ? ans.result : ans.response) : undefined;
+            const remarksVal = ans ? (ans.remarks || ans.remark || ans.notes || ans.comment || ans.comments || '') : '';
+            return {
+              id: clItem.id,
+              question: clItem.question || clItem.description || 'Inspection Point',
+              category: clItem.category || 'General',
+              is_critical: !!(clItem.is_critical || clItem.critical),
+              answer: parseAnswer(rawAns),
+              remarks: remarksVal
+            };
+          });
+        } else {
+          // Fallback if no checklists definition found
+          mapped = answersList.map((ans, idx) => {
+            const rawAns = ans.answer !== undefined ? ans.answer : ans.value !== undefined ? ans.value : ans.status !== undefined ? ans.status : ans.result !== undefined ? ans.result : ans.response;
+            const remarksVal = ans.remarks || ans.remark || ans.notes || ans.comment || ans.comments || '';
+            const itemId = ans.checklist_item_id || ans.checklist_id || ans.item_id || ans.question_id || ans.id || idx;
+            return {
+              id: itemId,
+              question: ans.question || ans.question_text || ans.description || `Check Item #${itemId || idx + 1}`,
+              category: ans.category || 'General',
+              is_critical: !!(ans.is_critical || ans.critical),
+              answer: parseAnswer(rawAns),
+              remarks: remarksVal
+            };
+          });
+        }
+
+        setDetailedChecklist(mapped);
+      } catch (err) {
+        console.error('Failed to fetch detailed checklist answers:', err);
+        setDetailedChecklist([]);
+      } finally {
+        setDetailLoading(false);
+      }
+    }
+  };
+
   const filteredItems = items.filter(item => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -91,10 +174,81 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const pageItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const openApprove = (item) => {
+  const openApprove = async (item) => {
     setSelectedItem(item);
     setRemarksInput('');
     setModalMode('approve');
+    setDetailedChecklist([]);
+    
+    if (item._itemType === 'inspection') {
+      setDetailLoading(true);
+      try {
+        // 1. Fetch detailed inspection responses
+        const inspectionRes = await ApiService.getInspectionById(item.id);
+        const answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+
+        // 2. Fetch the checklist definition for this module to map full question texts
+        const moduleId = item.module_id || 30; // default to fire extinguishers (30)
+        const checklistRes = await ApiService.getModuleChecklists(moduleId);
+        const checklistItems = Array.isArray(checklistRes) ? checklistRes : (checklistRes?.items || checklistRes?.data || checklistRes?.checklist_items || []);
+
+        // 3. Map answers to standard questions
+        const parseAnswer = (val) => {
+          if (val === undefined || val === null) return 'N/A';
+          const str = String(val).toLowerCase().trim();
+          if (val === true || str === 'true' || str === 'yes' || str === 'pass' || str === 'ok' || str === '1' || str === 'y') return 'Yes';
+          if (val === false || str === 'false' || str === 'no' || str === 'fail' || str === 'nok' || str === '0' || str === 'n') return 'No';
+          if (str === 'na' || str === 'n/a') return 'N/A';
+          return 'N/A';
+        };
+
+        let mapped = [];
+        if (checklistItems.length > 0) {
+          mapped = checklistItems.map(clItem => {
+            const ans = answersList.find(a => {
+              const aId = a.checklist_item_id !== undefined ? a.checklist_item_id :
+                          a.checklist_id !== undefined ? a.checklist_id :
+                          a.item_id !== undefined ? a.item_id :
+                          a.question_id !== undefined ? a.question_id :
+                          a.id !== undefined ? a.id : null;
+              return aId !== null && String(aId) === String(clItem.id);
+            });
+            const rawAns = ans ? (ans.answer !== undefined ? ans.answer : ans.value !== undefined ? ans.value : ans.status !== undefined ? ans.status : ans.result !== undefined ? ans.result : ans.response) : undefined;
+            const remarksVal = ans ? (ans.remarks || ans.remark || ans.notes || ans.comment || ans.comments || '') : '';
+            return {
+              id: clItem.id,
+              question: clItem.question || clItem.description || 'Inspection Point',
+              category: clItem.category || 'General',
+              is_critical: !!(clItem.is_critical || clItem.critical),
+              answer: parseAnswer(rawAns),
+              remarks: remarksVal
+            };
+          });
+        } else {
+          // Fallback if no checklists definition found
+          mapped = answersList.map((ans, idx) => {
+            const rawAns = ans.answer !== undefined ? ans.answer : ans.value !== undefined ? ans.value : ans.status !== undefined ? ans.status : ans.result !== undefined ? ans.result : ans.response;
+            const remarksVal = ans.remarks || ans.remark || ans.notes || ans.comment || ans.comments || '';
+            const itemId = ans.checklist_item_id || ans.checklist_id || ans.item_id || ans.question_id || ans.id || idx;
+            return {
+              id: itemId,
+              question: ans.question || ans.question_text || ans.description || `Check Item #${itemId || idx + 1}`,
+              category: ans.category || 'General',
+              is_critical: !!(ans.is_critical || ans.critical),
+              answer: parseAnswer(rawAns),
+              remarks: remarksVal
+            };
+          });
+        }
+
+        setDetailedChecklist(mapped);
+      } catch (err) {
+        console.error('Failed to fetch detailed checklist answers:', err);
+        setDetailedChecklist([]);
+      } finally {
+        setDetailLoading(false);
+      }
+    }
   };
 
   const openReject = (item) => {
@@ -129,20 +283,21 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
       if (toUser) {
          ApiService.broadcastNotification({
-           user_id: toUser,
-           title: 'Approval Accepted',
-           message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was approved.`,
-           type: 'success'
+            user_id: toUser,
+            title: 'Approval Accepted',
+            message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was approved.`,
+            type: 'success'
          }).catch(console.error);
       } else {
          ApiService.broadcastNotification({
-           title: 'Approval Accepted',
-           message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was approved.`,
-           type: 'success'
+            title: 'Approval Accepted',
+            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was approved.`,
+            type: 'success'
          }).catch(console.error);
       }
       
       setModalMode(null);
+      setDetailItem(null); // Close the drawer if open
       setRetry(r => r + 1);
     } catch (e) { 
       alert(e.message || 'Approval failed'); 
@@ -176,25 +331,35 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
       if (toUser) {
          ApiService.broadcastNotification({
-           user_id: toUser,
-           title: 'Approval Rejected',
-           message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was rejected. Reason: ${rejectInput}`,
-           type: 'error'
+            user_id: toUser,
+            title: 'Approval Rejected',
+            message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was rejected. Reason: ${rejectInput}`,
+            type: 'error'
          }).catch(console.error);
       } else {
          ApiService.broadcastNotification({
-           title: 'Approval Rejected',
-           message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was rejected. Reason: ${rejectInput}`,
-           type: 'error'
+            title: 'Approval Rejected',
+            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was rejected. Reason: ${rejectInput}`,
+            type: 'error'
          }).catch(console.error);
       }
       
       setModalMode(null);
+      setDetailItem(null); // Close the drawer if open
       setRetry(r => r + 1);
     } catch (e) { 
       alert(e.message || 'Rejection failed'); 
     }
     finally { setActionLoading(null); }
+  };
+
+  // Helper to extract fields for display comparison
+  const getDisplayFields = (item) => {
+    if (!item) return [];
+    return Object.entries(item).filter(([k, v]) => {
+      if (k.startsWith('_') || ['id', 'created_at', 'updated_at', 'status', 'approval_status', 'submitted_by_id', 'inspector_id', 'user_id', 'module_id'].includes(k)) return false;
+      return typeof v !== 'object' && v !== null && v !== '';
+    });
   };
 
   return (
@@ -277,7 +442,9 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                         <span className="rpt-cell-text-dark">{item.submitted_by_name || item.inspector_name || item.user_name || 'Unknown'}</span>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>{item.submitted_by_role || ''}</div>
                       </td>
-                      <td><span className="rpt-cell-mono-dark">{item.sos_code || item.equipment_code || '—'}</span></td>
+                      <td>
+                        <span className="rpt-cell-mono-dark">{item.sos_code || item.equipment_code || '—'}</span>
+                      </td>
                       <td><span className="rpt-cell-text-dark">{item.equipment_name || item.module_name || '—'}</span></td>
                       <td><span className="rpt-cell-muted-dark" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.remarks || item.notes || item.description || '—'}</span></td>
                       <td style={{ textAlign: 'center' }}>
@@ -330,36 +497,190 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         )}
       </div>
 
-      {/* Modal overlays using existing classes if possible, else inline */}
+      {/* ── HIGHLY PROFESSIONAL APPROVAL REVIEW MODAL ── */}
       {modalMode && selectedItem && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: '#fff', borderRadius: '12px', width: '400px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '16px' }}>
-              {modalMode === 'approve' ? 'Approve Request' : 'Reject Request'}
-            </h3>
+          <div className="pa-light-modal" style={{ border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', width: modalMode === 'approve' ? '640px' : '400px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
             
-            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Unit ID</div>
-              <div style={{ fontSize: '14px', color: '#0f172a', fontWeight: 700, fontFamily: 'monospace' }}>{selectedItem.sos_code || selectedItem.equipment_code || '—'}</div>
-              <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px' }}>{selectedItem.equipment_name || selectedItem.module_name || ''}</div>
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#3b82f6' }}>
+                  {modalMode === 'approve' ? 'Verification & Checklist Review' : 'Reject Request'}
+                </span>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 800, fontFamily: 'monospace' }}>
+                  {selectedItem.sos_code || selectedItem.equipment_code || '—'}
+                </h3>
+              </div>
+              <button onClick={() => setModalMode(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 0 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
-                {modalMode === 'approve' ? 'Remarks (Optional)' : 'Reason for rejection *'}
-              </label>
-              <textarea
-                value={modalMode === 'approve' ? remarksInput : rejectInput}
-                onChange={e => modalMode === 'approve' ? setRemarksInput(e.target.value) : setRejectInput(e.target.value)}
-                placeholder={modalMode === 'approve' ? 'Add approval notes...' : 'Explain why this is rejected...'}
-                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', minHeight: '80px', outline: 'none', resize: 'vertical' }}
-              />
+            {/* Modal Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }} className="pa-drawer-body">
+              {modalMode === 'approve' ? (
+                <>
+                  {/* Request Metadata Info Card */}
+                  <div className="pa-meta-card" style={{ padding: '12px 14px' }}>
+                    <div className="pa-meta-grid" style={{ gap: '12px' }}>
+                      <div className="pa-meta-item">
+                        <span className="pa-meta-label">Submitted By</span>
+                        <span className="pa-meta-val" style={{ fontSize: '12px' }}>{selectedItem.submitted_by_name || selectedItem.inspector_name || selectedItem.user_name || 'Unknown'}</span>
+                      </div>
+                      <div className="pa-meta-item">
+                        <span className="pa-meta-label">Module Type</span>
+                        <span className="pa-meta-val" style={{ fontSize: '12px' }}>{selectedItem.equipment_name || selectedItem.module_name || '—'}</span>
+                      </div>
+                    </div>
+                    {selectedItem.remarks && (
+                      <div className="pa-meta-remarks" style={{ fontSize: '11px', marginTop: '8px', paddingTop: '8px' }}>
+                        <strong>Inspector Remarks:</strong> "{selectedItem.remarks || selectedItem.notes || selectedItem.description}"
+                      </div>
+                    )}
+                  </div>
+
+                  {detailLoading ? (
+                    <div className="pa-drawer-loading" style={{ padding: '30px 0' }}>
+                      <div className="pa-drawer-spinner" />
+                      <span style={{ fontSize: '12px' }}>Loading checklist details…</span>
+                    </div>
+                  ) : selectedItem._itemType === 'inspection' ? (
+                    <>
+                      {/* Score Dial & Chips */}
+                      <div className="pa-score-summary" style={{ padding: '12px' }}>
+                        <div className="pa-score-dial" style={{ width: '70px', height: '70px' }}>
+                          <span className="pa-score-num" style={{ fontSize: '18px' }}>
+                            {detailedChecklist.length > 0 
+                              ? Math.round((detailedChecklist.filter(i => i.answer === 'Yes').length / detailedChecklist.length) * 100)
+                              : 0}%
+                          </span>
+                          <span className="pa-score-label" style={{ fontSize: '6px' }}>Pass Rate</span>
+                        </div>
+                        <div className="pa-score-details" style={{ gap: '8px' }}>
+                          <div className="pa-score-chip" style={{ padding: '6px' }}>
+                            <span>Passed</span>
+                            <strong style={{ fontSize: '13px' }}>{detailedChecklist.filter(i => i.answer === 'Yes').length}</strong>
+                          </div>
+                          <div className="pa-score-chip" style={{ padding: '6px' }}>
+                            <span>Failed</span>
+                            <strong style={{ color: '#ef4444', fontSize: '13px' }}>{detailedChecklist.filter(i => i.answer === 'No').length}</strong>
+                          </div>
+                          <div className="pa-score-chip" style={{ padding: '6px' }}>
+                            <span>Critical</span>
+                            <strong style={{ color: '#f97316', fontSize: '13px' }}>{detailedChecklist.filter(i => i.is_critical && i.answer === 'No').length}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Checklist Questionnaire List */}
+                      <div className="pa-checklist-container">
+                        <h4 className="pa-section-heading" style={{ fontSize: '12px' }}>Checklist Questionnaire Responses</h4>
+                        {detailedChecklist.length === 0 ? (
+                          <div className="pa-empty-state" style={{ fontSize: '11px', color: '#64748b' }}>No responses found.</div>
+                        ) : (
+                          <div className="pa-checklist-list" style={{ gap: '8px' }}>
+                            {detailedChecklist.map((item, idx) => {
+                              const isFail = item.answer === 'No';
+                              const isPass = item.answer === 'Yes';
+                              return (
+                                <div key={item.id || idx} className={`pa-checklist-card ${isFail ? 'fail' : ''} ${item.is_critical ? 'crit' : ''}`} style={{ padding: '10px 12px' }}>
+                                  <div className="pa-checklist-card-top" style={{ gap: '10px' }}>
+                                    <span className={`pa-checklist-num ${isFail ? 'fail' : ''}`} style={{ width: '18px', height: '18px', fontSize: '10px' }}>{idx + 1}</span>
+                                    <p className="pa-checklist-question" style={{ fontSize: '11.5px' }}>{item.question}</p>
+                                    <span className={`pa-ans-badge ${isPass ? 'pass' : isFail ? 'fail' : 'na'}`} style={{ padding: '2px 6px', fontSize: '9px' }}>
+                                      {item.answer}
+                                    </span>
+                                  </div>
+                                  {(item.remarks || item.is_critical) && (
+                                    <div className="pa-checklist-card-bottom" style={{ paddingLeft: '28px', gap: '4px' }}>
+                                      {item.is_critical && <span className="pa-crit-badge" style={{ width: 'fit-content', padding: '1px 4px', fontSize: '8px' }}>CRITICAL ITEM ⚠️</span>}
+                                      {item.remarks && (
+                                        <div className="pa-item-remark" style={{ padding: '4px 8px', fontSize: '10px' }}>
+                                          <strong>Inspector remark:</strong> "{item.remarks}"
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Update data comparison */
+                    <div className="pa-update-container">
+                      <h4 className="pa-section-heading" style={{ fontSize: '12px' }}>Proposed Data Field Updates</h4>
+                      <table className="pa-update-table" style={{ fontSize: '11px' }}>
+                        <thead>
+                          <tr>
+                            <th>Field Name</th>
+                            <th>Proposed Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getDisplayFields(selectedItem).length === 0 ? (
+                            <tr>
+                              <td colSpan={2} style={{ textAlign: 'center', color: '#94a3b8' }}>No updated fields found</td>
+                            </tr>
+                          ) : (
+                            getDisplayFields(selectedItem).map(([key, val]) => (
+                              <tr key={key}>
+                                <td className="pa-update-key" style={{ padding: '8px 10px' }}>{key.replace(/_/g, ' ').toUpperCase()}</td>
+                                <td className="pa-update-val" style={{ padding: '8px 10px' }}>{String(val)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Remarks Input */}
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                      Reviewer Remarks (Optional)
+                    </label>
+                    <textarea
+                      value={remarksInput}
+                      onChange={e => setRemarksInput(e.target.value)}
+                      placeholder="Add supervisor notes/remarks..."
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontSize: '12px', minHeight: '60px', outline: 'none', resize: 'vertical' }}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* Rejection Reason Form */
+                <div>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>Unit ID</div>
+                    <div style={{ fontSize: '14px', color: '#fff', fontWeight: 700, fontFamily: 'monospace' }}>{selectedItem.sos_code || selectedItem.equipment_code || '—'}</div>
+                  </div>
+                  <label style={{ display: 'block', fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                    Reason for rejection *
+                  </label>
+                  <textarea
+                    value={rejectInput}
+                    onChange={e => setRejectInput(e.target.value)}
+                    placeholder="Provide a reason for rejection..."
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontSize: '12px', minHeight: '80px', outline: 'none', resize: 'vertical' }}
+                  />
+                </div>
+              )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            {/* Modal Footer Actions */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'rgba(255,255,255,0.01)' }}>
               <button 
                 onClick={() => setModalMode(null)}
-                style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.08)'}
+                onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
               >
                 Cancel
               </button>
@@ -367,20 +688,25 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                 <button
                   onClick={handleApprove}
                   disabled={actionLoading === selectedItem.id}
-                  style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '8px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.2)', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.target.style.background = '#15803d'}
+                  onMouseLeave={e => e.target.style.background = '#16a34a'}
                 >
-                  {actionLoading === selectedItem.id ? 'Approving...' : 'Confirm Approve'}
+                  {actionLoading === selectedItem.id ? 'Approving...' : 'Confirm & Approve'}
                 </button>
               ) : (
                 <button
                   onClick={handleReject}
                   disabled={actionLoading === selectedItem.id || !rejectInput.trim()}
-                  style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: !rejectInput.trim() ? 0.5 : 1 }}
+                  style={{ padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: !rejectInput.trim() ? 0.5 : 1, transition: 'background 0.2s' }}
+                  onMouseEnter={e => !rejectInput.trim() ? null : e.target.style.background = '#b91c1c'}
+                  onMouseLeave={e => !rejectInput.trim() ? null : e.target.style.background = '#dc2626'}
                 >
                   {actionLoading === selectedItem.id ? 'Rejecting...' : 'Confirm Reject'}
                 </button>
               )}
             </div>
+
           </div>
         </div>
       )}

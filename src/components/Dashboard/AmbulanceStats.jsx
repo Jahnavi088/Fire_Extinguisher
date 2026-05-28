@@ -29,7 +29,7 @@ const KPI_CARDS = [
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 const fetchByType = async (type, moduleId = 14) => {
   if (type === 'active') {

@@ -2050,10 +2050,10 @@ body {
 .sb-header {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  min-height: 56px;
+  padding: 10px 12px 2px 12px;
+  min-height: auto;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none !important;
 }
 
 .sidenav-toggle-btn {
@@ -2136,24 +2136,16 @@ body {
 }
 
 .sb-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.sb-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sb-scroll::-webkit-scrollbar {
-  width: 5px;
-}
-
-.sb-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 99px;
 }
 
 .sb-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.sb-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .nav-item {
@@ -2425,7 +2417,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 1.2px;
   color: rgba(255, 255, 255, 0.38);
-  padding: 16px 14px 5px;
+  padding: 6px 14px 5px !important;
 }
 
 /* ── SIDEBAR USER PROFILE ── */
@@ -3856,3 +3848,12 @@ body {
   border-radius: 4px;
   transition: width 0.5s ease;
 }
+
+/* ── UNIFIED LIGHT BLUE PAGE BACKGROUNDS ── */
+.rpt-page, 
+.ea-page, 
+.as-container,
+.pa-container {
+  background: var(--bg, rgb(144, 194, 244)) !important;
+  color: #0f172a !important;
+}

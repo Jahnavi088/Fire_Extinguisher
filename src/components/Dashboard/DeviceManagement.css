@@ -36,7 +36,7 @@
 .dm-search-input-wrapper {
   position: relative;
   flex: 1;
-  max-width: 280px;
+  max-width: 220px;
 }
 
 .dm-search-input-wrapper svg {

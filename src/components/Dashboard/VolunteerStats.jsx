@@ -29,7 +29,7 @@ const KPI_CARDS = [
   { type: 'due-inspection', label: 'Due Refresher', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 const fetchByType = (type) => {
   const params = { module_id: 3, limit: 200 };

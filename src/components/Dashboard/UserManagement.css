@@ -106,7 +106,7 @@
 
 .um-search-wrap {
   flex: 1;
-  max-width: 320px;
+  max-width: 220px;
   position: relative;
   margin: 0 20px;
 }
@@ -859,4 +859,81 @@
   .um-table tbody td:nth-child(4) {
     display: none;
   }
+}
+
+/* ── Redesigned Header Overrides (Transparent & Borderless) ── */
+.setup-page .setup-header {
+  background: transparent;
+  padding: 16px 24px 8px 24px;
+  border-bottom: none;
+  position: relative;
+  box-shadow: none;
+}
+
+.setup-page .setup-back-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1e293b;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.setup-page .setup-back-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+.setup-page .setup-title {
+  color: #0f172a;
+}
+
+.setup-page .setup-subtitle {
+  color: #475569;
+}
+
+.setup-page .um-add-btn {
+  background: #0284c7;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+}
+
+.setup-page .um-add-btn:hover {
+  background: #0369a1;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+  opacity: 1;
+}
+
+.setup-page .um-search {
+  background: #ffffff;
+  border: 1.5px solid #dee2e6;
+  color: #1e293b;
+}
+
+.setup-page .um-search::placeholder {
+  color: #94a3b8;
+}
+
+.setup-page .um-search-icon {
+  color: #64748b;
+}
+
+.setup-page .um-search:focus {
+  border-color: #0284c7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.setup-page .um-search-clear {
+  color: #94a3b8;
+}
+
+.setup-page .um-search-clear:hover {
+  color: #475569;
 }

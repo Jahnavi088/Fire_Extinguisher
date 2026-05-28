@@ -36,7 +36,7 @@ const CompanyManagement = ({ onBack }) => {
     try {
       const data = await ApiService.getAdminCompanies();
       const list = Array.isArray(data) ? data : (data?.companies || data?.data || []);
-      
+
       // Fetch detailed records for each company to get full data (like logo, address, email)
       const detailedCompanies = await Promise.all(
         list.map(async (c) => {
@@ -49,7 +49,7 @@ const CompanyManagement = ({ onBack }) => {
           }
         })
       );
-      
+
       setCompanies(detailedCompanies);
       setError(null);
     } catch (err) {
@@ -266,10 +266,10 @@ const CompanyManagement = ({ onBack }) => {
           </svg>
         </button>
         <div className="setup-header-info" style={{ flex: 1 }}>
-          <div className="setup-header-icon">🏢</div>
+
           <div>
             <div className="setup-title">Company Management</div>
-            <div className="setup-subtitle">Enterprise Portal — Manage registered clients and safety partners</div>
+
           </div>
         </div>
         <button className="ea-add-nav-btn" onClick={openAdd}>

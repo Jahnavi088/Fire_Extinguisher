@@ -589,14 +589,17 @@ ${checklistHtml}
     if (activeTab === 'expiry' || activeTab === 'alerts') return;
     setLoading(true);
     try {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(end.getDate() - parseInt(filter.dateRange));
       const params = {
-        start_date: start.toISOString().split('T')[0],
-        end_date: end.toISOString().split('T')[0],
         module_id: filter.module === 'all' ? undefined : filter.module,
       };
+
+      if (filter.dateRange !== 'all') {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - parseInt(filter.dateRange));
+        params.start_date = start.toISOString().split('T')[0];
+        params.end_date = end.toISOString().split('T')[0];
+      }
 
       let res;
       if (activeTab === 'inspections') {
@@ -616,7 +619,11 @@ ${checklistHtml}
             const stStatus = (i.status || '').toUpperCase();
             const stApprov = (i.approval_status || '').toUpperCase();
             
-            const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
+            // Explicitly exclude rejected reports
+            if (stApprov === 'REJECTED' || stStatus === 'REJECTED') return false;
+            
+            // Allow approved reports with type-safe ID casting
+            const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(i.id));
             return isApproved;
          });
       }
@@ -628,7 +635,8 @@ ${checklistHtml}
       }
       
       setData(finalData);
-    } catch {
+    } catch (err) {
+      console.error('Error fetching reports:', err);
       setData([]);
     } finally {
       setLoading(false);
@@ -1001,6 +1009,7 @@ ${checklistHtml}
                     <option value="30">Last 30d</option>
                     <option value="90">Last 90d</option>
                     <option value="365">This Year</option>
+                    <option value="all">All Time</option>
                   </select>
                 </div>
 

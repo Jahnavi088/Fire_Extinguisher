@@ -2,7 +2,7 @@ import { useState, useEffect, useReducer, useMemo } from 'react';
 import './DeviceManagement.css';
 import { ApiService } from '../../services/apiService';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 function reducer(state, action) {
   switch (action.type) {
@@ -154,7 +154,7 @@ const DeviceManagement = ({ onBack }) => {
           </div>
           <div>
             <div className="setup-title">FDA Compliance Device Monitoring</div>
-            <div className="setup-subtitle">Part 11 Compliance — Authorize inspection terminals</div>
+
           </div>
         </div>
 
