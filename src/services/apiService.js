@@ -5,8 +5,66 @@
 
 const BASE_URL = 'https://ehs.garrev.com/app1/v1';
 
-// Module-level user cache — populated on login, read by getUser()
 let _cachedUser = null;
+
+let _pendingReportsCache = null;
+let _pendingReportsCacheTime = 0;
+
+const getPendingEquipmentSosCodes = async (moduleId) => {
+  const codes = new Set();
+  
+  // 1. Get locally queued inspections
+  try {
+    const localQueue = JSON.parse(localStorage.getItem('pending_inspections_queue') || '[]');
+    localQueue.forEach(item => {
+      if (!moduleId || String(item.module_id) === String(moduleId)) {
+        const code = item.sos_code || item.equipment_code;
+        if (code) codes.add(code);
+      }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+
+  // 2. Get backend pending inspections (cached for 5 seconds to avoid spamming)
+  try {
+    const now = Date.now();
+    let iList = [];
+    if (_pendingReportsCache && (now - _pendingReportsCacheTime < 5000)) {
+      iList = _pendingReportsCache;
+    } else {
+      const today = new Date();
+      const endDateStr = today.toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+      
+      const rawInspections = await request(`/reports/inspections?start_date=${startDateStr}&end_date=${endDateStr}`).catch(() => []);
+      iList = Array.isArray(rawInspections) ? rawInspections : (rawInspections?.items || rawInspections?.reports || rawInspections?.inspections || rawInspections?.data || []);
+      _pendingReportsCache = iList;
+      _pendingReportsCacheTime = now;
+    }
+    
+    const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+    
+    iList.forEach(i => {
+      const stStatus = (i.status || '').toUpperCase();
+      const stApprov = (i.approval_status || '').toUpperCase();
+      const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
+      
+      if (!isApproved) {
+        if (!moduleId || String(i.module_id) === String(moduleId)) {
+          const code = i.sos_code || i.equipment_code;
+          if (code) codes.add(code);
+        }
+      }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+  
+  return codes;
+};
 
 const qs = (params = {}) => {
   const cleaned = Object.fromEntries(
@@ -127,8 +185,74 @@ export const ApiService = {
     return await request('/dashboard');
   },
 
-  // --- EQUIPMENT ---
   getEquipment: async (params = {}) => {
+    const status = params.status;
+    const moduleId = params.module_id;
+    
+    if (status === 'due-inspection' || status === 'due_inspection') {
+      // Fetch both due-inspection and active equipment
+      const [dueRes, activeRes] = await Promise.all([
+        request(`/equipment${qs({ ...params, status: 'due-inspection' })}`),
+        request(`/equipment${qs({ ...params, status: 'active' })}`),
+      ]);
+      
+      let dueItems = dueRes.items || dueRes.data || (Array.isArray(dueRes) ? dueRes : []);
+      let activeItems = activeRes.items || activeRes.data || (Array.isArray(activeRes) ? activeRes : []);
+      
+      try {
+        const pendingCodes = await getPendingEquipmentSosCodes(moduleId);
+        if (pendingCodes.size > 0) {
+          const dueCodes = new Set(dueItems.map(item => item.sos_code || item.equipment_code));
+          
+          activeItems.forEach(item => {
+            const code = item.sos_code || item.equipment_code;
+            if (pendingCodes.has(code) && !dueCodes.has(code)) {
+              dueItems.push(item);
+            }
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      
+      if (Array.isArray(dueRes)) {
+        return dueItems;
+      }
+      return {
+        ...dueRes,
+        items: dueItems,
+        total: dueItems.length,
+        data: dueItems
+      };
+    }
+    
+    if (status === 'active') {
+      const res = await request(`/equipment${qs(params)}`);
+      let items = res.items || res.data || (Array.isArray(res) ? res : []);
+      
+      try {
+        const pendingCodes = await getPendingEquipmentSosCodes(moduleId);
+        if (pendingCodes.size > 0 && items.length > 0) {
+          items = items.filter(item => {
+            const code = item.sos_code || item.equipment_code;
+            return !pendingCodes.has(code);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      
+      if (Array.isArray(res)) {
+        return items;
+      }
+      return {
+        ...res,
+        items: items,
+        total: items.length,
+        data: items
+      };
+    }
+    
     return await request(`/equipment${qs(params)}`);
   },
 
@@ -179,7 +303,36 @@ export const ApiService = {
   },
 
   getModuleSummary: async (id) => {
-    return await request(`/modules/${id}/summary`);
+    const res = await request(`/modules/${id}/summary`);
+    try {
+      const pendingCodes = await getPendingEquipmentSosCodes(id);
+      const pendingCount = pendingCodes.size;
+      if (pendingCount > 0 && res) {
+        // Adjust the counts: because the backend incorrectly counts pending inspections as completed,
+        // we add them back to due_inspection and subtract them from active.
+        if (res.due_inspection !== undefined) {
+          res.due_inspection = (res.due_inspection ?? 0) + pendingCount;
+        }
+        if (res.active !== undefined) {
+          res.active = Math.max(0, (res.active ?? 0) - pendingCount);
+        }
+        // Also adjust the readiness score if calculated in frontend or backend
+        if (res.readiness_score !== undefined || res.health_score !== undefined || res.score !== undefined) {
+          const total = res.total ?? res.total_units ?? 0;
+          const expired = res.expired ?? 0;
+          const needsService = res.needs_service ?? 0;
+          const dueInspection = res.due_inspection ?? 0;
+          const issues = expired + needsService + dueInspection;
+          const newScore = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
+          if (res.readiness_score !== undefined) res.readiness_score = newScore;
+          if (res.health_score !== undefined) res.health_score = newScore;
+          if (res.score !== undefined) res.score = newScore;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to adjust module summary:', err);
+    }
+    return res;
   },
 
   getModuleChecklists: async (id) => {
@@ -359,6 +512,34 @@ export const ApiService = {
     });
   },
 
+  // --- ONBOARDING (new v1 endpoints) ---
+  getOnboardingDropdowns: async (companyId) => {
+    const remoteData = await request(`/onboarding/dropdowns?company_id=${encodeURIComponent(companyId)}`).catch(() => ({ buildings: [], zones: [], areas: [], departments: [] }));
+    try {
+      const localLocs = JSON.parse(localStorage.getItem('local_onboarding_locations') || '{}');
+      const match = localLocs[companyId];
+      if (match) {
+        return {
+          buildings: [...(remoteData.buildings || []), ...(match.buildings || [])],
+          zones: [...(remoteData.zones || []), ...(match.zones || [])],
+          areas: [...(remoteData.areas || []), ...(match.areas || [])],
+          departments: [...(remoteData.departments || []), ...(match.departments || [])],
+          floors: match.floors || []
+        };
+      }
+    } catch (e) {
+      console.error('Failed to merge local locations:', e);
+    }
+    return remoteData;
+  },
+
+  onboardEquipment: async (data) => {
+    return await request('/onboarding/equipment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- ADMIN EQUIPMENT ---
   getAdminEquipment: async () => {
     return await request('/admin/equipment');
@@ -446,6 +627,71 @@ export const ApiService = {
     return await request(`/admin/companies/${id}/logo`, {
       method: 'POST',
       body: formData,
+    });
+  },
+
+  // --- ADMIN BRANCH ZONES ---
+  getBranchZones: async (branchId) => {
+    return await request(`/admin/branches/${branchId}/zones`);
+  },
+
+  createBranchZone: async (branchId, data) => {
+    return await request(`/admin/branches/${branchId}/zones`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteBranchZone: async (branchId, zoneId) => {
+    return await request(`/admin/branches/${branchId}/zones/${zoneId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getBranchById: async (branchId) => {
+    return await request(`/admin/branches/${branchId}`);
+  },
+
+  updateBranch: async (branchId, data) => {
+    return await request(`/admin/branches/${branchId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // --- ADMIN BRANCH FLOORS ---
+  getBranchFloors: async (branchId) => {
+    return await request(`/admin/branches/${branchId}/floors`);
+  },
+
+  createBranchFloor: async (branchId, data) => {
+    return await request(`/admin/branches/${branchId}/floors`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteBranchFloor: async (branchId, floorId) => {
+    return await request(`/admin/branches/${branchId}/floors/${floorId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- ADMIN DEPARTMENTS ---
+  getDepartments: async () => {
+    return await request('/admin/departments');
+  },
+
+  createDepartment: async (data) => {
+    return await request('/admin/departments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteDepartment: async (id) => {
+    return await request(`/admin/departments/${id}`, {
+      method: 'DELETE',
     });
   },
 
@@ -824,6 +1070,56 @@ export const ApiService = {
       }));
       localStorage.setItem('safety_auto_schedules', JSON.stringify(newTasks));
       return { success: true, generated_count: newTasks.length };
+    }
+  },
+
+  // --- LOCAL INSPECTIONS QUEUE FOR DELAYED APPROVAL ---
+  getQueuedInspections: () => {
+    try {
+      return JSON.parse(localStorage.getItem('pending_inspections_queue') || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  queueInspection: (sosCode, data) => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('pending_inspections_queue') || '[]');
+      const newInspection = {
+        id: `INSP-QUEUED-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        sos_code: sosCode,
+        equipment_code: sosCode,
+        created_at: new Date().toISOString(),
+        inspected_at: new Date().toISOString(),
+        inspector_name: data.inspector_name || 'Inspector',
+        submitted_by_name: data.inspector_name || 'Inspector',
+        remarks: data.remarks || 'Pending Approval',
+        status: 'PENDING',
+        approval_status: 'PENDING',
+        _itemType: 'inspection',
+        _isQueuedLocal: true,
+        payload: data,
+        module_id: data.module_id || 30,
+        equipment_name: data.equipment_name || 'Fire Extinguisher'
+      };
+      queue.push(newInspection);
+      localStorage.setItem('pending_inspections_queue', JSON.stringify(queue));
+      return { success: true, item: newInspection };
+    } catch (e) {
+      console.error('Failed to queue inspection:', e);
+      throw e;
+    }
+  },
+
+  removeQueuedInspection: (id) => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('pending_inspections_queue') || '[]');
+      const filtered = queue.filter(item => String(item.id) !== String(id));
+      localStorage.setItem('pending_inspections_queue', JSON.stringify(filtered));
+      return { success: true };
+    } catch (e) {
+      console.error('Failed to remove queued inspection:', e);
+      return { success: false };
     }
   },
 };

@@ -114,8 +114,13 @@ export default function FireExtinguisherChecklist({ selectedEq, equipmentType, d
         }
       };
 
-      // Use the specific equipment SOS code — NOT the module_id
-      await ApiService.createInspection(equipmentSosCode.trim(), payload);
+      // Use the specific equipment SOS code — queue locally for approval first
+      const extPayload = {
+        ...payload,
+        module_id: module_id,
+        equipment_name: displayName || selectedEq?.name || 'Fire Extinguisher'
+      };
+      await ApiService.queueInspection(equipmentSosCode.trim(), extPayload);
       setSubmitted(true);
     } catch (err) {
       console.error('Submission failed:', err);

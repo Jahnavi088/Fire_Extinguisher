@@ -37,6 +37,25 @@ async function loadEquipmentAccess(userId) {
   }
 }
 
+const getStoredCompanyLogo = () => {
+  try {
+    const stored = localStorage.getItem('auth_user');
+    if (stored) {
+      const u = JSON.parse(stored);
+      const logo = u?.logo_url || u?.company_logo || u?.company?.logo || u?.logo || u?.company?.logo_url;
+      if (logo) {
+        if (logo.startsWith('http')) return logo;
+        if (logo.startsWith('/uploads/logos/')) return `http://ehs.garrev.com${logo}`;
+        if (logo.startsWith('uploads/logos/')) return `http://ehs.garrev.com/${logo}`;
+        return `http://ehs.garrev.com/uploads/logos/${logo}`;
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return '/apitoria-logo.png';
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [navAccess, setNavAccess] = useState(null);
@@ -93,7 +112,7 @@ function App() {
         <div className="circular-loader-container">
           <div className="circular-spinner"></div>
           <div className="circular-logo-wrapper">
-            <img src="/apitoria-logo.png" alt="Apitoria" className="circular-logo" />
+            <img src={getStoredCompanyLogo()} alt="Company Logo" className="circular-logo" />
           </div>
         </div>
         <div className="refresher-text">Initializing SOS Platform...</div>

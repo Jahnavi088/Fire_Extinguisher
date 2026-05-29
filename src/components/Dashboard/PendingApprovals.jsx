@@ -69,7 +69,10 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
          return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
       }).map(u => ({ ...u, _itemType: 'update' }));
 
-      let merged = [...pendingInspections, ...pendingUpdates];
+      // Extract locally queued inspections
+      const queuedInspections = ApiService.getQueuedInspections();
+
+      let merged = [...queuedInspections, ...pendingInspections, ...pendingUpdates];
       if (allowedModules) {
         const allowedIds = new Set(allowedModules.map(m => String(m.module_id)));
         merged = merged.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
@@ -94,9 +97,14 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     if (item._itemType === 'inspection') {
       setDetailLoading(true);
       try {
-        // 1. Fetch detailed inspection responses
-        const inspectionRes = await ApiService.getInspectionById(item.id);
-        const answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+        let answersList = [];
+        if (item._isQueuedLocal) {
+          answersList = item.payload?.answers || [];
+        } else {
+          // 1. Fetch detailed inspection responses
+          const inspectionRes = await ApiService.getInspectionById(item.id);
+          answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+        }
 
         // 2. Fetch the checklist definition for this module to map full question texts
         const moduleId = item.module_id || 30; // default to fire extinguishers (30)
@@ -183,9 +191,14 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     if (item._itemType === 'inspection') {
       setDetailLoading(true);
       try {
-        // 1. Fetch detailed inspection responses
-        const inspectionRes = await ApiService.getInspectionById(item.id);
-        const answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+        let answersList = [];
+        if (item._isQueuedLocal) {
+          answersList = item.payload?.answers || [];
+        } else {
+          // 1. Fetch detailed inspection responses
+          const inspectionRes = await ApiService.getInspectionById(item.id);
+          answersList = inspectionRes?.answers || inspectionRes?.items || inspectionRes?.responses || inspectionRes?.results || (Array.isArray(inspectionRes) ? inspectionRes : []);
+        }
 
         // 2. Fetch the checklist definition for this module to map full question texts
         const moduleId = item.module_id || 30; // default to fire extinguishers (30)
@@ -269,6 +282,24 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         } else {
           await ApiService.supervisorApproveUpdate(selectedItem.id, remarksInput.trim() || undefined);
         }
+      } else if (selectedItem._isQueuedLocal) {
+        // Submit the queued inspection to backend
+        const res = await ApiService.createInspection(selectedItem.sos_code, {
+          ...selectedItem.payload,
+          status: 'APPROVED',
+          approval_status: 'APPROVED',
+          remarks: remarksInput.trim() ? `${selectedItem.payload.remarks || ''} | Reviewer: ${remarksInput.trim()}` : selectedItem.payload.remarks
+        });
+        // Remove from local queue
+        ApiService.removeQueuedInspection(selectedItem.id);
+        
+        // Also add the newly created inspection's ID to approved locally
+        const approved = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+        const newId = res?.id || res?.inspection_id || selectedItem.id;
+        if (!approved.includes(newId)) {
+          approved.push(newId);
+          localStorage.setItem('approved_inspections', JSON.stringify(approved));
+        }
       } else {
         // Mark as approved locally since backend might not support it
         const approved = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
@@ -316,6 +347,9 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         } else {
           await ApiService.supervisorRejectUpdate(selectedItem.id, rejectInput.trim());
         }
+      } else if (selectedItem._isQueuedLocal) {
+        // Just discard from local queue
+        ApiService.removeQueuedInspection(selectedItem.id);
       } else {
         // Mark as rejected locally (remove from pending logic by simulating approval, or store in rejected_inspections)
         // For simplicity, we just mark it "approved" locally so it stops showing up in pending, and the result will just be what the backend has.
@@ -554,9 +588,11 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                       <div className="pa-score-summary" style={{ padding: '12px' }}>
                         <div className="pa-score-dial" style={{ width: '70px', height: '70px' }}>
                           <span className="pa-score-num" style={{ fontSize: '18px' }}>
-                            {detailedChecklist.length > 0 
-                              ? Math.round((detailedChecklist.filter(i => i.answer === 'Yes').length / detailedChecklist.length) * 100)
-                              : 0}%
+                            {selectedItem.score !== undefined && selectedItem.score !== null
+                              ? `${selectedItem.score}%`
+                              : (detailedChecklist.length > 0 
+                                  ? `${Math.round((detailedChecklist.filter(i => i.answer === 'Yes').length / detailedChecklist.length) * 100)}%`
+                                  : '0%')}
                           </span>
                           <span className="pa-score-label" style={{ fontSize: '6px' }}>Pass Rate</span>
                         </div>

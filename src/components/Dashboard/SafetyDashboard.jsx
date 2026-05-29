@@ -178,6 +178,15 @@ const CHECKLIST_TYPE_LABELS = {
 };
 
 const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
+  const getCompanyLogo = () => {
+    const logo = user?.logo_url || user?.company_logo || user?.company?.logo || user?.logo || user?.company?.logo_url;
+    if (!logo) return '/apitoria-logo.png';
+    if (logo.startsWith('http')) return logo;
+    if (logo.startsWith('/uploads/logos/')) return `http://ehs.garrev.com${logo}`;
+    if (logo.startsWith('uploads/logos/')) return `http://ehs.garrev.com/${logo}`;
+    return `http://ehs.garrev.com/uploads/logos/${logo}`;
+  };
+
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const [activePage, setActivePage] = useState(() => {
     return sessionStorage.getItem('sd_activePage') || 'grid';
@@ -197,6 +206,12 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
   const [currentTime, setCurrentTime] = useState('');
   const [companyName, setCompanyName] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setCompanyName(user.company_name || user.company?.name || '');
+    }
+  }, [user]);
   const [handoverNotes, setHandoverNotes] = useState('');
   const [drillTime, setDrillTime] = useState('');
   const [shiftData, setShiftData] = useState({ icon: '🌅', name: 'Day Shift', time: '06:00 - 14:00', staff: 12 });
@@ -295,7 +310,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const getStatus = (mod) => {
     const score = mod.health_score ?? 0;
-    if (score >= 80) return 'healthy'; // green
+    if (score > 90) return 'healthy'; // green
     if (score >= 50) return 'warning'; // amber
     return 'critical'; // red
   };
@@ -358,7 +373,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }),
       ApiService.getPendingUpdates().catch(() => [])
     ]).then(([inspectionsRes, updatesRes]) => {
-      let pendingItems = [];
+      const queuedInspections = ApiService.getQueuedInspections();
+      let pendingItems = [...queuedInspections];
       const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
       
       if (inspectionsRes.status === 'fulfilled') {
@@ -648,7 +664,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           <div className="circular-loader-container">
             <div className="circular-spinner"></div>
             <div className="circular-logo-wrapper">
-              <img src="/apitoria-logo.png" alt="Apitoria" className="circular-logo" />
+              <img src={getCompanyLogo()} alt="Company Logo" className="circular-logo" />
             </div>
           </div>
           <div className="refresher-text">Loading Safety Dashboard…</div>
@@ -659,7 +675,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         <div className="topbar-left">
           <div className="topbar-brand">
             <div className="topbar-logo-pill">
-              <img src="/apitoria-logo.png" alt="Apitoria" className="topbar-logo" />
+              <img src={getCompanyLogo()} alt="Company Logo" className="topbar-logo" />
             </div>
             <div className="topbar-copy">
               <div className="tb-title">

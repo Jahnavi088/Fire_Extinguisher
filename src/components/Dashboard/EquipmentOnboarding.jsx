@@ -2,77 +2,88 @@ import { useState, useEffect, useRef } from 'react';
 import { ApiService } from '../../services/apiService';
 import './EquipmentOnboarding.css';
 
-const ZONES = ['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'];
+// ── Static master lists ──────────────────────────────────────────────────────
+const EQUIPMENT_TYPES = [
+  'Fire Extinguisher', 'Sprinkler System', 'Hose Reel', 'Fire Hydrant',
+  'Smoke Detector', 'Heat Detector', 'Emergency Exit', 'Emergency Lighting',
+  'PA System', 'SCBA Unit', 'First Aid Kit', 'Eyewash Station',
+  'Chemical Shower', 'Spill Kit', 'PPE Station', 'Fire Trolley',
+  'Fire Blanket', 'Suppression System', 'Wind Sock', 'Ambulance',
+];
 
 const FLOORS = [
-  'Basement', 'Ground Floor', '1st Floor', '2nd Floor', '3rd Floor',
-  '4th Floor', '5th Floor', 'Terrace',
+  { id: 'FLR-02', name: 'Ground Floor' },
+  { id: 'FLR-03', name: '1st Floor' },
+  { id: 'FLR-04', name: '2nd Floor' },
+  { id: 'FLR-05', name: '3rd Floor' },
+  { id: 'FLR-06', name: '4th Floor' },
+  { id: 'FLR-07', name: '5th Floor' },
+  { id: 'FLR-08', name: 'Terrace' },
+  { id: 'FLR-01', name: 'Basement' },
 ];
 
 const DEPARTMENTS = [
-  'Administration', 'Operations', 'Production', 'Quality Control',
-  'Maintenance', 'Security', 'Warehouse', 'Laboratory', 'IT', 'HR',
-  'Finance', 'Reception', 'Common Area',
+  { id: 'DEP-01', name: 'Administration' },
+  { id: 'DEP-02', name: 'Operations' },
+  { id: 'DEP-03', name: 'Production' },
+  { id: 'DEP-04', name: 'Quality Control' },
+  { id: 'DEP-05', name: 'Maintenance' },
+  { id: 'DEP-06', name: 'Security' },
+  { id: 'DEP-07', name: 'Warehouse' },
+  { id: 'DEP-08', name: 'Laboratory' },
+  { id: 'DEP-09', name: 'IT' },
+  { id: 'DEP-10', name: 'HR' },
+  { id: 'DEP-11', name: 'Finance' },
+  { id: 'DEP-12', name: 'Granulation' },
+  { id: 'DEP-13', name: 'Common Area' },
 ];
 
-const AREAS = [
-  'Indoor', 'Outdoor', 'Lobby', 'Corridor', 'Stairwell',
-  'Server Room', 'Cafeteria', 'Parking', 'Conference Room',
+const CHECKLIST_TEMPLATES = [
+  { id: 'CHK-101', name: 'Standard Fire Extinguisher' },
+  { id: 'CHK-102', name: 'Hydrant System' },
+  { id: 'CHK-103', name: 'Sprinkler System' },
+  { id: 'CHK-104', name: 'Smoke Detector' },
+  { id: 'CHK-105', name: 'Emergency Exit' },
+  { id: 'CHK-106', name: 'First Aid Kit' },
+  { id: 'CHK-107', name: 'SCBA Unit' },
+  { id: 'CHK-108', name: 'Hose Reel' },
+  { id: 'CHK-109', name: 'Suppression System' },
+  { id: 'CHK-110', name: 'General Safety Equipment' },
 ];
 
 const FREQUENCIES = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
-
-const SHIFTS = [
-  'Shift A	6 AM – 2 PM',
-  'Shift B	2 PM – 10 PM',
-  'Shift C	10 PM – 6 AM',
-  'General Shift (G)	9 AM – 6 PM'
-];
-
+const SHIFT_OPTIONS = ['Morning', 'Evening', 'Night', 'General'];
 const STATUSES = ['Active', 'Inactive', 'Under Maintenance'];
 
-const CHECKLIST_TEMPLATES = [
-  'Standard Fire Extinguisher',
-  'Hydrant System',
-  'Sprinkler System',
-  'Smoke Detector',
-  'Emergency Exit',
-  'First Aid Kit',
-  'SCBA Unit',
-  'Hose Reel',
-  'Suppression System',
-  'General Safety Equipment',
-];
-
 const EMPTY_FORM = {
-  sos_code: '',
-  module_id: '',
+  equipment_code: '',
+  equipment_type: '',
   company_id: '',
   building_id: '',
-  floor_name: '',
-  zone_name: '',
-  department_name: '',
-  area_name: '',
-  frequency: '',
-  shift_allowed: '',
-  checklist_template: '',
+  floor_id: '',
+  zone_id: '',
+  department_id: '',
+  area_id: '',
+  inspection_frequency: '',
+  shift_allowed: [],
+  checklist_template_id: '',
   installation_date: '',
   expiry_date: '',
   status: 'Active',
 };
 
+// ── Sub-components ────────────────────────────────────────────────────────────
 const Field = ({ label, required, error, children, span }) => (
   <div className={`eob-field ${error ? 'has-error' : ''} ${span ? `eob-span-${span}` : ''}`}>
     <label className="eob-label">
-      {label}
-      {required && <span className="eob-req">*</span>}
+      {label}{required && <span className="eob-req">*</span>}
     </label>
     {children}
     {error && <span className="eob-error-msg">{error}</span>}
   </div>
 );
 
-const CustomSelect = ({ value, onChange, options, placeholder }) => {
+const CustomSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef(null);
 
@@ -87,26 +98,99 @@ const CustomSelect = ({ value, onChange, options, placeholder }) => {
   return (
     <div className={`eob-custom-select ${isOpen ? 'is-open' : ''}`} ref={ref}>
       <div
-        className={`eob-select-trigger ${isOpen ? 'open' : ''}`}
-        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(v => !v); }}
+        className={`eob-select-trigger ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
+        onMouseDown={(e) => {
+          if (disabled) return;
+          e.preventDefault(); e.stopPropagation();
+          setIsOpen(v => !v);
+        }}
       >
         <span className={selected ? '' : 'placeholder-text'}>
           {selected ? selected.label : placeholder}
         </span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="eob-select-icon" style={{ pointerEvents: 'none' }}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          className="eob-select-icon" style={{ pointerEvents: 'none' }}>
           <path d="M6 9l6 6 6-6" />
         </svg>
       </div>
       <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`}>
-        {options.map(opt => (
-          <div
-            key={opt.value}
-            className={`eob-select-option ${String(opt.value) === String(value) ? 'selected' : ''}`}
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(opt.value); setIsOpen(false); }}
-          >
-            {opt.label}
-          </div>
-        ))}
+        {options.length === 0
+          ? <div className="eob-select-option" style={{ opacity: 0.4, cursor: 'default' }}>No options available</div>
+          : options.map(opt => (
+            <div
+              key={opt.value}
+              className={`eob-select-option ${String(opt.value) === String(value) ? 'selected' : ''}`}
+              onMouseDown={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                onChange(opt.value); setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
+
+const ShiftDropdown = ({ value, onChange, placeholder, error }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const toggleShift = (shift) => {
+    if (value.includes(shift)) {
+      onChange(value.filter(s => s !== shift));
+    } else {
+      onChange([...value, shift]);
+    }
+  };
+
+  return (
+    <div className={`eob-custom-select ${isOpen ? 'is-open' : ''} ${error ? 'has-error' : ''}`} ref={ref}>
+      <div
+        className={`eob-select-trigger ${isOpen ? 'open' : ''}`}
+        onMouseDown={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          setIsOpen(v => !v);
+        }}
+      >
+        <span className={value.length > 0 ? '' : 'placeholder-text'}>
+          {value.length > 0 ? value.join(', ') : placeholder}
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          className="eob-select-icon" style={{ pointerEvents: 'none' }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+      <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`} style={{ maxHeight: '200px', overflowY: 'auto' }}>
+        {SHIFT_OPTIONS.map(shift => {
+          const isSelected = value.includes(shift);
+          return (
+            <div
+              key={shift}
+              className={`eob-select-option ${isSelected ? 'selected' : ''}`}
+              onMouseDown={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                toggleShift(shift);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px' }}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                readOnly
+                style={{ cursor: 'pointer', accentColor: '#3b82f6' }}
+              />
+              <span style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.7)' }}>{shift}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -120,65 +204,99 @@ const SectionDivider = ({ icon, title }) => (
   </div>
 );
 
+// ── Main component ────────────────────────────────────────────────────────────
 const EquipmentOnboarding = ({ onBack, onSuccess }) => {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setFormState] = useState(EMPTY_FORM);
   const [certified, setCertified] = useState(false);
-  const [modules, setModules] = useState([]);
-  const [buildings, setBuildings] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [allBuildings, setAllBuildings] = useState([]);
+  const [allZones, setAllZones] = useState([]);
+  const [allAreas, setAllAreas] = useState([]);
+  const [allDepartments, setAllDepartments] = useState([]);
+  const [dropdownsLoading, setDropdownsLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [dynamicFloors, setDynamicFloors] = useState([]);
+  const [successData, setSuccessData] = useState(null);
 
+  // Load companies on mount
   useEffect(() => {
-    Promise.allSettled([
-      ApiService.getAdminModulesList(),
-      ApiService.getAdminBuildings(),
-      ApiService.getAdminCompanies(),
-    ]).then(([modsRes, bldgsRes, compRes]) => {
-      if (modsRes.status === 'fulfilled') {
-        const raw = modsRes.value;
-        setModules(Array.isArray(raw) ? raw : (raw?.modules || raw?.data || []));
-      }
-      if (bldgsRes.status === 'fulfilled') {
-        const raw = bldgsRes.value;
-        setBuildings(Array.isArray(raw) ? raw : (raw?.buildings || raw?.data || []));
-      }
-      if (compRes.status === 'fulfilled') {
-        const raw = compRes.value;
-        setCompanies(Array.isArray(raw) ? raw : (raw?.companies || raw?.data || []));
-      }
-      setLoadingData(false);
-    }).catch(() => setLoadingData(false));
+    ApiService.getAdminCompanies()
+      .then(raw => {
+        const list = Array.isArray(raw) ? raw : (raw?.companies || raw?.data || []);
+        setCompanies(list);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingData(false));
   }, []);
 
+  // When company changes → fetch cascaded dropdowns
+  useEffect(() => {
+    if (!form.company_id) {
+      setAllBuildings([]); setAllZones([]); setAllAreas([]); setAllDepartments([]); setDynamicFloors([]);
+      return;
+    }
+    setDropdownsLoading(true);
+    ApiService.getOnboardingDropdowns(form.company_id)
+      .then(d => {
+        setAllBuildings(d.buildings || []);
+        setAllZones(d.zones || []);
+        setAllAreas(d.areas || []);
+        setAllDepartments(d.departments || []);
+        setDynamicFloors(d.floors || []);
+      })
+      .catch(() => { setAllBuildings([]); setAllZones([]); setAllAreas([]); setAllDepartments([]); setDynamicFloors([]); })
+      .finally(() => setDropdownsLoading(false));
+  }, [form.company_id]);
+
+  // Cascaded options
+  const filteredZones = allZones.filter(z => !form.building_id || z.building_id === form.building_id);
+  const filteredAreas = allAreas.filter(a => !form.zone_id || a.zone_id === form.zone_id);
+
   const set = (key, val) => {
-    setForm(f => ({ ...f, [key]: val }));
+    setFormState(f => ({ ...f, [key]: val }));
     setErrors(e => ({ ...e, [key]: undefined }));
   };
 
-  const qrPreview = form.sos_code.trim()
-    ? `https://ehs.garrev.com/scan/${form.sos_code.trim().toUpperCase()}`
-    : '';
+  const setBuilding = (val) => {
+    setFormState(f => ({ ...f, building_id: val, zone_id: '', area_id: '' }));
+    setErrors(e => ({ ...e, building_id: undefined, zone_id: undefined, area_id: undefined }));
+  };
+
+  const setZone = (val) => {
+    setFormState(f => ({ ...f, zone_id: val, area_id: '' }));
+    setErrors(e => ({ ...e, zone_id: undefined, area_id: undefined }));
+  };
 
   const validate = () => {
     const e = {};
-    if (!form.sos_code.trim()) e.sos_code = 'Required';
-    if (!form.module_id) e.module_id = 'Required';
-    if (!form.company_id) e.company_id = 'Required';
-    if (!form.building_id) e.building_id = 'Required';
-    if (!form.floor_name) e.floor_name = 'Required';
-    if (!form.zone_name) e.zone_name = 'Required';
-    if (!form.department_name) e.department_name = 'Required';
-    if (!form.area_name) e.area_name = 'Required';
-    if (!form.frequency) e.frequency = 'Required';
-    if (!form.shift_allowed) e.shift_allowed = 'Required';
-    if (!form.checklist_template) e.checklist_template = 'Required';
-    if (!form.installation_date) e.installation_date = 'Required';
-    if (!form.expiry_date) e.expiry_date = 'Required';
-    if (!form.status) e.status = 'Required';
-    if (!certified) e.certified = 'Certification required before deploying';
+    if (!form.equipment_code.trim())     e.equipment_code = 'Required';
+    if (!form.equipment_type)            e.equipment_type = 'Required';
+    if (!form.company_id)                e.company_id = 'Required';
+    if (!form.building_id)               e.building_id = 'Required';
+    if (!form.floor_id)                  e.floor_id = 'Required';
+    if (!form.zone_id)                   e.zone_id = 'Required';
+    if (!form.department_id)             e.department_id = 'Required';
+    if (!form.area_id)                   e.area_id = 'Required';
+    if (!form.inspection_frequency)      e.inspection_frequency = 'Required';
+    if (form.shift_allowed.length === 0) e.shift_allowed = 'Select at least one shift';
+    if (!form.checklist_template_id)     e.checklist_template_id = 'Required';
+    if (!form.installation_date)         e.installation_date = 'Required';
+    if (!form.expiry_date)               e.expiry_date = 'Required';
+    if (!form.status)                    e.status = 'Required';
+    if (!certified)                      e.certified = 'Certification required before deploying';
     return e;
+  };
+
+  const formatDateToDDMMYYYY = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      // Convert YYYY-MM-DD from HTML input to DD-MM-YYYY for API
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
   };
 
   const handleSubmit = async () => {
@@ -186,63 +304,135 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setSubmitting(true);
     try {
-      const selectedBuilding = buildings.find(b => String(b.id) === String(form.building_id));
-      await ApiService.createAdminEquipment({
-        sos_code: form.sos_code.trim().toUpperCase(),
-        module_id: parseInt(form.module_id),
-        company_id: parseInt(form.company_id),
-        building_id: parseInt(form.building_id),
-        building_name: selectedBuilding?.name || selectedBuilding?.building_name || '',
-        floor_name: form.floor_name,
-        zone_name: form.zone_name,
-        department_name: form.department_name,
-        area_name: form.area_name,
-        frequency: form.frequency,
+      const result = await ApiService.onboardEquipment({
+        equipment_code: form.equipment_code.trim().toUpperCase(),
+        equipment_type: form.equipment_type,
+        company_id: form.company_id,
+        building_id: form.building_id,
+        floor_id: form.floor_id,
+        zone_id: form.zone_id,
+        department_id: form.department_id,
+        area_id: form.area_id,
+        inspection_frequency: form.inspection_frequency,
         shift_allowed: form.shift_allowed,
-        checklist_template: form.checklist_template,
-        installation_date: form.installation_date,
-        expiry_date: form.expiry_date,
+        checklist_template_id: form.checklist_template_id,
+        auto_generate_qr: true,
+        installation_date: formatDateToDDMMYYYY(form.installation_date),
+        expiry_date: formatDateToDDMMYYYY(form.expiry_date),
         status: form.status,
+        fda_21_cfr_part_11_certified: certified,
       });
-      if (onSuccess) onSuccess();
-      else onBack();
+      setSuccessData(result);
     } catch (err) {
-      alert('Failed to onboard equipment: ' + err.message);
+      alert('Failed to onboard equipment: ' + (err.message || 'Unknown error'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const buildingOptions = buildings.length > 0
-    ? buildings.map(b => ({ value: b.id || b, label: b.name || b.building_name || b }))
-    : ['Main Block', 'Block A', 'Block B', 'Annex', 'Warehouse'].map(n => ({ value: n, label: n }));
+  const handleAddAnother = () => {
+    setFormState(EMPTY_FORM);
+    setCertified(false);
+    setErrors({});
+    setSuccessData(null);
+    setAllBuildings([]); setAllZones([]); setAllAreas([]);
+  };
 
+  // Company options — use company_ref as value for new API
+  const companyOptions = companies.map(c => ({
+    value: c.comapany_ref || c.company_ref || c.id,
+    label: c.name || c.company_name,
+  }));
+
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (successData) {
+    return (
+      <div className="eob-page">
+        <div className="eob-header">
+          <button className="eob-back-btn" onClick={onBack} title="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+          </button>
+          <div className="eob-header-info">
+            <div className="eob-header-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <div><div className="eob-title">Equipment Onboarding</div></div>
+          </div>
+        </div>
+
+        <div className="eob-body">
+          <div className="eob-success-card">
+            <div className="eob-success-icon">✅</div>
+            <div className="eob-success-title">Equipment Deployed Successfully</div>
+            <div className="eob-success-subtitle">{successData.message || 'Equipment has been onboarded and is ready for inspection scheduling.'}</div>
+
+            <div className="eob-success-detail-grid">
+              <div className="eob-success-detail">
+                <span className="eob-success-detail-label">Generated SOS Code</span>
+                <span className="eob-success-sos">{successData.sos_code || '—'}</span>
+              </div>
+              <div className="eob-success-detail">
+                <span className="eob-success-detail-label">System ID</span>
+                <span className="eob-success-id">#{successData.id || '—'}</span>
+              </div>
+              <div className="eob-success-detail">
+                <span className="eob-success-detail-label">Equipment Code</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{form.equipment_code.toUpperCase()}</span>
+              </div>
+              <div className="eob-success-detail">
+                <span className="eob-success-detail-label">Equipment Type</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{form.equipment_type}</span>
+              </div>
+              <div className="eob-success-detail">
+                <span className="eob-success-detail-label">QR Code URL</span>
+                <span className="eob-success-qr">https://ehs.garrev.com/scan/{successData.sos_code}</span>
+              </div>
+            </div>
+
+            <div className="eob-success-actions">
+              <button className="eob-cancel-btn" onClick={onSuccess || onBack}>Back to Dashboard</button>
+              <button className="eob-submit-btn" onClick={handleAddAnother}>
+                + Onboard Another Equipment
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form screen ─────────────────────────────────────────────────────────────
   return (
     <div className="eob-page">
       {/* Header */}
       <div className="eob-header">
         <button className="eob-back-btn" onClick={onBack} title="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
         <div className="eob-header-info">
           <div className="eob-header-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
+              <path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
             </svg>
           </div>
-          <div>
-            <div className="eob-title">Equipment Onboarding</div>
-
-          </div>
+          <div><div className="eob-title">Equipment Onboarding</div></div>
         </div>
-        {loadingData && (
+        {(loadingData || dropdownsLoading) && (
           <div className="eob-header-loading">
             <div className="eob-spinner" />
-            <span>Loading…</span>
+            <span>{dropdownsLoading ? 'Loading locations…' : 'Loading…'}</span>
           </div>
         )}
       </div>
@@ -251,25 +441,25 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
       <div className="eob-body">
 
         {/* ── SECTION 1: IDENTITY ── */}
-        <SectionDivider title="Equipment Identity" />
+        <SectionDivider icon="🏷️" title="Equipment Identity" />
         <div className="eob-grid">
-          <Field label="Equipment Code" required error={errors.sos_code}>
+          <Field label="Equipment Code" required error={errors.equipment_code}>
             <input
               className="eob-input"
               type="text"
               placeholder="e.g. FE-501"
-              value={form.sos_code}
-              onChange={e => set('sos_code', e.target.value.toUpperCase())}
+              value={form.equipment_code}
+              onChange={e => set('equipment_code', e.target.value.toUpperCase())}
               maxLength={20}
             />
           </Field>
 
-          <Field label="Equipment Type" required error={errors.module_id}>
+          <Field label="Equipment Type" required error={errors.equipment_type}>
             <CustomSelect
-              value={form.module_id}
-              onChange={v => set('module_id', v)}
-              placeholder="Select Module"
-              options={modules.map(m => ({ value: m.id || m.module_id, label: m.name || m.module_name }))}
+              value={form.equipment_type}
+              onChange={v => set('equipment_type', v)}
+              placeholder="Select Type"
+              options={EQUIPMENT_TYPES.map(t => ({ value: t, label: t }))}
             />
           </Field>
 
@@ -278,123 +468,131 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               value={form.company_id}
               onChange={v => set('company_id', v)}
               placeholder="Select Company"
-              options={companies.map(c => ({ value: c.id, label: c.name || c.company_name }))}
+              options={companyOptions}
+              disabled={loadingData}
             />
           </Field>
         </div>
 
-        {/* ── SECTION 2: LOCATION ── */}
-        <SectionDivider title="Location Details" />
+        {/* ── SECTION 2: LOCATION (cascades from company) ── */}
+        <SectionDivider icon="📍" title="Location Details" />
         <div className="eob-grid">
           <Field label="Building" required error={errors.building_id}>
             <CustomSelect
               value={form.building_id}
-              onChange={v => set('building_id', v)}
-              placeholder="Select Building"
-              options={buildingOptions}
+              onChange={setBuilding}
+              placeholder={!form.company_id ? 'Select company first' : dropdownsLoading ? 'Loading…' : 'Select Building'}
+              options={allBuildings.map(b => ({ value: b.id, label: b.name }))}
+              disabled={!form.company_id || dropdownsLoading}
             />
           </Field>
 
-          <Field label="Floor" required error={errors.floor_name}>
+          <Field label="Floor" required error={errors.floor_id}>
             <CustomSelect
-              value={form.floor_name}
-              onChange={v => set('floor_name', v)}
+              value={form.floor_id}
+              onChange={v => set('floor_id', v)}
               placeholder="Select Floor"
-              options={FLOORS.map(f => ({ value: f, label: f }))}
+              options={
+                dynamicFloors.length > 0
+                  ? dynamicFloors.map(f => ({ value: f.id, label: f.name }))
+                  : FLOORS.map(f => ({ value: f.id, label: f.name }))
+              }
             />
           </Field>
 
-          <Field label="Zone" required error={errors.zone_name}>
+          <Field label="Zone" required error={errors.zone_id}>
             <CustomSelect
-              value={form.zone_name}
-              onChange={v => set('zone_name', v)}
-              placeholder="Select Zone"
-              options={ZONES.map(z => ({ value: z, label: z }))}
+              value={form.zone_id}
+              onChange={setZone}
+              placeholder={!form.building_id ? 'Select building first' : 'Select Zone'}
+              options={filteredZones.map(z => ({ value: z.id, label: z.name }))}
+              disabled={!form.building_id}
             />
           </Field>
 
-          <Field label="Department" required error={errors.department_name}>
+          <Field label="Department" required error={errors.department_id}>
             <CustomSelect
-              value={form.department_name}
-              onChange={v => set('department_name', v)}
+              value={form.department_id}
+              onChange={v => set('department_id', v)}
               placeholder="Select Department"
-              options={DEPARTMENTS.map(d => ({ value: d, label: d }))}
+              options={
+                allDepartments.length > 0
+                  ? allDepartments.map(d => ({ value: d.id, label: d.name }))
+                  : DEPARTMENTS.map(d => ({ value: d.id, label: d.name }))
+              }
             />
           </Field>
 
-          <Field label="Area" required error={errors.area_name}>
+          <Field label="Area" required error={errors.area_id}>
             <CustomSelect
-              value={form.area_name}
-              onChange={v => set('area_name', v)}
-              placeholder="Select Area"
-              options={AREAS.map(a => ({ value: a, label: a }))}
+              value={form.area_id}
+              onChange={v => set('area_id', v)}
+              placeholder={!form.zone_id ? 'Select zone first' : 'Select Area'}
+              options={filteredAreas.map(a => ({ value: a.id, label: a.name }))}
+              disabled={!form.zone_id}
             />
           </Field>
         </div>
 
-        {/* ── SECTION 3: OPERATIONAL ── */}
-        <SectionDivider title="Operational Configuration" />
+        {/* ── SECTION 3: OPERATIONAL CONFIG ── */}
+        <SectionDivider icon="⚙️" title="Operational Configuration" />
         <div className="eob-grid">
-          <Field label="Inspection Frequency" required error={errors.frequency}>
+          <Field label="Inspection Frequency" required error={errors.inspection_frequency}>
             <CustomSelect
-              value={form.frequency}
-              onChange={v => set('frequency', v)}
+              value={form.inspection_frequency}
+              onChange={v => set('inspection_frequency', v)}
               placeholder="Select Frequency"
               options={FREQUENCIES.map(f => ({ value: f, label: f }))}
             />
           </Field>
 
-          <Field label="Shift Allowed" required error={errors.shift_allowed}>
+          <Field label="Checklist Template" required error={errors.checklist_template_id}>
             <CustomSelect
-              value={form.shift_allowed}
-              onChange={v => set('shift_allowed', v)}
-              placeholder="Select Shift"
-              options={SHIFTS.map(s => ({ value: s, label: s }))}
-            />
-          </Field>
-
-          <Field label="Checklist Template" required error={errors.checklist_template}>
-            <CustomSelect
-              value={form.checklist_template}
-              onChange={v => set('checklist_template', v)}
+              value={form.checklist_template_id}
+              onChange={v => set('checklist_template_id', v)}
               placeholder="Select Template"
-              options={CHECKLIST_TEMPLATES.map(t => ({ value: t, label: t }))}
+              options={CHECKLIST_TEMPLATES.map(t => ({ value: t.id, label: t.name }))}
             />
           </Field>
 
-          {/* QR Code — auto-generated from equipment code */}
-          <Field label="QR Code" error={null} span={3}>
+          <Field label="QR Code" span={1}>
             <div className="eob-qr-field">
-              <svg className="eob-qr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="eob-qr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="5" height="5" rx="1" />
                 <rect x="16" y="3" width="5" height="5" rx="1" />
                 <rect x="3" y="16" width="5" height="5" rx="1" />
-                <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
-                <path d="M21 21v.01" />
-                <path d="M12 7v3a2 2 0 0 1-2 2H7" />
-                <path d="M3 12h.01" />
-                <path d="M12 3h.01" />
-                <path d="M12 16v.01" />
-                <path d="M16 12h1" />
-                <path d="M21 12v.01" />
-                <path d="M12 21v-1" />
+                <path d="M21 16h-3a2 2 0 0 0-2 2v3" /><path d="M21 21v.01" />
+                <path d="M12 7v3a2 2 0 0 1-2 2H7" /><path d="M3 12h.01" />
+                <path d="M12 3h.01" /><path d="M12 16v.01" />
+                <path d="M16 12h1" /><path d="M21 12v.01" /><path d="M12 21v-1" />
               </svg>
               <input
                 className="eob-input eob-qr-input"
                 type="text"
                 readOnly
-                placeholder="Auto-generated after entering Equipment Code"
-                value={qrPreview}
+                placeholder="Auto-generated by server on deploy"
+                value={form.equipment_code.trim() ? `https://ehs.garrev.com/scan/[auto]` : ''}
               />
-              {qrPreview && (
+              {form.equipment_code.trim() && (
                 <span className="eob-qr-badge">Auto-generated</span>
               )}
             </div>
           </Field>
+
+          {/* Shift dropdown multi-select — reduced field size */}
+          <Field label="Shift Allowed" required error={errors.shift_allowed} span={1}>
+            <ShiftDropdown
+              value={form.shift_allowed}
+              onChange={v => { set('shift_allowed', v); }}
+              placeholder="Select Allowed Shifts"
+              error={errors.shift_allowed}
+            />
+          </Field>
         </div>
 
         {/* ── SECTION 4: LIFECYCLE ── */}
-        <SectionDivider title="Lifecycle & Status" />
+        <SectionDivider icon="📅" title="Lifecycle & Status" />
         <div className="eob-grid">
           <Field label="Installation Date" required error={errors.installation_date}>
             <input
@@ -424,7 +622,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
           </Field>
         </div>
 
-        {/* ── CERTIFICATION ── */}
+        {/* ── FDA 21 CFR CERTIFICATION ── */}
         <div className={`eob-cert-card ${errors.certified ? 'has-error' : ''}`}>
           <label className="eob-cert-label">
             <input
@@ -436,7 +634,9 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
             <span className="eob-cert-title">FDA 21 CFR Part 11 — Electronic Signature Certification</span>
           </label>
           <p className="eob-cert-text">
-            I certify that this equipment has undergone required physical verification and complies with applicable safety standards. This electronic signature authorizes its secure provisioning into the system.
+            I certify that this equipment has undergone required physical verification and complies
+            with applicable safety standards. This electronic signature authorizes its secure
+            provisioning into the system.
           </p>
           {errors.certified && <span className="eob-error-msg">{errors.certified}</span>}
         </div>
@@ -453,10 +653,10 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
           >
             {submitting
               ? <><div className="eob-btn-spinner" /> Deploying…</>
-              : '⚡ Onboard & Deploy Asset'
-            }
+              : '⚡ Onboard & Deploy Asset'}
           </button>
         </div>
+
       </div>
     </div>
   );

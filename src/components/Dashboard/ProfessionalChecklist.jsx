@@ -54,7 +54,12 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
         }
       };
 
-      await ApiService.createInspection(module.module_id || module.id, payload);
+      const extPayload = {
+        ...payload,
+        module_id: module.module_id || module.id,
+        equipment_name: module.name || 'Equipment'
+      };
+      await ApiService.queueInspection(String(module.module_id || module.id), extPayload);
       alert('Inspection submitted successfully!');
       if (onComplete) onComplete();
       onBack();

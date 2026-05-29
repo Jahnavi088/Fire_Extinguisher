@@ -451,3 +451,147 @@
 }
 
 .eob-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ── DISABLED SELECT ─────────────────────────────────────────────────────── */
+.eob-select-trigger.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── SHIFT MULTI-SELECT CHIPS ────────────────────────────────────────────── */
+.eob-shift-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.eob-shift-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #0d2d4a;
+  border: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.eob-shift-chip input[type="checkbox"] {
+  display: none;
+}
+
+.eob-shift-chip:hover {
+  background: #0f3559;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.eob-shift-chip.checked {
+  background: rgba(95, 211, 243, 0.15);
+  border-color: #5fd3f3;
+  color: #5fd3f3;
+}
+
+.eob-shift-group.has-error .eob-shift-chip {
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+/* ── SUCCESS CARD ────────────────────────────────────────────────────────── */
+.eob-success-card {
+  background: rgba(13, 45, 74, 0.75);
+  border: 1px solid rgba(95, 211, 243, 0.25);
+  border-radius: 16px;
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  max-width: 640px;
+  margin: 40px auto;
+  backdrop-filter: blur(8px);
+}
+
+.eob-success-icon { font-size: 48px; line-height: 1; }
+
+.eob-success-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.eob-success-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 440px;
+  line-height: 1.5;
+}
+
+.eob-success-detail-grid {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.eob-success-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.eob-success-detail-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
+.eob-success-sos {
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 800;
+  color: #5fd3f3;
+  background: rgba(95, 211, 243, 0.1);
+  border: 1px solid rgba(95, 211, 243, 0.25);
+  padding: 3px 12px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+}
+
+.eob-success-id {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.eob-success-qr {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(95, 211, 243, 0.7);
+  word-break: break-all;
+  text-align: right;
+}
+
+.eob-success-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
