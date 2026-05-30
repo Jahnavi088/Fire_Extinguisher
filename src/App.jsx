@@ -71,9 +71,29 @@ function App() {
           const u = userData.user || userData;
           setUser(u);
           const userId = u?.id || u?.user_id;
-          if (userId) {
+          const role = (u?.role || '').toLowerCase();
+          const isAdmin = role === 'admin' || role === 'superadmin';
+          
+          let eqAccess = u?.modules || null;
+          
+          if (userId && isAdmin) {
             setNavAccess(await loadNavAccess(userId));
-            setEquipmentAccess(await loadEquipmentAccess(userId));
+            if (!eqAccess) {
+              setEquipmentAccess(await loadEquipmentAccess(userId));
+            } else {
+              setEquipmentAccess(eqAccess);
+              localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+            }
+          } else {
+            setNavAccess(null);
+            if (!eqAccess && userId) {
+              // Try loading from cache
+              try {
+                const stored = localStorage.getItem(`eq_access_${userId}`);
+                eqAccess = stored ? JSON.parse(stored) : null;
+              } catch { }
+            }
+            setEquipmentAccess(eqAccess);
           }
         } catch (error) {
           console.error('Session restoration failed:', error);
@@ -89,12 +109,27 @@ function App() {
   const handleLogin = async (userData) => {
     const u = userData?.user || userData;
     const userId = u?.id || u?.user_id;
-    // Fetch nav-access BEFORE setting user so the dashboard
-    // renders with the correct restriction already in place (no flash).
-    const access = userId ? await loadNavAccess(userId) : null;
-    const eqAccess = userId ? await loadEquipmentAccess(userId) : null;
-    setNavAccess(access);
-    setEquipmentAccess(eqAccess);
+    const role = (u?.role || '').toLowerCase();
+    const isAdmin = role === 'admin' || role === 'superadmin';
+    
+    let eqAccess = u?.modules || null;
+    
+    if (userId && isAdmin) {
+      const access = await loadNavAccess(userId);
+      if (!eqAccess) {
+        eqAccess = await loadEquipmentAccess(userId);
+      } else {
+        localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+      }
+      setNavAccess(access);
+      setEquipmentAccess(eqAccess);
+    } else {
+      setNavAccess(null);
+      setEquipmentAccess(eqAccess);
+      if (eqAccess && userId) {
+        localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+      }
+    }
     setUser(u);
   };
 

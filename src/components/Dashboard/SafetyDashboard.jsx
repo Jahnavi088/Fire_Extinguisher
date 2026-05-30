@@ -201,11 +201,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState(false);
   const notifRef = React.useRef(null);
   const [checkedItems, setCheckedItems] = useState({});
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
   const [currentTime, setCurrentTime] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [supervisorStats, setSupervisorStats] = useState(null);
+  const [agmStats, setAgmStats] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -255,11 +258,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const fetchNotifications = async () => {
     setNotifLoading(true);
+    setNotifError(false);
     try {
       const d = await ApiService.getNotifications({ limit: 20 });
       const list = Array.isArray(d) ? d : (d?.notifications || d?.items || d?.data || []);
       setNotifications(list);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+      setNotifError(true);
       setNotifications([]);
     } finally {
       setNotifLoading(false);
@@ -282,10 +288,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   };
 
   const handleMarkAllRead = async () => {
-    const unreadIds = notifications.filter(n => !n.read && !n.is_read).map(n => n.id);
-    if (!unreadIds.length) return;
     try {
-      await ApiService.markNotificationRead(unreadIds);
+      await ApiService.markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
       setAlertCount(0);
     } catch { /* ignore */ }
@@ -358,8 +362,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   }, [selectedChecklistType]);
 
   useEffect(() => {
-    ApiService.getAlertsSummary()
-      .then((d) => setAlertCount(d.total_alerts || 0))
+    ApiService.getNotificationsUnreadCount()
+      .then((d) => setAlertCount(d.unread_count || 0))
       .catch(() => setAlertCount(0));
 
     // Fetch pending approvals count
@@ -413,6 +417,26 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         setAdminCompanies(list);
       })
       .catch(() => setAdminCompanies([]));
+
+    if (user?.role === 'supervisor') {
+      ApiService.getSupervisorDashboard()
+        .then(data => {
+          setSupervisorStats(data);
+        })
+        .catch(err => {
+          console.error("Failed to load supervisor dashboard stats:", err);
+        });
+    }
+
+    if (user?.role === 'agm') {
+      ApiService.getAgmDashboard()
+        .then(data => {
+          setAgmStats(data);
+        })
+        .catch(err => {
+          console.error("Failed to load AGM dashboard stats:", err);
+        });
+    }
 
     // Fetch real-time health scores for all modules
     const fetchSummaries = async () => {
@@ -516,16 +540,28 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   }, [modules, equipmentAccessList, navAccessList]);
 
   const pendingApprovalsCount = useMemo(() => {
+    if (user?.role === 'supervisor' && supervisorStats !== null && supervisorStats.pending_approvals > 0) {
+      return supervisorStats.pending_approvals;
+    }
+    if (user?.role === 'agm' && agmStats !== null && agmStats.pending_approvals_across_team > 0) {
+      return agmStats.pending_approvals_across_team;
+    }
     if (!pendingRawItems) return 0;
     const allowedIds = new Set(filteredModules.map(m => String(m.module_id)));
     const finalItems = pendingRawItems.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
     return finalItems.length;
-  }, [pendingRawItems, filteredModules]);
+  }, [pendingRawItems, filteredModules, user, supervisorStats, agmStats]);
 
   const preparednessScore = useMemo(() => {
+    if (user?.role === 'supervisor' && supervisorStats !== null && supervisorStats.compliance_rate > 0) {
+      return supervisorStats.compliance_rate;
+    }
+    if (user?.role === 'agm' && agmStats !== null && agmStats.compliance_rate > 0) {
+      return agmStats.compliance_rate;
+    }
     const total = filteredModules.reduce((sum, m) => sum + (m.health_score || 0), 0);
     return filteredModules.length > 0 ? Math.round(total / filteredModules.length) : 0;
-  }, [filteredModules]);
+  }, [filteredModules, user, supervisorStats, agmStats]);
 
   const statusCounts = useMemo(() => {
     return filteredModules.reduce(
@@ -618,6 +654,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   // navAccess: null = unrestricted (admin/superadmin), array = allowed module codes
   const isNavAllowed = (code) => {
+    if (code === 'pending_updates') return true; // ALWAYS allowed for every role globally
     if (!navAccessList) return true; // admins see everything
     if (navAccessList.includes(code)) return true;
     if (equipmentAccessList) {
@@ -752,6 +789,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                 <div className="notif-panel-body">
                   {notifLoading ? (
                     <div className="notif-loading"><div className="notif-spinner" /><span>Loading…</span></div>
+                  ) : notifError ? (
+                    <div className="notif-empty" style={{ color: '#ff6b6b', padding: '14px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                      <span>⚠️ Service temporarily unavailable</span>
+                      <button onClick={fetchNotifications} style={{ background: 'rgba(255, 107, 107, 0.15)', border: '1px solid rgba(255, 107, 107, 0.3)', color: '#ff6b6b', borderRadius: '6px', padding: '5px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}>Retry Connection</button>
+                    </div>
                   ) : notifications.length === 0 ? (
                     <div className="notif-empty">No notifications</div>
                   ) : notifications.map(n => {
@@ -760,8 +802,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       <div key={n.id} className={`notif-item ${isRead ? 'read' : 'unread'}`} onClick={() => !isRead && handleMarkRead(n.id)}>
                         <div className="notif-item-dot" />
                         <div className="notif-item-content">
-                          <div className="notif-item-msg">{n.message || n.title || n.body || 'Notification'}</div>
-                          {n.created_at && <div className="notif-item-time">{new Date(n.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+                           <div className="notif-item-title" style={{ fontWeight: '700', fontSize: '12.5px', color: '#fff', marginBottom: '3px' }}>{n.title || 'Notification'}</div>
+                           <div className="notif-item-msg" style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>{n.body || n.message || ''}</div>
+                           {n.created_at && <div className="notif-item-time" style={{ marginTop: '4px' }}>{new Date(n.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
                         </div>
                       </div>
                     );

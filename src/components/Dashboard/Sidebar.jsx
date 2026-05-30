@@ -94,7 +94,14 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
 
   const userInitial = (user?.name || user?.username || 'A').charAt(0).toUpperCase();
   const userName = user?.name || user?.username || 'Admin User';
-  const userRole = user?.role === 'superadmin' ? 'Super Admin' : (user?.role || 'Safety Officer');
+  const ROLE_LABELS = {
+    superadmin: 'Super Admin',
+    admin: 'Admin',
+    agm: 'Asst. General Manager',
+    supervisor: 'Supervisor',
+    user: 'User',
+  };
+  const userRole = ROLE_LABELS[user?.role] || user?.role || 'Safety Officer';
 
   return (
     <aside className={`sidebar ${navCollapsed ? 'collapsed' : ''}`}>

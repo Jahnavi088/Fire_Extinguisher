@@ -55,13 +55,42 @@ const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Modules', 'S
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
   admin: { label: 'Admin', color: '#FFD700', bg: 'rgba(255,215,0,0.18)' },
-  inspector: { label: 'Inspector', color: '#FF9800', bg: 'rgba(255,152,0,0.18)' },
+  agm: { label: 'Asst. General Manager', color: '#c084fc', bg: 'rgba(192,132,252,0.18)' },
+  supervisor: { label: 'Supervisor', color: '#34d399', bg: 'rgba(52,211,153,0.18)' },
   user: { label: 'User', color: '#a0cfe8', bg: 'rgba(160,207,232,0.14)' },
 };
 
 const getRoleConf = (role) => ROLE_CONFIG[(role || '').toLowerCase()] || ROLE_CONFIG.user;
 
-const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active', company_id: '' };
+const CODE_TO_ID = {
+  fire_extinguisher: 30,
+  hose_reel: 33,
+  sprinkler: 31,
+  hydrant: 34,
+  fpca: 35,
+  smoke_detector: 36,
+  heat_detector: 37,
+  fire_trolley: 55,
+  emergency_door: 39,
+  emergency_light: 38,
+  pa_system: 44,
+  wind_sock: 56,
+  scba: 57,
+  ambulance: 58,
+  first_aid_kit: 45,
+  eyewash_station: 46,
+  spill_kit: 48,
+  chemical_shower: 60,
+  ppe_station: 49,
+  suppression_system: 42,
+  safety_signage: 62,
+  emergency_comm: 61,
+  fire_blanket: 41,
+  muster_point: 59
+};
+
+const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active', company_id: '', supervisor_id: '', agm_id: '' };
+const ROLE_ORDER = ['superadmin', 'admin', 'agm', 'supervisor', 'user'];
 const PAGE_SIZE = 10;
 
 function fetchReducer(state, action) {
@@ -87,9 +116,12 @@ const UserManagement = ({ onBack }) => {
   const [viewUser, setViewUser] = useState(null);
   const [modLoading, setModLoading] = useState(false);
   const [moduleChecks, setModuleChecks] = useState({});
+  const [initialChecks, setInitialChecks] = useState({});
   const [modSaving, setModSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [companies, setCompanies] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
+  const [agms, setAgms] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -100,6 +132,18 @@ const UserManagement = ({ onBack }) => {
         if (active) setCompanies(Array.isArray(data) ? data : (data?.companies || data?.data || []));
       })
       .catch(() => { if (active) setCompanies([]); });
+
+    ApiService.getAdminUsers({ role: 'supervisor' })
+      .then(data => {
+        if (active) setSupervisors(Array.isArray(data) ? data : (data?.users || data?.data || []));
+      })
+      .catch(() => { if (active) setSupervisors([]); });
+
+    ApiService.getAdminUsers({ role: 'agm' })
+      .then(data => {
+        if (active) setAgms(Array.isArray(data) ? data : (data?.users || data?.data || []));
+      })
+      .catch(() => { if (active) setAgms([]); });
 
     ApiService.getAdminUsers()
       .then(data => {
@@ -152,7 +196,9 @@ const UserManagement = ({ onBack }) => {
       password: '',
       role: u.role || 'user',
       status: u.status || 'active',
-      company_id: u.company_id || ''
+      company_id: u.company_id || '',
+      supervisor_id: u.supervisor_id || '',
+      agm_id: u.agm_id || ''
     });
     setFormError('');
     setShowForm(true);
@@ -167,7 +213,9 @@ const UserManagement = ({ onBack }) => {
         password: '',
         role: actualUser.role || 'user',
         status: actualUser.status || 'active',
-        company_id: actualUser.company_id || ''
+        company_id: actualUser.company_id || '',
+        supervisor_id: actualUser.supervisor_id || '',
+        agm_id: actualUser.agm_id || ''
       });
     } catch (err) {
       console.error('Failed to fetch full user details:', err);
@@ -178,35 +226,19 @@ const UserManagement = ({ onBack }) => {
     setViewUser(u);
     setModLoading(true);
 
-    ApiService.getUserNavAccess(u.id)
-      .then(res => {
-        const modules = Array.isArray(res?.modules) && res.modules.length > 0 ? res.modules : null;
-        if (modules) {
-          const checks = {};
-          NAV_MODULES.forEach(m => {
-            checks[m.code] = modules.includes(m.code);
-          });
-          setModuleChecks(checks);
-        } else {
-          // Fallback to legacy getAdminUserModules
-          return ApiService.getAdminUserModules(u.id)
-            .then(data => {
-              const legacyList = Array.isArray(data) ? data : (data?.modules || data?.data || []);
-              const apiCodes = new Set(legacyList.map(m => m.code || m.module_code || ''));
-              const hasNavCodes = NAV_MODULES.some(m => apiCodes.has(m.code));
-              if (hasNavCodes) {
-                const checks = {};
-                NAV_MODULES.forEach(m => { checks[m.code] = apiCodes.has(m.code); });
-                setModuleChecks(checks);
-              } else {
-                const defaults = {};
-                NAV_MODULES.forEach(m => { defaults[m.code] = true; });
-                setModuleChecks(defaults);
-              }
-            });
-        }
+    ApiService.getAdminUserModules(u.id)
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.modules || data?.data || []);
+        const apiCodes = new Set(list.map(m => m.code || m.module_code || ''));
+        const checks = {};
+        NAV_MODULES.forEach(m => {
+          checks[m.code] = apiCodes.has(m.code);
+        });
+        setModuleChecks(checks);
+        setInitialChecks(checks);
       })
-      .catch(() => {
+      .catch(err => {
+        console.error("Failed to load user modules:", err);
         // Fallback to local storage
         const stored = localStorage.getItem(`nav_access_${u.id}`);
         try {
@@ -215,6 +247,7 @@ const UserManagement = ({ onBack }) => {
             const checks = {};
             NAV_MODULES.forEach(m => { checks[m.code] = parsed.includes(m.code); });
             setModuleChecks(checks);
+            setInitialChecks(checks);
             return;
           }
         } catch { }
@@ -222,6 +255,7 @@ const UserManagement = ({ onBack }) => {
         const defaults = {};
         NAV_MODULES.forEach(m => { defaults[m.code] = true; });
         setModuleChecks(defaults);
+        setInitialChecks(defaults);
       })
       .finally(() => setModLoading(false));
   };
@@ -235,14 +269,32 @@ const UserManagement = ({ onBack }) => {
     setModSaving(true);
     try {
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
-      // Build an array of enabled module codes (matches API format)
-      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
 
-      await ApiService.updateUserNavAccess(userId, enabledCodes);
+      // Identify added and removed codes
+      const promises = [];
+      for (const m of NAV_MODULES) {
+        const initiallyChecked = !!initialChecks[m.code];
+        const currentlyChecked = !!moduleChecks[m.code];
+        const moduleId = CODE_TO_ID[m.code];
+
+        if (initiallyChecked !== currentlyChecked && moduleId !== undefined) {
+          if (currentlyChecked) {
+            // Added
+            promises.push(ApiService.addAdminUserModule(userId, { module_id: moduleId, access_level: 'admin' }));
+          } else {
+            // Removed
+            promises.push(ApiService.removeAdminUserModule(userId, moduleId));
+          }
+        }
+      }
+
+      await Promise.all(promises);
+
+      // Save list to local storage fallback
+      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
     } catch (err) {
-      console.error('Failed to save nav access via API, falling back to localStorage:', err);
-      // Fallback: still save locally so it works offline
+      console.error('Failed to save module access via API, falling back to localStorage:', err);
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
       const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
@@ -258,7 +310,15 @@ const UserManagement = ({ onBack }) => {
     setSaving(true); setFormError('');
     try {
       if (editUser) {
-        const payload = { name: form.name, email: form.email, role: form.role, status: form.status, company_id: form.company_id };
+        const payload = {
+          name: form.name,
+          email: form.email,
+          role: form.role,
+          status: form.status,
+          company_id: form.company_id,
+          supervisor_id: form.role === 'user' ? (form.supervisor_id || null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : null
+        };
         if (form.password.trim()) payload.password = form.password;
         await ApiService.updateAdminUser(editUser.id, payload);
       } else {
@@ -269,7 +329,9 @@ const UserManagement = ({ onBack }) => {
           password: form.password,
           role: form.role,
           status: form.status,
-          company_id: form.company_id
+          company_id: form.company_id,
+          supervisor_id: form.role === 'user' ? (form.supervisor_id || null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : null
         });
       }
       setShowForm(false);
@@ -343,6 +405,7 @@ const UserManagement = ({ onBack }) => {
                   <th>Username</th>
                   <th>Email</th>
                   <th>Role</th>
+                  <th>Hierarchy</th>
                   <th>Status</th>
                   <th className="um-th-actions">Actions</th>
                 </tr>
@@ -367,6 +430,31 @@ const UserManagement = ({ onBack }) => {
                         <span className="um-role-badge" style={{ color: rc.color, background: rc.bg, borderColor: rc.color + '44' }}>
                           {rc.label}
                         </span>
+                      </td>
+                      <td>
+                        {u.role === 'user' ? (
+                          u.supervisor_name ? (
+                            <span style={{ fontSize: '12.5px', color: '#16a34a', fontWeight: '600' }}>
+                              Supervisor: {u.supervisor_name}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: '#ef4444', fontStyle: 'italic', fontWeight: '500' }}>
+                              ⚠️ Unassigned Supervisor
+                            </span>
+                          )
+                        ) : u.role === 'supervisor' ? (
+                          u.agm_name ? (
+                            <span style={{ fontSize: '12.5px', color: '#c084fc', fontWeight: '600' }}>
+                              AGM: {u.agm_name}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: '#ef4444', fontStyle: 'italic', fontWeight: '500' }}>
+                              ⚠️ Unassigned AGM
+                            </span>
+                          )
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
+                        )}
                       </td>
                       <td>
                         <span className={`um-status ${u.status === 'inactive' ? 'inactive' : 'active'}`}>
@@ -454,10 +542,9 @@ const UserManagement = ({ onBack }) => {
                 <div className="um-form-field">
                   <label>Role</label>
                   <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-                    <option value="superadmin">Superadmin</option>
-                    <option value="admin">Admin</option>
-                    <option value="inspector">Inspector</option>
-                    <option value="user">User</option>
+                    {ROLE_ORDER.map(r => (
+                      <option key={r} value={r}>{ROLE_CONFIG[r].label}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="um-form-field">
@@ -469,6 +556,28 @@ const UserManagement = ({ onBack }) => {
                     ))}
                   </select>
                 </div>
+                {form.role === 'user' && (
+                  <div className="um-form-field">
+                    <label>Assign Supervisor</label>
+                    <select value={form.supervisor_id || ''} onChange={e => setForm(f => ({ ...f, supervisor_id: e.target.value }))}>
+                      <option value="">No Supervisor</option>
+                      {supervisors.map(s => (
+                        <option key={s.id} value={s.id}>{s.name || s.username}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {form.role === 'supervisor' && (
+                  <div className="um-form-field">
+                    <label>Assign AGM</label>
+                    <select value={form.agm_id || ''} onChange={e => setForm(f => ({ ...f, agm_id: e.target.value }))}>
+                      <option value="">No AGM</option>
+                      {agms.map(a => (
+                        <option key={a.id} value={a.id}>{a.name || a.username}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="um-form-field">
                   <label>Status</label>
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>

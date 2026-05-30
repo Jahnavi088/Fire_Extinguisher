@@ -12,7 +12,7 @@ let _pendingReportsCacheTime = 0;
 
 const getPendingEquipmentSosCodes = async (moduleId) => {
   const codes = new Set();
-  
+
   // 1. Get locally queued inspections
   try {
     const localQueue = JSON.parse(localStorage.getItem('pending_inspections_queue') || '[]');
@@ -38,20 +38,20 @@ const getPendingEquipmentSosCodes = async (moduleId) => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 30);
       const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
-      
+
       const rawInspections = await request(`/reports/inspections?start_date=${startDateStr}&end_date=${endDateStr}`).catch(() => []);
       iList = Array.isArray(rawInspections) ? rawInspections : (rawInspections?.items || rawInspections?.reports || rawInspections?.inspections || rawInspections?.data || []);
       _pendingReportsCache = iList;
       _pendingReportsCacheTime = now;
     }
-    
+
     const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
-    
+
     iList.forEach(i => {
       const stStatus = (i.status || '').toUpperCase();
       const stApprov = (i.approval_status || '').toUpperCase();
       const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
-      
+
       if (!isApproved) {
         if (!moduleId || String(i.module_id) === String(moduleId)) {
           const code = i.sos_code || i.equipment_code;
@@ -62,7 +62,7 @@ const getPendingEquipmentSosCodes = async (moduleId) => {
   } catch (e) {
     console.error(e);
   }
-  
+
   return codes;
 };
 
@@ -116,6 +116,29 @@ const request = async (endpoint, options = {}) => {
 
 export const ApiService = {
   // --- AUTH ---
+  register: async (firstName, lastName, email, mobile, companyId = 21) => {
+    return await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        mobile,
+        company_id: Number(companyId)
+      }),
+    });
+  },
+
+  verifyEmailOtp: async (registrationId, otp) => {
+    return await request('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({
+        registration_id: Number(registrationId),
+        otp: String(otp)
+      }),
+    });
+  },
+
   login: async (username, password) => {
     const data = await request('/auth/login', {
       method: 'POST',
@@ -188,22 +211,22 @@ export const ApiService = {
   getEquipment: async (params = {}) => {
     const status = params.status;
     const moduleId = params.module_id;
-    
+
     if (status === 'due-inspection' || status === 'due_inspection') {
       // Fetch both due-inspection and active equipment
       const [dueRes, activeRes] = await Promise.all([
         request(`/equipment${qs({ ...params, status: 'due-inspection' })}`),
         request(`/equipment${qs({ ...params, status: 'active' })}`),
       ]);
-      
+
       let dueItems = dueRes.items || dueRes.data || (Array.isArray(dueRes) ? dueRes : []);
       let activeItems = activeRes.items || activeRes.data || (Array.isArray(activeRes) ? activeRes : []);
-      
+
       try {
         const pendingCodes = await getPendingEquipmentSosCodes(moduleId);
         if (pendingCodes.size > 0) {
           const dueCodes = new Set(dueItems.map(item => item.sos_code || item.equipment_code));
-          
+
           activeItems.forEach(item => {
             const code = item.sos_code || item.equipment_code;
             if (pendingCodes.has(code) && !dueCodes.has(code)) {
@@ -214,7 +237,7 @@ export const ApiService = {
       } catch (e) {
         console.error(e);
       }
-      
+
       if (Array.isArray(dueRes)) {
         return dueItems;
       }
@@ -225,11 +248,11 @@ export const ApiService = {
         data: dueItems
       };
     }
-    
+
     if (status === 'active') {
       const res = await request(`/equipment${qs(params)}`);
       let items = res.items || res.data || (Array.isArray(res) ? res : []);
-      
+
       try {
         const pendingCodes = await getPendingEquipmentSosCodes(moduleId);
         if (pendingCodes.size > 0 && items.length > 0) {
@@ -241,7 +264,7 @@ export const ApiService = {
       } catch (e) {
         console.error(e);
       }
-      
+
       if (Array.isArray(res)) {
         return items;
       }
@@ -252,7 +275,7 @@ export const ApiService = {
         data: items
       };
     }
-    
+
     return await request(`/equipment${qs(params)}`);
   },
 
@@ -286,14 +309,14 @@ export const ApiService = {
   approveInspection: async (id, remarks) => {
     return await request(`/inspections/${id}/approve`, {
       method: 'PATCH',
-      body: remarks ? JSON.stringify({ remarks }) : undefined,
+      body: JSON.stringify({ remarks: remarks || '' }),
     });
   },
 
   rejectInspection: async (id, reason) => {
     return await request(`/inspections/${id}/reject`, {
       method: 'PATCH',
-      body: reason ? JSON.stringify({ reason }) : undefined,
+      body: JSON.stringify({ reason: reason || '' }),
     });
   },
 
@@ -794,8 +817,8 @@ export const ApiService = {
   },
 
   // --- ADMIN USERS ---
-  getAdminUsers: async () => {
-    return await request('/admin/users');
+  getAdminUsers: async (params = {}) => {
+    return await request(`/admin/users${qs(params)}`);
   },
 
   getAdminUserById: async (id) => {
@@ -926,6 +949,23 @@ export const ApiService = {
     return await request(`/notifications${qs(params)}`);
   },
 
+  getNotificationsUnreadCount: async () => {
+    return await request('/notifications/unread-count');
+  },
+
+  sendTargetedNotification: async (data) => {
+    return await request('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  markAllNotificationsRead: async () => {
+    return await request('/notifications/read-all', {
+      method: 'PATCH',
+    });
+  },
+
   markNotificationRead: async (ids) => {
     const idList = Array.isArray(ids) ? ids : (ids == null ? [] : [ids]);
     return await request('/notifications/read', {
@@ -941,6 +981,14 @@ export const ApiService = {
   // Kept for backward compatibility — use broadcastNotification for new code
   sendNotification: async (data) => {
     return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  getSupervisorDashboard: async () => {
+    return await request('/dashboard/supervisor');
+  },
+
+  getAgmDashboard: async () => {
+    return await request('/dashboard/agm');
   },
 
   // --- ADMIN INSPECTION PLANS ---

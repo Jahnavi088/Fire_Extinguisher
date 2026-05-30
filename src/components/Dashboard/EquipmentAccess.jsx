@@ -15,7 +15,7 @@ const MODULE_EMOJI = {
 
 const ACCESS_LEVELS = [
   { value: 'view', label: 'View Only' },
-  { value: 'inspect', label: 'Inspector' },
+  { value: 'inspect', label: 'Inspect' },
   { value: 'manage', label: 'Manager' },
   { value: 'admin', label: 'Administrator' },
 ];
