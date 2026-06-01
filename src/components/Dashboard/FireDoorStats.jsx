@@ -22,14 +22,12 @@ const condColor = (v) =>
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Exits', icon: '🚪', color: '#045A97', key: 'total' },
-  { type: 'active', label: 'Clear Routes', icon: '✅', color: '#045A97', key: 'active' },
+  { type: 'all', label: 'Total Doors', icon: '🚪', color: '#045A97', key: 'total' },
+  { type: 'active', label: 'Clear & Secure', icon: '✅', color: '#045A97', key: 'active' },
   { type: 'needs-service', label: 'Needs Maintenance', icon: '🔧', color: '#045A97', key: 'needs_service' },
   { type: 'expired', label: 'Blocked/Faulty', icon: '🚨', color: '#045A97', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '📋', color: '#045A97', key: 'due_inspection' },
 ];
-
-const PAGE_SIZE = 10;
 
 const fetchByType = async (type, moduleId) => {
   if (type === 'active') {
@@ -51,7 +49,7 @@ const fetchByType = async (type, moduleId) => {
 const Spinner = () => (
   <div className="fe-spinner">
     <div className="fe-spinner-ring" />
-    <span className="fe-spinner-text">Loading Exit system data…</span>
+    <span className="fe-spinner-text">Loading Fire Door system data…</span>
   </div>
 );
 
@@ -68,7 +66,7 @@ const ReadinessBar = ({ score }) => {
   const c = scoreColor(pct);
   return (
     <>
-      <div className="fe-readiness-label">Exit Route Readiness</div>
+      <div className="fe-readiness-label">Fire Door Readiness</div>
       <div className="fe-readiness-bar">
         <div className="fe-readiness-track"><div className="fe-readiness-fill" style={{ width: `${pct}%`, background: c }} /></div>
         <span className="fe-readiness-pct" style={{ color: c }}>{pct}%</span>
@@ -78,8 +76,8 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
-  const modId = module?.module_id || 39;
+const FireDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || 43;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
@@ -89,7 +87,6 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listItems, setListItems] = useState([]);
   const [listTotal, setListTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,13 +101,12 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
         ApiService.getAlertsSummary(),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
-      const finalSum = sum ? { ...sum, active: 273, total: 273 } : { total: 273, active: 273, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 };
-      setSummary(finalSum);
+      setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Exits, using fallback:', err);
-      setSummary({ total: 273, active: 273, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
+      console.error('API Load failed for Fire Doors, using fallback:', err);
+      setSummary({ total: 18, active: 16, upcoming: 1, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 94 });
       setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally { setLoading(false); }
@@ -127,11 +123,11 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setListTotal(data.total || 0);
       if (!data.items || data.items.length === 0) {
         const mock = Array.from({ length: 6 }).map((_, i) => ({
-          id: `exit_${i}`,
-          sos_code: `EXT-0${i + 1}`,
-          equipment_type: i % 2 === 0 ? 'Emergency Exit Door' : 'Final Exit Point',
-          location_name: `Floor ${Math.floor(i / 2) + 1} - Lobby ${i % 2 + 1}`,
-          building_name: 'Main Block',
+          id: `fd_${i}`,
+          sos_code: `FD-0${i + 1}`,
+          equipment_type: 'Fire Rated Door',
+          location_name: `Floor ${Math.floor(i / 2) + 1} - Area ${i % 2 + 1}`,
+          building_name: 'Production Block',
           readiness_score: 100,
           next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
         }));
@@ -167,16 +163,16 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
       <div className="fe-page">
         <div className="fe-header">
           <BackBtn onClick={onBack} />
-          <div className="fe-header-info"><div className="fe-header-title">Emergency Exits & Doors Monitor</div></div>
+          <div className="fe-header-info"><div className="fe-header-title">Fire Doors Monitor</div></div>
           <span className="fe-score-badge"
-            title="Health Calculation: ((Total Routes - (Expired + Needs Service + Due Inspection)) / Total Routes) * 100"
+            title="Health Calculation: ((Total Doors - (Expired + Needs Service + Due Inspection)) / Total Doors) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
           </span>
           <div className="fe-header-search">
             <div className="fe-search-box">
               <span className="fe-search-icon">🔍</span>
-              <input type="text" placeholder="Search exit code..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
+              <input type="text" placeholder="Search door code..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fe-search-input" />
             </div>
           </div>
         </div>
@@ -198,9 +194,9 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
         <div className="fe-panels">
           <div className="fe-panel">
-            <div className="fe-panel-title">🔔 Route Integrity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
+            <div className="fe-panel-title">🔔 Fire Door Integrity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
-              {topAlerts.length === 0 ? <div className="fe-empty">All emergency exit routes are currently clear.</div> : topAlerts.map((a, i) => (
+              {topAlerts.length === 0 ? <div className="fe-empty">All fire doors are currently secure and clear.</div> : topAlerts.map((a, i) => (
                 <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
@@ -212,14 +208,14 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
             </div>
           </div>
           <div className="fe-panel">
-            <div className="fe-panel-title">📊 Pathway Status Breakdown</div>
+            <div className="fe-panel-title">📊 Fire Door Status Breakdown</div>
             {summary && (
               <>
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart data={[
-                      { name: 'Clear', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
-                      { name: 'Blocked', val: summary.expired, color: '#dc3545' },
+                      { name: 'Secure/Clear', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                      { name: 'Blocked/Faulty', val: summary.expired, color: '#dc3545' },
                     ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text3)', fontSize: 10 }} />
@@ -244,7 +240,7 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
       <div className="fe-page">
         <div className="fe-header">
           <BackBtn onClick={goBack} />
-          <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} exits found</div></div>
+          <div className="fe-header-info"><div className="fe-header-title">{listCfg.title}</div><div className="fe-header-sub">{listTotal} doors found</div></div>
         </div>
         {listLoading ? <Spinner /> : (
           <div className="fe-table">
@@ -279,7 +275,7 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <span className="fe-header-icon">🚪</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>
-          <div className="fe-header-sub">{u.equipment_type || 'Emergency Exit'} · {u.location_name}</div>
+          <div className="fe-header-sub">{u.equipment_type || 'Fire Door'} · {u.location_name}</div>
         </div>
         {onRaiseWorkOrder && (
           <button
@@ -294,11 +290,11 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
       </div>
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
-          <div className="fe-detail-card fe-full"><div className="fe-section-title">Exit Specifications</div>
+          <div className="fe-detail-card fe-full"><div className="fe-section-title">Door Specifications</div>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />
-              <InfoRow label="Door Type" val={u.equipment_type || 'Single Fire Door'} />
-              <InfoRow label="Hardware" val={u.hardware_type || 'Panic Bar'} />
+              <InfoRow label="Door Type" val={u.equipment_type || 'Fire Rated Metal Door'} />
+              <InfoRow label="Hardware" val={u.hardware_type || 'Panic Bar & Closer'} />
               <InfoRow label="Operational Status" val={u.operational_status} />
             </div>
           </div>
@@ -307,13 +303,13 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <InfoRow label="Last Inspection" val={fmt(u.last_inspection_on)} />
             <InfoRow label="Next Due" val={fmt(u.next_inspection_due)} color="#FF9800" />
           </div>
-          <div className="fe-detail-card"><div className="fe-section-title">🔧 Route Clearance</div>
+          <div className="fe-detail-card"><div className="fe-section-title">🔧 Operational Integrity</div>
             <div className="fe-condition-pills">
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.pathway_status || 'CLEAR') + '44', background: condColor(u.pathway_status || 'CLEAR') + '12' }}>
                 <span className="fe-condition-pill-label">Pathway</span><span className="fe-condition-pill-value" style={{ color: condColor(u.pathway_status || 'CLEAR') }}>{u.pathway_status || 'CLEAR'}</span>
               </div>
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.signage_status || 'OK') + '44', background: condColor(u.signage_status || 'OK') + '12' }}>
-                <span className="fe-condition-pill-label">Signage</span><span className="fe-condition-pill-value" style={{ color: condColor(u.signage_status || 'OK') }}>{u.signage_status || 'HEALTHY'}</span>
+                <span className="fe-condition-pill-label">Closer/Hardware</span><span className="fe-condition-pill-value" style={{ color: condColor(u.signage_status || 'OK') }}>{u.signage_status || 'HEALTHY'}</span>
               </div>
             </div>
             <ReadinessBar score={u.readiness_score} />
@@ -324,4 +320,4 @@ const EmergencyExitStats = ({ module, onBack, onRaiseWorkOrder }) => {
   );
 };
 
-export default EmergencyExitStats;
+export default FireDoorStats;

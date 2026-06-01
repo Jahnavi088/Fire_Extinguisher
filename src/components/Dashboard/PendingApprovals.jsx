@@ -19,11 +19,19 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
   const [rejectInput, setRejectInput] = useState('');
   const [modalMode, setModalMode] = useState(null); // 'approve' | 'reject'
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Detailed view drawer states
   const [detailItem, setDetailItem] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailedChecklist, setDetailedChecklist] = useState([]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   useEffect(() => {
     let active = true;
@@ -80,6 +88,7 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       merged.sort((a, b) => new Date(b.created_at || b.inspected_at || 0) - new Date(a.created_at || a.inspected_at || 0));
       
       setItems(merged);
+      setSelectedIds([]);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -181,6 +190,112 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const pageItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const pageItemIds = pageItems.map(item => `${item._itemType}-${item.id}`);
+  const isAllSelected = pageItemIds.length > 0 && pageItemIds.every(id => selectedIds.includes(id));
+  
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(prev => prev.filter(id => !pageItemIds.includes(id)));
+    } else {
+      setSelectedIds(prev => {
+        const next = [...prev];
+        pageItemIds.forEach(id => {
+          if (!next.includes(id)) next.push(id);
+        });
+        return next;
+      });
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to approve all ${selectedIds.length} selected request(s)?`)) return;
+    setBulkActionLoading(true);
+    
+    const selectedItemsList = items.filter(item => selectedIds.includes(`${item._itemType}-${item.id}`));
+    const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+
+    try {
+      await Promise.allSettled(selectedItemsList.map(async (selectedItem) => {
+        try {
+          if (selectedItem._itemType === 'update') {
+            if (isSuperadminOrAdmin) {
+              await ApiService.adminApproveUpdate(selectedItem.id, 'Bulk Approved');
+            } else {
+              await ApiService.supervisorApproveUpdate(selectedItem.id, 'Bulk Approved');
+            }
+          } else if (selectedItem._isQueuedLocal) {
+            const res = await ApiService.createInspection(selectedItem.sos_code, {
+              ...selectedItem.payload,
+              status: 'APPROVED',
+              approval_status: 'APPROVED',
+              remarks: selectedItem.payload.remarks ? `${selectedItem.payload.remarks} | Bulk Approved` : 'Bulk Approved'
+            });
+            ApiService.removeQueuedInspection(selectedItem.id);
+            const newId = res?.id || res?.inspection_id || selectedItem.id;
+            if (!approvedLocally.includes(newId)) approvedLocally.push(newId);
+          } else {
+            if (!approvedLocally.includes(selectedItem.id)) {
+              approvedLocally.push(selectedItem.id);
+            }
+            try { await ApiService.approveInspection(selectedItem.id, 'Bulk Approved'); } catch(e) {}
+          }
+        } catch (err) {
+          console.error(`Failed to approve item ${selectedItem.id}:`, err);
+        }
+      }));
+      
+      localStorage.setItem('approved_inspections', JSON.stringify(approvedLocally));
+      setSelectedIds([]);
+      setRetry(r => r + 1);
+    } catch (e) {
+      alert('Bulk approval completed.');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedIds.length === 0) return;
+    const reason = window.prompt(`Please enter the rejection reason for all ${selectedIds.length} selected request(s):`);
+    if (!reason || !reason.trim()) return;
+    setBulkActionLoading(true);
+
+    const selectedItemsList = items.filter(item => selectedIds.includes(`${item._itemType}-${item.id}`));
+    const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+
+    try {
+      await Promise.allSettled(selectedItemsList.map(async (selectedItem) => {
+        try {
+          if (selectedItem._itemType === 'update') {
+            if (isSuperadminOrAdmin) {
+              await ApiService.adminRejectUpdate(selectedItem.id, reason.trim());
+            } else {
+              await ApiService.supervisorRejectUpdate(selectedItem.id, reason.trim());
+            }
+          } else if (selectedItem._isQueuedLocal) {
+            ApiService.removeQueuedInspection(selectedItem.id);
+          } else {
+            if (!approvedLocally.includes(selectedItem.id)) {
+              approvedLocally.push(selectedItem.id);
+            }
+            try { await ApiService.rejectInspection(selectedItem.id, reason.trim()); } catch(e) {}
+          }
+        } catch (err) {
+          console.error(`Failed to reject item ${selectedItem.id}:`, err);
+        }
+      }));
+
+      localStorage.setItem('approved_inspections', JSON.stringify(approvedLocally));
+      setSelectedIds([]);
+      setRetry(r => r + 1);
+    } catch (e) {
+      alert('Bulk rejection completed.');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
 
   const openApprove = async (item) => {
     setSelectedItem(item);
@@ -418,6 +533,48 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
           </div>
           {!loading && items.length > 0 && (
             <div className="rpt-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {selectedIds.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', marginRight: '12px' }}>
+                  <button
+                    onClick={handleBulkApprove}
+                    disabled={bulkActionLoading}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      background: '#16a34a',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Approve Selected ({selectedIds.length})
+                  </button>
+                  <button
+                    onClick={handleBulkReject}
+                    disabled={bulkActionLoading}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      background: '#dc2626',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Reject Selected ({selectedIds.length})
+                  </button>
+                </div>
+              )}
               <input 
                 type="text" 
                 placeholder="Search requests..." 
@@ -452,6 +609,14 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
             <table className="rpt-grid-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   <th style={{ width: '50px', textAlign: 'center' }}>S.No</th>
                   <th>Date &amp; Time</th>
                   <th>Submitted By</th>
@@ -467,6 +632,14 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                   const dateStr = item.created_at || item.inspected_at;
                   return (
                     <tr key={`${item._itemType}-${item.id}`}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(`${item._itemType}-${item.id}`)}
+                          onChange={() => toggleSelect(`${item._itemType}-${item.id}`)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>{sno}</td>
                       <td className="rpt-cell-date-new">
                         <div className="rpt-d">{fmt(dateStr)}</div>

@@ -11,15 +11,14 @@ const fmt = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
-const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
   return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'CLEAN' ? '#28a745'
-    : (v === 'DIRTY' || v === 'DUSTY') ? '#FF9800'
-      : (v === 'FAULTY' || v === 'OFFLINE' || v === 'DAMAGED') ? '#dc3545'
+  v === 'OK' || v === 'CLEAN' || v === 'NORMAL' ? '#28a745'
+    : (v === 'DIRTY' || v === 'DUSTY' || v === 'STALE') ? '#FF9800'
+      : (v === 'FAULTY' || v === 'OFFLINE' || v === 'DAMAGED' || v === 'HIGH CO') ? '#dc3545'
         : '#666';
 
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
@@ -27,14 +26,14 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 const KPI_CARDS = [
   { type: 'all', label: 'Total Fleet', icon: '🌫️', color: '#3b82f6', key: 'total' },
   { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
-  { type: 'needs-service', label: 'Needs Cleaning', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
-  { type: 'expired', label: 'Faulty/Critical', icon: '⌛', color: '#8b5cf6', key: 'expired' },
-  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
+  { type: 'needs-service', label: 'Needs Maintenance', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
+  { type: 'expired', label: 'Faulty/Critical', icon: '🚨', color: '#8b5cf6', key: 'expired' },
+  { type: 'due-inspection', label: 'Due Inspection', icon: '📋', color: '#dc3545', key: 'due_inspection' },
 ];
 
 const PAGE_SIZE = 10;
 
-const fetchByType = async (type, moduleId = 10) => {
+const fetchByType = async (type, moduleId = 40) => {
   if (type === 'active') {
     const [activeData, upcomingData] = await Promise.all([
       ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
@@ -54,7 +53,7 @@ const fetchByType = async (type, moduleId = 10) => {
 const Spinner = () => (
   <div className="fe-spinner">
     <div className="fe-spinner-ring" />
-    <span className="fe-spinner-text">Loading smoke detector data…</span>
+    <span className="fe-spinner-text">Loading CO detector data…</span>
   </div>
 );
 
@@ -77,7 +76,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPage }) => {
   return (
     <div className="fe-pagination">
       <span className="fe-page-info">
-        Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> smoke detectors
+        Showing <strong>{start}–{end}</strong> of <strong>{total}</strong> CO detectors
       </span>
       <div className="fe-page-controls">
         <button className="fe-page-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>
@@ -132,13 +131,12 @@ const ReadinessBar = ({ score }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
-  const modId = module?.module_id || 10;
+const CODetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
+  const modId = module?.module_id || 40;
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [alertsSummary, setAlertsSummary] = useState(null);
   const [topAlerts, setTopAlerts] = useState([]);
-  const [error, setError] = useState(null);
 
   const [view, setView] = useState('overview');
   const [listCfg, setListCfg] = useState({ title: '', type: '', color: '' });
@@ -191,9 +189,9 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Smoke Detectors, using fallback:', err);
-      setSummary({ total: 156, active: 148, upcoming: 4, needs_service: 2, expired: 2, due_inspection: 0, readiness_score: 95 });
-      setAlertsSummary({ total_alerts: 4, level_1: { count: 3, label: 'Low', description: 'Cleaning' }, level_2: { count: 1, label: 'Med', description: 'Battery' }, level_3: { count: 0, label: 'High', description: 'Fault' } });
+      console.error('API Load failed for CO Detectors, using fallback:', err);
+      setSummary({ total: 42, active: 38, upcoming: 2, needs_service: 1, expired: 1, due_inspection: 0, readiness_score: 95 });
+      setAlertsSummary({ total_alerts: 1, level_1: { count: 0 }, level_2: { count: 1, label: 'Med', description: 'Battery Low' }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -213,14 +211,14 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setListTotal(data.total || 0);
 
       if (!data.items || data.items.length === 0) {
-        const mock = Array.from({ length: 10 }).map((_, i) => ({
-          id: `sd_${i}`,
-          sos_code: `SD-${3000 + i}`,
-          equipment_type: i % 2 === 0 ? 'Optical' : 'Ionization',
-          location_name: `Room ${101 + i}`,
-          building_name: 'Admin Block',
+        const mock = Array.from({ length: 8 }).map((_, i) => ({
+          id: `cod_${i}`,
+          sos_code: `COD-400${i + 1}`,
+          equipment_type: 'Carbon Monoxide Detector',
+          location_name: `Boiler Room ${i + 1} - Wall Mount`,
+          building_name: 'Utility Block',
           readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
+          next_inspection_due: new Date(Date.now() + 86400000 * 30).toISOString()
         }));
         setListItems(mock);
         setListTotal(mock.length);
@@ -259,7 +257,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack} />
           <div className="fe-header-info">
-            <div className="fe-header-title">Smoke Detector Fleet Monitor</div>
+            <div className="fe-header-title">CO Detector Fleet Monitor</div>
           </div>
           <span className="fe-score-badge"
             title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100"
@@ -399,7 +397,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 return (
                   <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
                     <span className="fe-table-sos">{item.sos_code}</span>
-                    <span className="fe-table-type">{item.equipment_type || 'Detector'}</span>
+                    <span className="fe-table-type">{item.equipment_type || 'CO Detector'}</span>
                     <span className="fe-table-loc">{item.location_name}</span>
                     <span className="fe-table-bldg">{item.building_name}</span>
                     <span className="fe-score-chip" style={{ color: col, borderColor: col + '55', background: col + '14' }}>{sc}%</span>
@@ -433,7 +431,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <span className="fe-header-icon">🌫️</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>
-          <div className="fe-header-sub">{u.equipment_type || 'Smoke Detector'} · {u.location_name}</div>
+          <div className="fe-header-sub">{u.equipment_type || 'CO Detector'} · {u.location_name}</div>
         </div>
         {onRaiseWorkOrder && (
           <button
@@ -453,7 +451,7 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <SectionTitle>Unit Identity</SectionTitle>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />
-              <InfoRow label="Detector Type" val={u.equipment_type} />
+              <InfoRow label="Detector Type" val={u.equipment_type || 'CO Detector'} />
               <InfoRow label="Zone" val={u.zone_name} />
               <InfoRow label="Building" val={u.building_name} />
               <InfoRow label="Manufacturer" val={u.manufacturer_name} />
@@ -472,8 +470,8 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <SectionTitle>🔧 Operational Status</SectionTitle>
             <div className="fe-condition-pills">
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.chamber_status) + '44', background: condColor(u.chamber_status) + '12' }}>
-                <span className="fe-condition-pill-label">Chamber</span>
-                <span className="fe-condition-pill-value" style={{ color: condColor(u.chamber_status) }}>{u.chamber_status || 'CLEAN'}</span>
+                <span className="fe-condition-pill-label">CO Level</span>
+                <span className="fe-condition-pill-value" style={{ color: condColor(u.chamber_status) }}>{u.chamber_status || 'NORMAL'}</span>
               </div>
               <div className="fe-condition-pill" style={{ borderColor: condColor(u.battery_status) + '44', background: condColor(u.battery_status) + '12' }}>
                 <span className="fe-condition-pill-label">Battery</span>
@@ -488,4 +486,4 @@ const SmokeDetectorStats = ({ module, onBack, onRaiseWorkOrder }) => {
   );
 };
 
-export default SmokeDetectorStats;
+export default CODetectorStats;

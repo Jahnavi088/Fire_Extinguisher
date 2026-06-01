@@ -47,6 +47,8 @@ import Onboarding from './Onboarding';
 import EquipmentOnboarding from './EquipmentOnboarding';
 import ModuleManagement from './ModuleManagement';
 import AutoScheduler from './AutoScheduler';
+import CODetectorStats from './CODetectorStats';
+import FireDoorStats from './FireDoorStats';
 
 
 
@@ -59,22 +61,24 @@ const STATIC_MODULES = [
   { module_id: 36, name: 'Smoke Detectors', code: 'smoke_detector', health_score: 92, category: 'fire', image: '/images/smoke_detector1.png' },
   { module_id: 37, name: 'Heat Detectors', code: 'heat_detector', health_score: 92, category: 'fire', image: '/images/heatdetector1.png' },
   { module_id: 55, name: 'Fire Trolleys', code: 'fire_trolley', health_score: 100, category: 'fire', image: '/images/fire_trolley1.png' },
-  { module_id: 39, name: 'Emergency Exits', code: 'emergency_door', health_score: 92, category: 'fire', image: '/images/emergency_exitdoor1.png' },
+  { module_id: 39, name: 'Emergency Exits', code: 'emergency_exit', health_score: 92, category: 'fire', image: '/images/emergency_exitdoor1.png' },
   { module_id: 38, name: 'Emergency Lighting', code: 'emergency_light', health_score: 92, category: 'fire', image: '/images/emergencylight1.png' },
   { module_id: 44, name: 'PA Systems', code: 'pa_system', health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
   { module_id: 56, name: 'Wind Socks', code: 'wind_sock', health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
-  { module_id: 57, name: 'SCBA Units', code: 'scba', health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
+  { module_id: 57, name: 'SCBA', code: 'scba', health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
   { module_id: 58, name: 'Ambulances', code: 'ambulance', health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
   { module_id: 45, name: 'First Aid Kits', code: 'first_aid_kit', health_score: 93, category: 'chemical', image: '/images/Firstaid1.png' },
   { module_id: 46, name: 'Eye Wash Stations', code: 'eyewash_station', health_score: 92, category: 'chemical', image: '/images/eye_wash1.png' },
   { module_id: 48, name: 'Spill Kits', code: 'spill_kit', health_score: 92, category: 'chemical', image: '/images/spill_kit1.png' },
-  { module_id: 60, name: 'Chemical Showers', code: 'chemical_shower', health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
+  { module_id: 47, name: 'Emergency Showers', code: 'safety_shower', health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
   { module_id: 49, name: 'PPE Stations', code: 'ppe_station', health_score: 94, category: 'chemical', image: '/images/ppe_station1.png' },
   { module_id: 42, name: 'CO2 Systems', code: 'suppression_system', health_score: 94, category: 'fire', image: '/images/suppression_system.png' },
   { module_id: 62, name: 'Safety Signage', code: 'safety_signage', health_score: 100, category: 'permit', image: '/images/signage1.png' },
   { module_id: 61, name: 'Emergency Comms', code: 'emergency_comm', health_score: 100, category: 'permit', image: '/images/Emergency_call1.png' },
   { module_id: 41, name: 'Fire Blankets', code: 'fire_blanket', health_score: 93, category: 'fire', image: '/images/fireblanket1.png' },
   { module_id: 59, name: 'Muster Points', code: 'muster_point', health_score: 100, category: 'permit', image: '/images/muster_point1.png' },
+  { module_id: 40, name: 'CO Detectors', code: 'co_detector', health_score: 100, category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 43, name: 'Fire Doors', code: 'fire_door', health_score: 100, category: 'fire', image: '/images/emergency_exitdoor1.png' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
@@ -87,9 +91,9 @@ const CHECKLIST_MODULES = [
   { id: 34, name: 'Fire Hydrant', code: 'hydrant', icon: CHECKLIST_GENERIC_ICON },
   { id: 36, name: 'Smoke Detector', code: 'smoke_detector', icon: CHECKLIST_GENERIC_ICON },
   { id: 37, name: 'Heat Detector', code: 'heat_detector', icon: CHECKLIST_GENERIC_ICON },
-  { id: 57, name: 'SCBA Units', code: 'scba', icon: CHECKLIST_GENERIC_ICON },
+  { id: 57, name: 'SCBA', code: 'scba', icon: CHECKLIST_GENERIC_ICON },
   { id: 38, name: 'Emergency Light', code: 'emergency_light', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h5" /><path d="M4 12h5" /><path d="M12 4v5" /><path d="M12 15v5" /><path d="m17 7 3-3" /><path d="m4 20 3-3" /><path d="m17 17 3 3" /><path d="m4 4 3 3" /></svg> },
-  { id: 39, name: 'Exit Sign', code: 'emergency_door', icon: CHECKLIST_GENERIC_ICON },
+  { id: 39, name: 'Emergency Exits', code: 'emergency_exit', icon: CHECKLIST_GENERIC_ICON },
   { id: 41, name: 'Fire Blanket', code: 'fire_blanket', icon: CHECKLIST_GENERIC_ICON },
   { id: 42, name: 'Suppression System', code: 'suppression_system', icon: CHECKLIST_GENERIC_ICON },
   { id: 45, name: 'First Aid Kit', code: 'first_aid_kit', icon: CHECKLIST_GENERIC_ICON },
@@ -107,9 +111,10 @@ const CHECKLIST_MODULES = [
   { id: 59, name: 'Muster Point', code: 'muster_point', icon: CHECKLIST_GENERIC_ICON },
   { id: 20, name: 'Fire Brigade', code: 'fire_brigade', icon: CHECKLIST_GENERIC_ICON },
   { id: 3, name: 'Volunteers', code: 'volunteers', icon: CHECKLIST_GENERIC_ICON },
-  { id: 22, name: 'Shift Volunteers', code: 'shift_volunteers', icon: CHECKLIST_GENERIC_ICON },
   { id: 23, name: 'Trained/Shift', code: 'trained_shift', icon: CHECKLIST_GENERIC_ICON },
   { id: 29, name: 'Fire NOC', code: 'fire_noc', icon: CHECKLIST_GENERIC_ICON },
+  { id: 40, name: 'CO Detector', code: 'co_detector', icon: CHECKLIST_GENERIC_ICON },
+  { id: 43, name: 'Fire Door', code: 'fire_door', icon: CHECKLIST_GENERIC_ICON },
 ];
 
 const MODULE_EMOJI = {
@@ -144,6 +149,10 @@ const MODULE_EMOJI = {
   safety_signage: '⚠️',
   muster_point: '📌',
   fire_noc: '📜',
+  co_detector: '🌫️',
+  fire_door: '🚪',
+  emergency_door: '🚪',
+  emergency_exit: '🚪',
 };
 
 const CHECKLIST_TYPE_LABELS = {
@@ -226,6 +235,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     () => sessionStorage.getItem('sd_checklistType') || null
   );
   const [searchFilter, setSearchFilter] = useState('All');
+  const [eqSearchQuery, setEqSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [modules, setModules] = useState(STATIC_MODULES);
@@ -314,9 +324,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const getStatus = (mod) => {
     const score = mod.health_score ?? 0;
-    if (score > 90) return 'healthy'; // green
-    if (score >= 50) return 'warning'; // amber
-    return 'critical'; // red
+    if (score < 80) return 'critical'; // red (below 80 is critical)
+    if (score >= 90) return 'healthy'; // green
+    return 'warning'; // amber (80 to 90)
   };
 
   // Sync navAccessList whenever the prop changes (e.g. after admin updates access)
@@ -380,7 +390,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       const queuedInspections = ApiService.getQueuedInspections();
       let pendingItems = [...queuedInspections];
       const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
-      
+
       if (inspectionsRes.status === 'fulfilled') {
         const raw = inspectionsRes.value;
         const iList = Array.isArray(raw) ? raw : (raw?.items || raw?.reports || raw?.inspections || raw?.data || []);
@@ -390,7 +400,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           return !(stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id));
         }).map(i => ({ ...i, _itemType: 'inspection' })));
       }
-      
+
       if (updatesRes.status === 'fulfilled') {
         const raw = updatesRes.value;
         const uList = Array.isArray(raw) ? raw : (raw?.items || raw?.updates || raw?.data || []);
@@ -519,25 +529,48 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   // Filter the grid cards by equipment-access module codes when user is restricted
   const filteredModules = useMemo(() => {
-    if (!equipmentAccessList && !navAccessList) return modules;
-
-    const allowedCodes = new Set();
-
-    if (equipmentAccessList) {
-      equipmentAccessList.forEach(m => {
-        const code = typeof m === 'string' ? m : (m.code || m.module_code);
-        if (code) allowedCodes.add(code);
-      });
+    let list = modules;
+    const isGlobalUser = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'safety_manager';
+    if (!isGlobalUser && (equipmentAccessList || navAccessList)) {
+      const allowedCodes = new Set();
+      if (equipmentAccessList) {
+        equipmentAccessList.forEach(m => {
+          const code = typeof m === 'string' ? m : (m.code || m.module_code);
+          if (code) {
+            allowedCodes.add(code);
+            if (code === 'scba_unit') allowedCodes.add('scba');
+            if (code === 'scba') allowedCodes.add('scba_unit');
+            if (code === 'exit_sign' || code === 'emergency_door') allowedCodes.add('emergency_exit');
+            if (code === 'emergency_exit') {
+              allowedCodes.add('exit_sign');
+              allowedCodes.add('emergency_door');
+            }
+          }
+        });
+      }
+      if (navAccessList) {
+        navAccessList.forEach(code => {
+          if (code) {
+            allowedCodes.add(code);
+            if (code === 'scba_unit') allowedCodes.add('scba');
+            if (code === 'scba') allowedCodes.add('scba_unit');
+            if (code === 'exit_sign' || code === 'emergency_door') allowedCodes.add('emergency_exit');
+            if (code === 'emergency_exit') {
+              allowedCodes.add('exit_sign');
+              allowedCodes.add('emergency_door');
+            }
+          }
+        });
+      }
+      list = modules.filter(m => allowedCodes.has(m.code));
     }
 
-    if (navAccessList) {
-      navAccessList.forEach(code => {
-        if (code) allowedCodes.add(code);
-      });
+    if (eqSearchQuery.trim()) {
+      const q = eqSearchQuery.toLowerCase();
+      list = list.filter(m => (m.name || '').toLowerCase().includes(q) || (m.code || '').toLowerCase().includes(q));
     }
-
-    return modules.filter(m => allowedCodes.has(m.code));
-  }, [modules, equipmentAccessList, navAccessList]);
+    return list;
+  }, [modules, equipmentAccessList, navAccessList, eqSearchQuery, user]);
 
   const pendingApprovalsCount = useMemo(() => {
     if (user?.role === 'supervisor' && supervisorStats !== null && supervisorStats.pending_approvals > 0) {
@@ -603,7 +636,10 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     else if (mod.code === 'fpca') setActivePage('fire-alarm-panel-stats');
     else if (mod.code === 'smoke_detector') setActivePage('smoke-detector-stats');
     else if (mod.code === 'heat_detector') setActivePage('heat-detector-stats');
-    else if (mod.code === 'emergency_door') setActivePage('emergency-exit-stats');
+    else if (mod.code === 'emergency_exit') setActivePage('emergency-exit-stats');
+    else if (mod.code === 'emergency_door') setActivePage('emergency-door-stats');
+    else if (mod.code === 'co_detector') setActivePage('co-detector-stats');
+    else if (mod.code === 'fire_door') setActivePage('fire-door-stats');
     else if (mod.code === 'emergency_light') setActivePage('emergency-lighting-stats');
     else if (mod.code === 'pa_system') setActivePage('pa-siren-stats');
     else if (mod.code === 'wind_sock') setActivePage('wind-sock-stats');
@@ -655,11 +691,21 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   // navAccess: null = unrestricted (admin/superadmin), array = allowed module codes
   const isNavAllowed = (code) => {
     if (code === 'pending_updates') return true; // ALWAYS allowed for every role globally
+    const isGlobalUser = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'safety_manager';
+    if (isGlobalUser) return true; // global roles see everything
     if (!navAccessList) return true; // admins see everything
     if (navAccessList.includes(code)) return true;
+    if (code === 'scba' && navAccessList.includes('scba_unit')) return true;
+    if (code === 'scba_unit' && navAccessList.includes('scba')) return true;
+    if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
+        (navAccessList.includes('emergency_exit') || navAccessList.includes('exit_sign') || navAccessList.includes('emergency_door'))) return true;
     if (equipmentAccessList) {
       const allowedCodes = equipmentAccessList.map(m => typeof m === 'string' ? m : (m.code || m.module_code));
       if (allowedCodes.includes(code)) return true;
+      if (code === 'scba' && allowedCodes.includes('scba_unit')) return true;
+      if (code === 'scba_unit' && allowedCodes.includes('scba')) return true;
+      if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
+          (allowedCodes.includes('emergency_exit') || allowedCodes.includes('exit_sign') || allowedCodes.includes('emergency_door'))) return true;
     }
     return false;
   };
@@ -731,39 +777,19 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
 
         <div className="tb-actions">
-          {activePage === 'grid' && filteredModules.length > 10 && (
+          {activePage === 'grid' && modules.length > 10 && (
             <div className="topbar-search">
               <div className="search-group">
-                <div className="custom-select-wrap">
-                  <div className="custom-select-trigger" onClick={() => setFilterOpen(!filterOpen)}>
-                    <span className="select-label">{searchFilter}</span>
-                    <svg className={`select-chevron ${filterOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                  {filterOpen && (
-                    <>
-                      <div className="dropdown-overlay" onClick={() => setFilterOpen(false)} />
-                      <div className="custom-select-options">
-                        {filterOptions.map((opt) => (
-                          <div
-                            key={opt.label}
-                            className={`custom-option ${searchFilter === opt.label ? 'selected' : ''}`}
-                            onClick={() => { setSearchFilter(opt.label); setFilterOpen(false); }}
-                          >
-                            <span className="opt-icon">{opt.icon}</span>
-                            {opt.label}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
                 <div className="search-box">
                   <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round">
                     <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                   </svg>
-                  <input className="search-input" placeholder="Search equipment..." />
+                  <input
+                    className="search-input"
+                    placeholder="Search equipment..."
+                    value={eqSearchQuery}
+                    onChange={(e) => setEqSearchQuery(e.target.value)}
+                  />
                 </div>
               </div>
             </div>
@@ -802,9 +828,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       <div key={n.id} className={`notif-item ${isRead ? 'read' : 'unread'}`} onClick={() => !isRead && handleMarkRead(n.id)}>
                         <div className="notif-item-dot" />
                         <div className="notif-item-content">
-                           <div className="notif-item-title" style={{ fontWeight: '700', fontSize: '12.5px', color: '#fff', marginBottom: '3px' }}>{n.title || 'Notification'}</div>
-                           <div className="notif-item-msg" style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>{n.body || n.message || ''}</div>
-                           {n.created_at && <div className="notif-item-time" style={{ marginTop: '4px' }}>{new Date(n.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+                          <div className="notif-item-title" style={{ fontWeight: '700', fontSize: '12.5px', color: '#fff', marginBottom: '3px' }}>{n.title || 'Notification'}</div>
+                          <div className="notif-item-msg" style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>{n.body || n.message || ''}</div>
+                          {n.created_at && <div className="notif-item-time" style={{ marginTop: '4px' }}>{new Date(n.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
                         </div>
                       </div>
                     );
@@ -841,16 +867,16 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         <span className="nav-label" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                           {item.label}
                           {item.badge ? (
-                            <span style={{ 
+                            <span style={{
                               position: 'absolute',
                               top: '-8px',
                               right: '-18px',
-                              background: '#dc2626', 
-                              color: 'white', 
-                              fontSize: '9px', 
-                              fontWeight: 'bold', 
-                              padding: '2px 5px', 
-                              borderRadius: '10px', 
+                              background: '#dc2626',
+                              color: 'white',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              padding: '2px 5px',
+                              borderRadius: '10px',
                               lineHeight: 1
                             }}>
                               {item.badge}
@@ -1004,7 +1030,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       <svg width="190" height="110" viewBox="0 0 112 64" fill="none" role="img">
                         <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
                         <path d="M10 58 A46 46 0 0 1 102 58"
-                          stroke={preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'}
+                          stroke={preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'}
                           strokeWidth="10" strokeLinecap="round" fill="none"
                           strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
                         <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '26px' }}>{preparednessScore}%</text>
@@ -1013,9 +1039,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         fontSize: '15px',
                         fontWeight: '800',
                         marginTop: '2px',
-                        color: preparednessScore >= 80 ? '#2ecc71' : preparednessScore >= 50 ? '#f39c12' : '#e74c3c'
+                        color: preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'
                       }}>
-                        {preparednessScore >= 80 ? 'System Healthy' : preparednessScore >= 50 ? 'System Warning' : 'System Critical'}
+                        {preparednessScore >= 90 ? 'System Healthy' : preparednessScore >= 80 ? 'System Warning' : 'System Critical'}
                       </div>
                     </div>
                   </div>
@@ -1030,13 +1056,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
                         <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
                       </div>
-                      <svg 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2.5" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                         style={{ width: '18px', height: '18px', color: '#adb5bd', marginLeft: '4px', cursor: 'pointer', transition: 'color 0.2s' }}
                         onClick={() => setActivePage('pending-updates')}
                         onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
@@ -1160,6 +1186,12 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             </section>
             <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
               {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+            </section>
+            <section className={`page ${activePage === 'co-detector-stats' ? 'active' : ''}`}>
+              {activePage === 'co-detector-stats' && <CODetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+            </section>
+            <section className={`page ${activePage === 'fire-door-stats' ? 'active' : ''}`}>
+              {activePage === 'fire-door-stats' && <FireDoorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
             </section>
             <section className={`page ${activePage === 'emergency-lighting-stats' ? 'active' : ''}`}>
               {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
