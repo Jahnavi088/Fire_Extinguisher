@@ -81,6 +81,8 @@ const Login = ({ onLogin }) => {
       alert("Please enter a valid email address.");
       return;
     }
+    const enteredDomain = email.split('@')[1]?.toLowerCase();
+
     if (!mobile || mobile.length < 10) {
       alert("Please enter a valid 10-digit mobile number.");
       return;
@@ -88,6 +90,28 @@ const Login = ({ onLogin }) => {
     setIsLoading(true);
     setOtpError('');
     setOtpSentNotice('');
+
+    try {
+      const domainsRaw = await ApiService.getAdminEmailDomains().catch(() => []);
+      const allowedDomains = Array.isArray(domainsRaw) 
+        ? domainsRaw.map(d => (d.domain || d.name || d || '').toLowerCase().replace('@', '')) 
+        : [];
+      if (allowedDomains.length > 0 && !allowedDomains.includes(enteredDomain)) {
+        setIsLoading(false);
+        setOtpError(`❌ Error: Email domain @${enteredDomain} is not authorized for registration on this platform.`);
+        return;
+      }
+      
+      // Auto-assign Company from the matched domain link
+      const matchedDomain = Array.isArray(domainsRaw)
+        ? domainsRaw.find(d => (d.domain || d.name || d || '').toLowerCase().replace('@', '') === enteredDomain)
+        : null;
+      if (matchedDomain && (matchedDomain.company_id || matchedDomain.companyId)) {
+        setCompanyId(matchedDomain.company_id || matchedDomain.companyId);
+      }
+    } catch (e) {
+      console.warn("Domain check bypassed:", e);
+    }
 
     try {
       const res = await ApiService.register(firstName, secondName, email, mobile, companyId);
@@ -347,6 +371,9 @@ const Login = ({ onLogin }) => {
                     </div>
                   </div>
 
+                  {otpSentNotice && !isOtpSent && <div className="otp-success-banner" style={{ marginTop: '12px' }}>{otpSentNotice}</div>}
+                  {otpError && !isOtpSent && <div className="otp-error-banner" style={{ marginTop: '12px' }}>{otpError}</div>}
+
                   {firstName && secondName && isOtpSent && !isOtpVerified && (
                     <div className="input-group wizard-otp-group inline-otp-box">
                       <label className="wizard-field-label">Verification OTP Code <span className="req">*</span></label>
@@ -466,7 +493,7 @@ const Login = ({ onLogin }) => {
                   </span>
                 </>
               )}
-              <span className="auth-copyright">SafeHydra © 2026</span>
+
             </div>
           </div>
         )}

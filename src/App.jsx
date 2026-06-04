@@ -70,30 +70,18 @@ function App() {
           const userData = await ApiService.getMe();
           const u = userData.user || userData;
           setUser(u);
+          localStorage.setItem('auth_user', JSON.stringify(u));
           const userId = u?.id || u?.user_id;
           const role = (u?.role || '').toLowerCase();
           const isAdmin = role === 'admin' || role === 'superadmin';
-          
-          let eqAccess = u?.modules || null;
-          
-          if (userId && isAdmin) {
-            setNavAccess(await loadNavAccess(userId));
-            if (!eqAccess) {
-              setEquipmentAccess(await loadEquipmentAccess(userId));
+
+          if (userId) {
+            if (isAdmin) {
+              setNavAccess(await loadNavAccess(userId));
             } else {
-              setEquipmentAccess(eqAccess);
-              localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+              setNavAccess(null);
             }
-          } else {
-            setNavAccess(null);
-            if (!eqAccess && userId) {
-              // Try loading from cache
-              try {
-                const stored = localStorage.getItem(`eq_access_${userId}`);
-                eqAccess = stored ? JSON.parse(stored) : null;
-              } catch { }
-            }
-            setEquipmentAccess(eqAccess);
+            setEquipmentAccess(await loadEquipmentAccess(userId));
           }
         } catch (error) {
           console.error('Session restoration failed:', error);
@@ -107,30 +95,35 @@ function App() {
   }, []);
 
   const handleLogin = async (userData) => {
+    // Clear residual page states on login to prevent blank pages
+    sessionStorage.removeItem('sd_activePage');
+    sessionStorage.removeItem('sd_selectedEq');
+    sessionStorage.removeItem('sd_checklistType');
+
     const u = userData?.user || userData;
     const userId = u?.id || u?.user_id;
     const role = (u?.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'superadmin';
-    
-    let eqAccess = u?.modules || null;
-    
-    if (userId && isAdmin) {
-      const access = await loadNavAccess(userId);
-      if (!eqAccess) {
-        eqAccess = await loadEquipmentAccess(userId);
-      } else {
-        localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+
+    if (userId) {
+      try {
+        if (isAdmin) {
+          setNavAccess(await loadNavAccess(userId));
+        } else {
+          setNavAccess(null);
+        }
+      } catch (err) {
+        console.error("Failed to load nav access on login:", err);
       }
-      setNavAccess(access);
-      setEquipmentAccess(eqAccess);
-    } else {
-      setNavAccess(null);
-      setEquipmentAccess(eqAccess);
-      if (eqAccess && userId) {
-        localStorage.setItem(`eq_access_${userId}`, JSON.stringify(eqAccess));
+
+      try {
+        setEquipmentAccess(await loadEquipmentAccess(userId));
+      } catch (err) {
+        console.error("Failed to load equipment access on login:", err);
       }
     }
     setUser(u);
+    localStorage.setItem('auth_user', JSON.stringify(u));
   };
 
   const handleLogout = () => {

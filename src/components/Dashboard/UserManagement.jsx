@@ -57,10 +57,13 @@ const ROLE_CONFIG = {
   admin: { label: 'Admin', color: '#FFD700', bg: 'rgba(255,215,0,0.18)' },
   agm: { label: 'Asst. General Manager', color: '#c084fc', bg: 'rgba(192,132,252,0.18)' },
   supervisor: { label: 'Supervisor', color: '#34d399', bg: 'rgba(52,211,153,0.18)' },
-  user: { label: 'User', color: '#a0cfe8', bg: 'rgba(160,207,232,0.14)' },
+  inspector: { label: 'Inspector', color: '#a0cfe8', bg: 'rgba(160,207,232,0.14)' },
 };
 
-const getRoleConf = (role) => ROLE_CONFIG[(role || '').toLowerCase()] || ROLE_CONFIG.user;
+const getRoleConf = (role) => {
+  const r = (role || '').toLowerCase();
+  return ROLE_CONFIG[r === 'user' ? 'inspector' : r] || ROLE_CONFIG.inspector;
+};
 
 const CODE_TO_ID = {
   fire_extinguisher: 30,
@@ -89,9 +92,55 @@ const CODE_TO_ID = {
   muster_point: 59
 };
 
-const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'user', status: 'active', company_id: '', supervisor_id: '', agm_id: '' };
-const ROLE_ORDER = ['superadmin', 'admin', 'agm', 'supervisor', 'user'];
+const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'inspector', status: 'active', company_id: '', supervisor_id: '', agm_id: '', availability_status: 'active', leave_start_at: '', leave_end_at: '', leave_reason: '' };
+const ROLE_ORDER = ['superadmin', 'admin', 'agm', 'supervisor', 'inspector'];
 const PAGE_SIZE = 10;
+
+const calculateSimilarity = (companyName, emailDomain) => {
+  if (!companyName || !emailDomain) return 0;
+  
+  // Extract main domain part (before first dot)
+  const mainDomain = emailDomain.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanCompany = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  if (!mainDomain || !cleanCompany) return 0;
+  
+  // Find Longest Common Subsequence (LCS) length
+  const m = mainDomain.length;
+  const n = cleanCompany.length;
+  const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (mainDomain[i - 1] === cleanCompany[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  
+  const lcsLength = dp[m][n];
+  const maxLen = Math.max(mainDomain.length, cleanCompany.length);
+  const similarity = Math.round((lcsLength / maxLen) * 100);
+  return similarity;
+};
+
+const getDomainFromEmail = (email) => {
+  if (!email || !email.includes('@')) return '';
+  const parts = email.split('@');
+  return parts[parts.length - 1] || '';
+};
+
+const ensureArray = (val) => {
+  if (Array.isArray(val)) return val;
+  if (val && Array.isArray(val.users)) return val.users;
+  if (val && Array.isArray(val.companies)) return val.companies;
+  if (val && Array.isArray(val.data)) return val.data;
+  if (val && val.data && Array.isArray(val.data.users)) return val.data.users;
+  if (val && val.data && Array.isArray(val.data.companies)) return val.data.companies;
+  return [];
+};
 
 function fetchReducer(state, action) {
   switch (action.type) {
@@ -102,9 +151,32 @@ function fetchReducer(state, action) {
   }
 }
 
-const UserManagement = ({ onBack }) => {
+const UserManagement = ({ onBack, allowedModules, navAccess }) => {
   const [fetchState, dispatch] = useReducer(fetchReducer, { loading: true, error: null, users: [] });
   const { loading, error, users } = fetchState;
+
+  const displayModules = useMemo(() => {
+    let list = NAV_MODULES;
+
+    if (navAccess && navAccess.length > 0) {
+      const allowedCodes = new Set(navAccess);
+      list = list.filter(m => allowedCodes.has(m.code));
+    } else if (allowedModules) {
+      const allowedCodes = new Set(allowedModules.map(m => m.code));
+      list = list.filter(m => {
+        if (m.category !== 'Modules') return true;
+        return allowedCodes.has(m.code);
+      });
+    }
+
+    return list;
+  }, [allowedModules, navAccess]);
+
+  const displayCategories = useMemo(() => {
+    return NAV_CATEGORIES.filter(cat =>
+      displayModules.some(m => m.category === cat)
+    );
+  }, [displayModules]);
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -113,15 +185,35 @@ const UserManagement = ({ onBack }) => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+
+  const [companies, setCompanies] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
+  const [agms, setAgms] = useState([]);
+
+  const similarityWarning = useMemo(() => {
+    if (!form.email || !form.email.trim() || !form.company_id) return null;
+    const company = companies.find(c => String(c.id || c.company_id) === String(form.company_id));
+    if (!company) return null;
+    
+    const companyName = company.name || company.company_name;
+    const emailDomain = getDomainFromEmail(form.email.trim());
+    if (!emailDomain) return null;
+
+    const similarity = calculateSimilarity(companyName, emailDomain);
+    if (similarity < 50) {
+      return `Company name and email domain must match at least 50%. Company name: '${companyName}', Email Domain: '${emailDomain}' (Similarity: ${similarity}%)`;
+    }
+    return null;
+  }, [form.email, form.company_id, companies]);
+
   const [viewUser, setViewUser] = useState(null);
   const [modLoading, setModLoading] = useState(false);
   const [moduleChecks, setModuleChecks] = useState({});
   const [initialChecks, setInitialChecks] = useState({});
   const [modSaving, setModSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [companies, setCompanies] = useState([]);
-  const [supervisors, setSupervisors] = useState([]);
-  const [agms, setAgms] = useState([]);
+  const [showPasswordText, setShowPasswordText] = useState(false);
+
 
   useEffect(() => {
     let active = true;
@@ -129,27 +221,26 @@ const UserManagement = ({ onBack }) => {
 
     ApiService.getAdminCompanies()
       .then(data => {
-        if (active) setCompanies(Array.isArray(data) ? data : (data?.companies || data?.data || []));
+        if (active) setCompanies(ensureArray(data));
       })
       .catch(() => { if (active) setCompanies([]); });
 
     ApiService.getAdminUsers({ role: 'supervisor' })
       .then(data => {
-        if (active) setSupervisors(Array.isArray(data) ? data : (data?.users || data?.data || []));
+        if (active) setSupervisors(ensureArray(data));
       })
       .catch(() => { if (active) setSupervisors([]); });
 
     ApiService.getAdminUsers({ role: 'agm' })
       .then(data => {
-        if (active) setAgms(Array.isArray(data) ? data : (data?.users || data?.data || []));
+        if (active) setAgms(ensureArray(data));
       })
       .catch(() => { if (active) setAgms([]); });
 
     ApiService.getAdminUsers()
       .then(data => {
         if (!active) return;
-        const list = Array.isArray(data) ? data : (data?.users || data?.data || []);
-        dispatch({ type: 'success', users: list });
+        dispatch({ type: 'success', users: ensureArray(data) });
       })
       .catch(err => {
         if (!active) return;
@@ -159,9 +250,10 @@ const UserManagement = ({ onBack }) => {
   }, [refreshKey]);
 
   const filteredUsers = useMemo(() => {
+    const activeUsers = users.filter(u => u.status !== 'inactive');
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(u =>
+    if (!q) return activeUsers;
+    return activeUsers.filter(u =>
       (u.name || '').toLowerCase().includes(q) ||
       (u.username || '').toLowerCase().includes(q) ||
       (u.email || '').toLowerCase().includes(q) ||
@@ -175,7 +267,13 @@ const UserManagement = ({ onBack }) => {
   const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
 
-  const openAdd = () => { setEditUser(null); setForm(EMPTY_FORM); setFormError(''); setShowForm(true); };
+  const openAdd = () => { 
+    setShowPasswordText(false);
+    setEditUser(null); 
+    setForm(EMPTY_FORM); 
+    setFormError(''); 
+    setShowForm(true); 
+  };
 
   const handleDelete = async (u) => {
     if (!window.confirm(`Delete user "${u.name || u.username}"? This cannot be undone.`)) return;
@@ -188,6 +286,7 @@ const UserManagement = ({ onBack }) => {
   };
 
   const openEdit = async (u) => {
+    setShowPasswordText(false);
     setEditUser(u);
     setForm({
       name: u.name || '',
@@ -198,7 +297,11 @@ const UserManagement = ({ onBack }) => {
       status: u.status || 'active',
       company_id: u.company_id || '',
       supervisor_id: u.supervisor_id || '',
-      agm_id: u.agm_id || ''
+      agm_id: u.agm_id || '',
+      availability_status: u.availability_status || 'active',
+      leave_start_at: u.leave_start_at ? u.leave_start_at.split('T')[0] : '',
+      leave_end_at: u.leave_end_at ? u.leave_end_at.split('T')[0] : '',
+      leave_reason: u.leave_reason || ''
     });
     setFormError('');
     setShowForm(true);
@@ -215,7 +318,11 @@ const UserManagement = ({ onBack }) => {
         status: actualUser.status || 'active',
         company_id: actualUser.company_id || '',
         supervisor_id: actualUser.supervisor_id || '',
-        agm_id: actualUser.agm_id || ''
+        agm_id: actualUser.agm_id || '',
+        availability_status: actualUser.availability_status || 'active',
+        leave_start_at: actualUser.leave_start_at ? actualUser.leave_start_at.split('T')[0] : '',
+        leave_end_at: actualUser.leave_end_at ? actualUser.leave_end_at.split('T')[0] : '',
+        leave_reason: actualUser.leave_reason || ''
       });
     } catch (err) {
       console.error('Failed to fetch full user details:', err);
@@ -231,7 +338,7 @@ const UserManagement = ({ onBack }) => {
         const list = Array.isArray(data) ? data : (data?.modules || data?.data || []);
         const apiCodes = new Set(list.map(m => m.code || m.module_code || ''));
         const checks = {};
-        NAV_MODULES.forEach(m => {
+        displayModules.forEach(m => {
           checks[m.code] = apiCodes.has(m.code);
         });
         setModuleChecks(checks);
@@ -245,7 +352,7 @@ const UserManagement = ({ onBack }) => {
           const parsed = stored ? JSON.parse(stored) : null;
           if (Array.isArray(parsed)) {
             const checks = {};
-            NAV_MODULES.forEach(m => { checks[m.code] = parsed.includes(m.code); });
+            displayModules.forEach(m => { checks[m.code] = parsed.includes(m.code); });
             setModuleChecks(checks);
             setInitialChecks(checks);
             return;
@@ -253,7 +360,7 @@ const UserManagement = ({ onBack }) => {
         } catch { }
         // Default to all true if no config exists
         const defaults = {};
-        NAV_MODULES.forEach(m => { defaults[m.code] = true; });
+        displayModules.forEach(m => { defaults[m.code] = true; });
         setModuleChecks(defaults);
         setInitialChecks(defaults);
       })
@@ -270,33 +377,42 @@ const UserManagement = ({ onBack }) => {
     try {
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
 
-      // Identify added and removed codes
-      const promises = [];
-      for (const m of NAV_MODULES) {
-        const initiallyChecked = !!initialChecks[m.code];
-        const currentlyChecked = !!moduleChecks[m.code];
-        const moduleId = CODE_TO_ID[m.code];
-
-        if (initiallyChecked !== currentlyChecked && moduleId !== undefined) {
-          if (currentlyChecked) {
-            // Added
-            promises.push(ApiService.addAdminUserModule(userId, { module_id: moduleId, access_level: 'admin' }));
-          } else {
-            // Removed
-            promises.push(ApiService.removeAdminUserModule(userId, moduleId));
+      // Collect all checked modules for bulk update
+      const selectedModules = [];
+      displayModules.forEach(m => {
+        if (moduleChecks[m.code]) {
+          const moduleId = CODE_TO_ID[m.code];
+          if (moduleId !== undefined) {
+            selectedModules.push({
+              module_id: moduleId,
+              id: moduleId,
+              module_code: m.code,
+              code: m.code,
+              module_name: m.label,
+              name: m.label,
+              access_level: 'admin',
+              assigned_at: new Date().toISOString()
+            });
           }
         }
-      }
+      });
 
-      await Promise.all(promises);
+      const payload = {
+        user_id: Number(userId),
+        total: selectedModules.length,
+        modules: selectedModules
+      };
+
+      await ApiService.updateAdminUserModules(userId, payload);
 
       // Save list to local storage fallback
-      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
+      const enabledCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
+      localStorage.setItem(`eq_access_${userId}`, JSON.stringify(selectedModules));
     } catch (err) {
-      console.error('Failed to save module access via API, falling back to localStorage:', err);
+      console.error('Failed to save module access via API bulk update, falling back to localStorage:', err);
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
-      const enabledCodes = NAV_MODULES.filter(m => moduleChecks[m.code]).map(m => m.code);
+      const enabledCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
     } finally {
       setModSaving(false);
@@ -310,18 +426,33 @@ const UserManagement = ({ onBack }) => {
     setSaving(true); setFormError('');
     try {
       if (editUser) {
+        const selectedSupervisor = supervisors.find(s => String(s.id) === String(form.supervisor_id));
+        const supervisorAgmId = selectedSupervisor?.agm_id || selectedSupervisor?.agmId || null;
+
         const payload = {
           name: form.name,
           email: form.email,
           role: form.role,
           status: form.status,
           company_id: form.company_id,
-          supervisor_id: form.role === 'user' ? (form.supervisor_id || null) : null,
-          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : null
+          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
         };
         if (form.password.trim()) payload.password = form.password;
         await ApiService.updateAdminUser(editUser.id, payload);
+
+        if (form.role === 'supervisor') {
+          await ApiService.updateUserAvailability(editUser.id, {
+            availability_status: form.availability_status,
+            leave_start_at: form.leave_start_at || null,
+            leave_end_at: form.leave_end_at || null,
+            leave_reason: form.leave_reason || null
+          });
+        }
       } else {
+        const selectedSupervisor = supervisors.find(s => String(s.id) === String(form.supervisor_id));
+        const supervisorAgmId = selectedSupervisor?.agm_id || selectedSupervisor?.agmId || null;
+
         await ApiService.createAdminUser({
           name: form.name,
           username: form.username,
@@ -330,8 +461,8 @@ const UserManagement = ({ onBack }) => {
           role: form.role,
           status: form.status,
           company_id: form.company_id,
-          supervisor_id: form.role === 'user' ? (form.supervisor_id || null) : null,
-          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : null
+          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
         });
       }
       setShowForm(false);
@@ -432,7 +563,7 @@ const UserManagement = ({ onBack }) => {
                         </span>
                       </td>
                       <td>
-                        {u.role === 'user' ? (
+                        {(u.role === 'inspector' || u.role === 'user') ? (
                           u.supervisor_name ? (
                             <span style={{ fontSize: '12.5px', color: '#16a34a', fontWeight: '600' }}>
                               Supervisor: {u.supervisor_name}
@@ -457,10 +588,17 @@ const UserManagement = ({ onBack }) => {
                         )}
                       </td>
                       <td>
-                        <span className={`um-status ${u.status === 'inactive' ? 'inactive' : 'active'}`}>
-                          <span className="um-status-dot" />
-                          {u.status === 'inactive' ? 'Inactive' : 'Active'}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span className={`um-status ${u.status === 'inactive' ? 'inactive' : 'active'}`}>
+                            <span className="um-status-dot" />
+                            {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                          </span>
+                          {u.role === 'supervisor' && u.availability_status && u.availability_status !== 'active' && (
+                            <span className="um-avail-status" style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 'bold' }}>
+                              🗓️ {u.availability_status === 'on_leave' ? 'On Leave' : 'Unavailable'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div className="um-actions">
@@ -537,7 +675,44 @@ const UserManagement = ({ onBack }) => {
                 </div>
                 <div className="um-form-field">
                   <label>{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
-                  <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder={editUser ? '••••••••' : 'Enter password'} />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input 
+                      type={showPasswordText ? 'text' : 'password'} 
+                      value={form.password} 
+                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))} 
+                      placeholder={editUser ? '••••••••' : 'Enter password'} 
+                      style={{ paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordText(!showPasswordText)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'rgba(255,255,255,0.6)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        outline: 'none'
+                      }}
+                    >
+                      {showPasswordText ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <div className="um-form-field">
                   <label>Role</label>
@@ -556,7 +731,27 @@ const UserManagement = ({ onBack }) => {
                     ))}
                   </select>
                 </div>
-                {form.role === 'user' && (
+                {similarityWarning && (
+                  <div style={{
+                    gridColumn: 'span 2',
+                    marginTop: '4px',
+                    padding: '10px 12px',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '6px',
+                    color: '#f59e0b',
+                    fontSize: '12px',
+                    lineHeight: '1.4',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '6px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <span style={{ fontSize: '14px' }}>⚠️</span>
+                    <span>{similarityWarning}</span>
+                  </div>
+                )}
+                {(form.role === 'inspector' || form.role === 'user') && (
                   <div className="um-form-field">
                     <label>Assign Supervisor</label>
                     <select value={form.supervisor_id || ''} onChange={e => setForm(f => ({ ...f, supervisor_id: e.target.value }))}>
@@ -568,15 +763,45 @@ const UserManagement = ({ onBack }) => {
                   </div>
                 )}
                 {form.role === 'supervisor' && (
-                  <div className="um-form-field">
-                    <label>Assign AGM</label>
-                    <select value={form.agm_id || ''} onChange={e => setForm(f => ({ ...f, agm_id: e.target.value }))}>
-                      <option value="">No AGM</option>
-                      {agms.map(a => (
-                        <option key={a.id} value={a.id}>{a.name || a.username}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <>
+                    <div className="um-form-field">
+                      <label>Assign AGM</label>
+                      <select value={form.agm_id || ''} onChange={e => setForm(f => ({ ...f, agm_id: e.target.value }))}>
+                        <option value="">No AGM</option>
+                        {agms.map(a => (
+                          <option key={a.id} value={a.id}>{a.name || a.username}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {editUser && (
+                      <>
+                        <div className="um-form-field">
+                          <label>Availability Status</label>
+                          <select value={form.availability_status} onChange={e => setForm(f => ({ ...f, availability_status: e.target.value }))}>
+                            <option value="active">Active / On Duty</option>
+                            <option value="on_leave">On Leave</option>
+                            <option value="temporarily_unavailable">Temporarily Unavailable</option>
+                          </select>
+                        </div>
+                        {form.availability_status !== 'active' && (
+                          <>
+                            <div className="um-form-field">
+                              <label>Leave Start Date</label>
+                              <input type="date" value={form.leave_start_at} onChange={e => setForm(f => ({ ...f, leave_start_at: e.target.value }))} />
+                            </div>
+                            <div className="um-form-field">
+                              <label>Leave End Date</label>
+                              <input type="date" value={form.leave_end_at} onChange={e => setForm(f => ({ ...f, leave_end_at: e.target.value }))} />
+                            </div>
+                            <div className="um-form-field um-full-width" style={{ gridColumn: 'span 2' }}>
+                              <label>Leave/Unavailable Reason</label>
+                              <textarea value={form.leave_reason} onChange={e => setForm(f => ({ ...f, leave_reason: e.target.value }))} placeholder="Explain reason (e.g. sick leave, training...)" rows={2} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30,41,59,0.5)', color: '#fff', outline: 'none' }} />
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
                 <div className="um-form-field">
                   <label>Status</label>
@@ -615,11 +840,11 @@ const UserManagement = ({ onBack }) => {
                 <div className="um-state-block"><div className="um-spinner" /><span>Loading modules...</span></div>
               ) : (
                 <div className="um-modules-list">
-                  {NAV_CATEGORIES.map(cat => (
+                  {displayCategories.map(cat => (
                     <div key={cat} className="um-module-category">
                       <div className="um-module-cat-label">{cat}</div>
                       <div className={`um-module-items-wrapper ${cat === 'Modules' ? 'multi-col-grid' : 'single-col-list'}`}>
-                        {NAV_MODULES.filter(m => m.category === cat).map(m => (
+                        {displayModules.filter(m => m.category === cat).map(m => (
                           <label
                             key={m.code}
                             className={`um-module-item${moduleChecks[m.code] ? ' assigned' : ''}`}

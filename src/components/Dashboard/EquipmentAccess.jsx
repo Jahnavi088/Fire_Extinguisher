@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer } from 'react';
+import { useState, useEffect, useReducer, useMemo } from 'react';
 import { ApiService } from '../../services/apiService';
 import './EquipmentAccess.css';
 
@@ -31,6 +31,8 @@ function dataReducer(state, action) {
       return { loading: false, error: action.error, users: [], assignments: [] };
     case 'add':
       return { ...state, assignments: [action.assignment, ...state.assignments.filter(a => a.id !== action.assignment.id)] };
+    case 'add_batch':
+      return { ...state, assignments: [...action.assignments, ...state.assignments.filter(a => !action.assignments.some(na => na.id === a.id))] };
     case 'remove':
       return { ...state, assignments: state.assignments.filter(a => a.id !== action.id) };
     default:
@@ -49,8 +51,9 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const itemsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedModule, setSelectedModule] = useState(null);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedModules, setSelectedModules] = useState([]);
+  const [accessLevels, setAccessLevels] = useState(ACCESS_LEVELS);
   const [accessLevel, setAccessLevel] = useState('user');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false);
@@ -59,11 +62,85 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [removing, setRemoving] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const getAccessLevelOptionLabel = (val) =>
+    accessLevels.find(l => l.value === val)?.label || val || 'User';
+
+  useEffect(() => {
+    ApiService.getAccessLevels()
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.access_levels || res?.levels || res?.data || []);
+        if (list.length > 0) {
+          const mapped = list.map(item => {
+            if (typeof item === 'string') {
+              return { value: item, label: item.charAt(0).toUpperCase() + item.slice(1) };
+            }
+            return {
+              value: item.value || item.code || item.id || item,
+              label: item.label || item.name || item.value || item.code || item
+            };
+          });
+          setAccessLevels(mapped);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load access levels:", err);
+      });
+  }, []);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
   const modules = availableModules.length > 0 ? availableModules : [];
+
+  const currentUser = ApiService.getUser();
+
+  // Bulletproof fallback to find current admin's company_id from user list if not cached in local storage
+  let adminCompanyId = currentUser?.company_id;
+  if (!adminCompanyId && currentUser && users.length > 0) {
+    const self = users.find(u => String(u.id) === String(currentUser.id) || u.username === currentUser.username);
+    if (self) {
+      adminCompanyId = self.company_id;
+    }
+  }
+
+  // Filter dropdown users: only show users assigned to the current Admin's company
+  const filteredUsersForDropdown = users.filter(u => {
+    if (!currentUser) return true;
+    if (currentUser.role === 'superadmin') return true;
+    if (!adminCompanyId) return true; // Fallback to showing all if we can't find the company ID yet
+    return String(u.company_id) === String(adminCompanyId);
+  });
+
+  const [adminModules, setAdminModules] = useState([]);
+  const [adminModulesLoading, setAdminModulesLoading] = useState(false);
+
+  useEffect(() => {
+    const adminId = currentUser?.id || currentUser?.user_id;
+    if (!adminId || currentUser?.role === 'superadmin') return;
+    setAdminModulesLoading(true);
+    ApiService.getAdminUserModules(adminId)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.modules || res?.data || []);
+        setAdminModules(list);
+      })
+      .catch(err => {
+        console.error("Failed to load admin's modules:", err);
+      })
+      .finally(() => setAdminModulesLoading(false));
+  }, [currentUser]);
+
+  // Filter dropdown modules: only show modules assigned to the current Admin
+  const displayModules = useMemo(() => {
+    if (!currentUser) return modules;
+    if (currentUser.role === 'superadmin') return modules;
+    
+    const allowedIds = new Set(adminModules.map(m => String(m.module_id || m.id)));
+    return modules.filter(m => {
+      const mId = m.module_id || m.id;
+      return allowedIds.has(String(mId));
+    });
+  }, [modules, currentUser, adminModules]);
 
   /* ── Load users + their module assignments ─────────────────────── */
   useEffect(() => {
@@ -108,40 +185,48 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   }, [refreshKey]);
 
   /* ── Add assignment ───────────────────────────────────────────────── */
+  /* ── Add assignment ───────────────────────────────────────────────── */
   const handleAddAssignment = async () => {
-    if (!selectedUser || !selectedModule) {
-      alert('Please select both a user and an equipment module.');
-      return;
-    }
-    const moduleId = selectedModule.module_id || selectedModule.id;
-    const alreadyAssigned = assignments.some(
-      a => a.userId === selectedUser.id && String(a.moduleId) === String(moduleId)
-    );
-    if (alreadyAssigned) {
-      alert(`${selectedUser.name || selectedUser.username} already has access to ${selectedModule.name}.`);
+    if (selectedUsers.length === 0 || selectedModules.length === 0) {
+      alert('Please select at least one user and at least one equipment module.');
       return;
     }
     setSaving(true);
     try {
-      await ApiService.addAdminUserModule(selectedUser.id, {
-        module_id: moduleId,
-        access_level: accessLevel,
+      const newAssignments = [];
+      const promises = [];
+      
+      selectedUsers.forEach(user => {
+        selectedModules.forEach(m => {
+          const moduleId = m.module_id || m.id;
+          promises.push(
+            ApiService.addAdminUserModule(user.id, {
+              module_id: moduleId,
+              access_level: accessLevel,
+            }).then(() => {
+              newAssignments.push({
+                id: `${user.id}_${moduleId}`,
+                userId: user.id,
+                userName: user.name || user.username || 'Unknown',
+                moduleId,
+                moduleName: m.name,
+                moduleCode: m.code || '',
+                level: accessLevel,
+                date: new Date().toISOString().split('T')[0],
+              });
+            })
+          );
+        });
       });
+
+      await Promise.all(promises);
+
       dispatch({
-        type: 'add',
-        assignment: {
-          id: `${selectedUser.id}_${moduleId}`,
-          userId: selectedUser.id,
-          userName: selectedUser.name || selectedUser.username || 'Unknown',
-          moduleId,
-          moduleName: selectedModule.name,
-          moduleCode: selectedModule.code || '',
-          level: accessLevel,
-          date: new Date().toISOString().split('T')[0],
-        },
+        type: 'add_batch',
+        assignments: newAssignments,
       });
-      setSelectedUser(null);
-      setSelectedModule(null);
+      setSelectedUsers([]);
+      setSelectedModules([]);
       setAccessLevel('user');
       setView('list');
     } catch (err) {
@@ -369,9 +454,11 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                       <span className="ea-trigger-text">
                         {usersLoading ? (
                           <span style={{ color: 'rgba(255,255,255,0.4)' }}>Loading users...</span>
-                        ) : selectedUser ? (
-                          <><span className="ea-trigger-icon">👤</span>{selectedUser.name || selectedUser.username}</>
-                        ) : 'Choose a user...'}
+                        ) : selectedUsers.length === 1 ? (
+                          <><span className="ea-trigger-icon">👤</span>{selectedUsers[0].name || selectedUsers[0].username}</>
+                        ) : selectedUsers.length > 1 ? (
+                          `${selectedUsers.length} users selected`
+                        ) : 'Choose user(s)...'}
                       </span>
                       <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M6 9l6 6 6-6" />
@@ -379,59 +466,92 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                     </div>
                     {userDropdownOpen && !usersLoading && (
                       <div className="ea-dropdown-options">
-                        {users.length === 0 ? (
+                        {filteredUsersForDropdown.length === 0 ? (
                           <div className="ea-option-empty">No users found</div>
-                        ) : users.map(u => (
-                          <div
-                            key={u.id}
-                            className={`ea-option ${selectedUser?.id === u.id ? 'selected' : ''}`}
-                            onClick={() => { setSelectedUser(u); setUserDropdownOpen(false); }}
-                          >
-                            <div className="ea-option-main">
-                              <span className="ea-option-name">{u.name || u.username}</span>
-                              <span className="ea-option-sub">{u.role || 'User'}</span>
+                        ) : filteredUsersForDropdown.map(u => {
+                          const isSelected = selectedUsers.some(item => item.id === u.id);
+                          return (
+                            <div
+                              key={u.id}
+                              className={`ea-option ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                const exists = selectedUsers.some(item => item.id === u.id);
+                                if (exists) {
+                                  setSelectedUsers(selectedUsers.filter(item => item.id !== u.id));
+                                } else {
+                                  setSelectedUsers([...selectedUsers, u]);
+                                }
+                              }}
+                            >
+                              <div className="ea-option-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                  type="checkbox"
+                                  className="ea-module-checkbox"
+                                  checked={isSelected}
+                                  readOnly
+                                  onClick={e => e.stopPropagation()}
+                                />
+                                  <span className="ea-option-main">
+                                    <span className="ea-option-name">{u.name || u.username}</span>
+                                    <span className="ea-option-sub">
+                                      {(u.role === 'user' || u.role === 'inspector') ? 'Inspector' : (u.role || 'Inspector')}
+                                    </span>
+                                  </span>
+                              </div>
+                              {isSelected && <span className="ea-check">✓</span>}
                             </div>
-                            {selectedUser?.id === u.id && <span className="ea-check">✓</span>}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="ea-field">
-                  <label className="ea-label">Select Equipment Module</label>
+                  <label className="ea-label">Select Equipment Module(s)</label>
                   <div className="ea-dropdown-wrap">
                     <div
                       className={`ea-dropdown-trigger ${moduleDropdownOpen ? 'open' : ''}`}
                       onClick={() => { setModuleDropdownOpen(v => !v); setUserDropdownOpen(false); setLevelDropdownOpen(false); }}
                     >
                       <span className="ea-trigger-text">
-                        {selectedModule ? (
-                          <><span className="ea-trigger-icon">{MODULE_EMOJI[selectedModule.code] || '📦'}</span>{selectedModule.name}</>
-                        ) : 'Choose equipment...'}
+                        {selectedModules.length === 0 ? (
+                          'Choose equipment...'
+                        ) : selectedModules.length === 1 ? (
+                          <><span className="ea-trigger-icon">{MODULE_EMOJI[selectedModules[0].code] || '📦'}</span>{selectedModules[0].name}</>
+                        ) : (
+                          `${selectedModules.length} modules selected`
+                        )}
                       </span>
                       <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </div>
                     {moduleDropdownOpen && (() => {
-                      const assignedModuleIds = selectedUser
-                        ? assignments.filter(a => String(a.userId) === String(selectedUser.id)).map(a => String(a.moduleId))
+                      const assignedModuleIds = selectedUsers.length === 1
+                        ? assignments.filter(a => String(a.userId) === String(selectedUsers[0].id)).map(a => String(a.moduleId))
                         : [];
-                      const selId = selectedModule?.module_id || selectedModule?.id;
                       return (
                         <div className="ea-dropdown-options">
-                          {modules.map(m => {
+                          {displayModules.map(m => {
                             const mId = m.module_id || m.id;
-                            const isSelected = String(selId) === String(mId);
                             const isAssigned = assignedModuleIds.includes(String(mId));
+                            const isSelected = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
                             const isChecked = isAssigned || isSelected;
                             return (
                               <div
                                 key={mId}
                                 className={`ea-option ${isSelected ? 'selected' : ''} ${isAssigned ? 'already-assigned' : ''}`}
-                                onClick={() => { if (!isAssigned) { setSelectedModule(m); setModuleDropdownOpen(false); } }}
+                                onClick={() => {
+                                  if (!isAssigned) {
+                                    const exists = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
+                                    if (exists) {
+                                      setSelectedModules(selectedModules.filter(item => String(item.module_id || item.id) !== String(mId)));
+                                    } else {
+                                      setSelectedModules([...selectedModules, m]);
+                                    }
+                                  }
+                                }}
                               >
                                 <div className="ea-option-row">
                                   <input
@@ -463,14 +583,14 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                       className={`ea-dropdown-trigger ${levelDropdownOpen ? 'open' : ''}`}
                       onClick={() => { setLevelDropdownOpen(v => !v); setUserDropdownOpen(false); setModuleDropdownOpen(false); }}
                     >
-                      <span className="ea-trigger-text">{getLevelLabel(accessLevel)}</span>
+                      <span className="ea-trigger-text">{getAccessLevelOptionLabel(accessLevel)}</span>
                       <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </div>
                     {levelDropdownOpen && (
                       <div className="ea-dropdown-options level-dropdown">
-                        {ACCESS_LEVELS.map(level => (
+                        {accessLevels.map(level => (
                           <div
                             key={level.value}
                             className={`ea-option ${accessLevel === level.value ? 'selected' : ''}`}

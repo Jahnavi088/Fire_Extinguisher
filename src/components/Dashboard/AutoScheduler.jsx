@@ -2,15 +2,22 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './AutoScheduler.css';
 
 const INSPECTORS = [
-  { id: 'INS-01', name: 'Rahul Sharma', role: 'Safety Lead', shift: 'G', primaryBuilding: 'Block A' },
-  { id: 'INS-02', name: 'Anjali Desai', role: 'Fire Marshal', shift: 'A', primaryBuilding: 'Block B' },
-  { id: 'INS-03', name: 'Vikram Singh', role: 'Compliance Inspector', shift: 'B', primaryBuilding: 'Utility' },
-  { id: 'INS-04', name: 'Priya Patel', role: 'Safety Volunteer', shift: 'C', primaryBuilding: 'Block C' }
+  { id: 'INS-01', name: 'Rahul Sharma',  role: 'Safety Lead',          shift: 'G', primaryBuilding: 'Block A' },
+  { id: 'INS-02', name: 'Anjali Desai',  role: 'Fire Marshal',         shift: 'A', primaryBuilding: 'Block B' },
+  { id: 'INS-03', name: 'Vikram Singh',  role: 'Compliance Inspector',  shift: 'B', primaryBuilding: 'Utility' },
+  { id: 'INS-04', name: 'Priya Patel',   role: 'Safety Volunteer',     shift: 'C', primaryBuilding: 'Block C' }
 ];
 
 const BUILDINGS = ['Block A', 'Block B', 'Block C', 'Utility', 'Lab Wing'];
-const ZONES = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
-const SHIFTS = ['G', 'A', 'B', 'C'];
+const ZONES     = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
+const SHIFTS    = ['G', 'A', 'B', 'C'];
+
+const INSPECTOR_COLORS = {
+  'INS-01': 'linear-gradient(135deg, #2563eb, #7c3aed)',
+  'INS-02': 'linear-gradient(135deg, #dc2626, #ea580c)',
+  'INS-03': 'linear-gradient(135deg, #059669, #0d9488)',
+  'INS-04': 'linear-gradient(135deg, #d97706, #b45309)',
+};
 
 const MODULE_EMOJIS = {
   fire_extinguisher: '🧯', sprinkler: '🚿', hose_reel: '🧵',
@@ -41,21 +48,21 @@ const FAILURE_REASONS = {
 };
 
 const STATIC_COMPLIANCE_RULES = [
-  { moduleCode: 'smoke_detector', frequency: 'Weekly', priority: 'Medium', inspectorIdx: 3 },
-  { moduleCode: 'fire_extinguisher', frequency: 'Monthly', priority: 'High', inspectorIdx: 0 },
-  { moduleCode: 'hose_reel', frequency: 'Monthly', priority: 'High', inspectorIdx: 0 },
-  { moduleCode: 'first_aid_kit', frequency: 'Monthly', priority: 'Medium', inspectorIdx: 3 },
-  { moduleCode: 'safety_shower', frequency: 'Monthly', priority: 'Medium', inspectorIdx: 2 },
-  { moduleCode: 'eyewash_station', frequency: 'Monthly', priority: 'Medium', inspectorIdx: 2 },
-  { moduleCode: 'fire_trolley', frequency: 'Monthly', priority: 'High', inspectorIdx: 0 },
-  { moduleCode: 'ppe_station', frequency: 'Monthly', priority: 'Medium', inspectorIdx: 3 },
-  { moduleCode: 'sprinkler', frequency: 'Quarterly', priority: 'Critical', inspectorIdx: 1 },
-  { moduleCode: 'hydrant', frequency: 'Quarterly', priority: 'High', inspectorIdx: 1 },
-  { moduleCode: 'suppression_system', frequency: 'Quarterly', priority: 'Critical', inspectorIdx: 1 },
-  { moduleCode: 'emergency_door', frequency: 'Quarterly', priority: 'High', inspectorIdx: 2 },
-  { moduleCode: 'emergency_light', frequency: 'Quarterly', priority: 'Medium', inspectorIdx: 2 },
-  { moduleCode: 'scba', frequency: 'Quarterly', priority: 'High', inspectorIdx: 0 },
-  { moduleCode: 'spill_kit', frequency: 'Quarterly', priority: 'Medium', inspectorIdx: 3 }
+  { moduleCode: 'smoke_detector',    frequency: 'Weekly',    priority: 'Medium',   inspectorIdx: 3 },
+  { moduleCode: 'fire_extinguisher', frequency: 'Monthly',   priority: 'High',     inspectorIdx: 0 },
+  { moduleCode: 'hose_reel',         frequency: 'Monthly',   priority: 'High',     inspectorIdx: 0 },
+  { moduleCode: 'first_aid_kit',     frequency: 'Monthly',   priority: 'Medium',   inspectorIdx: 3 },
+  { moduleCode: 'safety_shower',     frequency: 'Monthly',   priority: 'Medium',   inspectorIdx: 2 },
+  { moduleCode: 'eyewash_station',   frequency: 'Monthly',   priority: 'Medium',   inspectorIdx: 2 },
+  { moduleCode: 'fire_trolley',      frequency: 'Monthly',   priority: 'High',     inspectorIdx: 0 },
+  { moduleCode: 'ppe_station',       frequency: 'Monthly',   priority: 'Medium',   inspectorIdx: 3 },
+  { moduleCode: 'sprinkler',         frequency: 'Quarterly', priority: 'Critical', inspectorIdx: 1 },
+  { moduleCode: 'hydrant',           frequency: 'Quarterly', priority: 'High',     inspectorIdx: 1 },
+  { moduleCode: 'suppression_system',frequency: 'Quarterly', priority: 'Critical', inspectorIdx: 1 },
+  { moduleCode: 'emergency_door',    frequency: 'Quarterly', priority: 'High',     inspectorIdx: 2 },
+  { moduleCode: 'emergency_light',   frequency: 'Quarterly', priority: 'Medium',   inspectorIdx: 2 },
+  { moduleCode: 'scba',              frequency: 'Quarterly', priority: 'High',     inspectorIdx: 0 },
+  { moduleCode: 'spill_kit',         frequency: 'Quarterly', priority: 'Medium',   inspectorIdx: 3 }
 ];
 
 const ESSENTIAL_CODES = STATIC_COMPLIANCE_RULES.map(r => r.moduleCode);
@@ -65,21 +72,43 @@ const STATUS_PATTERNS = [
   'Pending', 'Completed', 'Pending', 'In Progress', 'Completed'
 ];
 
+const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
 function getDaysOverdue(dueDate) {
   const diff = Math.floor((new Date() - new Date(dueDate)) / 86400000);
   return diff > 0 ? diff : 0;
 }
 
+function formatDueDate(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due   = new Date(dateStr); due.setHours(0, 0, 0, 0);
+  const diff  = Math.round((due - today) / 86400000);
+  if (diff === 0)  return { label: 'Today',         cls: 'due-today' };
+  if (diff === -1) return { label: 'Yesterday',     cls: 'due-late'  };
+  if (diff < 0)    return { label: `${Math.abs(diff)}d overdue`, cls: 'due-late' };
+  if (diff === 1)  return { label: 'Tomorrow',      cls: 'due-soon'  };
+  if (diff <= 7)   return { label: `In ${diff}d`,   cls: 'due-soon'  };
+  return { label: dateStr, cls: 'due-future' };
+}
+
 const LS_KEY = 'safety_auto_schedules_v2';
 
 export default function AutoScheduler({ modules, onBack }) {
-  const [schedules, setSchedules] = useState([]);
-  const [activeTab, setActiveTab] = useState('today');
+  const [schedules,    setSchedules]    = useState([]);
+  const [activeTab,    setActiveTab]    = useState('today');
   const [selectedTask, setSelectedTask] = useState(null);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isRunning,    setIsRunning]    = useState(false);
+  const [toasts,       setToasts]       = useState([]);
+  const [sortConfig,   setSortConfig]   = useState({ key: 'dueDate', dir: 'asc' });
   const [filters, setFilters] = useState({
     shift: '', building: '', zone: '', equipmentType: '', operator: '', status: '', search: ''
   });
+
+  const showToast = (msg, type = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
 
   const essentialModules = useMemo(
     () => modules.filter(m => ESSENTIAL_CODES.includes(m.code)),
@@ -109,7 +138,7 @@ export default function AutoScheduler({ modules, onBack }) {
       const latestInspections = {};
 
       reports.forEach(r => {
-        const sos = r.sos_code || r.equipment_code;
+        const sos    = r.sos_code || r.equipment_code;
         const dateStr = r.inspected_at || r.created_at;
         if (sos && dateStr) {
           const d = new Date(dateStr);
@@ -121,7 +150,7 @@ export default function AutoScheduler({ modules, onBack }) {
       if (Object.keys(latestInspections).length === 0) {
         essentialModules.forEach(m => {
           for (let j = 1; j <= 3; j++) {
-            const prefix = m.code.split('_').map(w => w[0]).join('').toUpperCase();
+            const prefix  = m.code.split('_').map(w => w[0]).join('').toUpperCase();
             const sosCode = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
             const d = new Date();
             d.setDate(d.getDate() - (75 + Math.floor(Math.random() * 30)));
@@ -136,17 +165,16 @@ export default function AutoScheduler({ modules, onBack }) {
       Object.entries(latestInspections).forEach(([sosCode, info]) => {
         const nextDate = new Date(info.date);
         nextDate.setDate(nextDate.getDate() + 90);
-
         const visDate = new Date(nextDate);
         visDate.setDate(visDate.getDate() - 7);
 
         if (today >= visDate) {
-          const rule = STATIC_COMPLIANCE_RULES.find(r => r.moduleCode === info.moduleCode);
+          const rule      = STATIC_COMPLIANCE_RULES.find(r => r.moduleCode === info.moduleCode);
           const inspector = INSPECTORS[rule ? rule.inspectorIdx : i % INSPECTORS.length];
-          const building = BUILDINGS[i % BUILDINGS.length];
-          const zone = ZONES[i % ZONES.length];
-          const shift = SHIFTS[i % SHIFTS.length];
-          const status = STATUS_PATTERNS[i % STATUS_PATTERNS.length];
+          const building  = BUILDINGS[i % BUILDINGS.length];
+          const zone      = ZONES[i % ZONES.length];
+          const shift     = SHIFTS[i % SHIFTS.length];
+          const status    = STATUS_PATTERNS[i % STATUS_PATTERNS.length];
 
           const dueDate = status === 'Overdue'
             ? new Date(today.getTime() - (2 + (i % 5)) * 86400000).toISOString().split('T')[0]
@@ -162,20 +190,20 @@ export default function AutoScheduler({ modules, onBack }) {
             building,
             zone,
             shift,
-            assignedOperator: inspector.name,
+            assignedOperator:   inspector.name,
             assignedOperatorId: inspector.id,
-            inspectorRole: inspector.role,
+            inspectorRole:      inspector.role,
             healthScore: Math.floor(Math.random() * 40) + 60,
             dueDate,
             dueTime: `${String(8 + (i % 8)).padStart(2, '0')}:00`,
-            priority: rule ? rule.priority : 'Medium',
+            priority:  rule ? rule.priority  : 'Medium',
             frequency: rule ? rule.frequency : 'Monthly',
             status,
             failureReason: status === 'Failed' ? (FAILURE_REASONS[info.moduleCode] || 'Inspection failed') : null,
             whyAssigned: {
-              shiftMatch: inspector.shift === shift,
-              lowestWorkload: rule ? rule.inspectorIdx < 2 : i % 2 === 0,
-              nearbyLocation: inspector.primaryBuilding === building
+              shiftMatch:      inspector.shift === shift,
+              lowestWorkload:  rule ? rule.inspectorIdx < 2 : i % 2 === 0,
+              nearbyLocation:  inspector.primaryBuilding === building
             }
           });
           i++;
@@ -183,10 +211,10 @@ export default function AutoScheduler({ modules, onBack }) {
       });
 
       saveSchedules(newSchedules);
-      alert(`⚡ Schedule Generated!\n\n${newSchedules.length} inspection tasks created.`);
+      showToast(`Schedule generated — ${newSchedules.length} inspection tasks created.`, 'success');
     } catch (e) {
       console.error(e);
-      alert('Failed to run scheduler. Please try again.');
+      showToast('Failed to run scheduler. Please try again.', 'error');
     } finally {
       setIsRunning(false);
     }
@@ -205,35 +233,36 @@ export default function AutoScheduler({ modules, onBack }) {
       s.building, s.zone, s.shift, s.assignedOperator,
       s.dueDate, s.dueTime, s.priority, s.status
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${v ?? ''}"`).join(',')).join('\n');
+    const csv  = [headers, ...rows].map(r => r.map(v => `"${v ?? ''}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = `schedule_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('Schedule exported as CSV.', 'info');
   };
 
-  // ── computed ─────────────────────────────────────────────────────────────
+  // ── computed ──────────────────────────────────────────────────────────────
 
   const summary = useMemo(() => ({
-    total: schedules.length,
-    pending: schedules.filter(s => s.status === 'Pending').length,
+    total:      schedules.length,
+    pending:    schedules.filter(s => s.status === 'Pending').length,
     inProgress: schedules.filter(s => s.status === 'In Progress').length,
-    completed: schedules.filter(s => s.status === 'Completed').length,
-    overdue: schedules.filter(s => s.status === 'Overdue').length,
-    failed: schedules.filter(s => s.status === 'Failed').length,
+    completed:  schedules.filter(s => s.status === 'Completed').length,
+    overdue:    schedules.filter(s => s.status === 'Overdue').length,
+    failed:     schedules.filter(s => s.status === 'Failed').length,
   }), [schedules]);
 
   const filteredSchedules = useMemo(() => {
     let r = schedules;
-    if (filters.shift) r = r.filter(s => s.shift === filters.shift);
-    if (filters.building) r = r.filter(s => s.building === filters.building);
-    if (filters.zone) r = r.filter(s => s.zone === filters.zone);
+    if (filters.shift)         r = r.filter(s => s.shift === filters.shift);
+    if (filters.building)      r = r.filter(s => s.building === filters.building);
+    if (filters.zone)          r = r.filter(s => s.zone === filters.zone);
     if (filters.equipmentType) r = r.filter(s => s.equipmentType === filters.equipmentType);
-    if (filters.operator) r = r.filter(s => s.assignedOperator === filters.operator);
-    if (filters.status) r = r.filter(s => s.status === filters.status);
+    if (filters.operator)      r = r.filter(s => s.assignedOperator === filters.operator);
+    if (filters.status)        r = r.filter(s => s.status === filters.status);
     if (filters.search) {
       const q = filters.search.toLowerCase();
       r = r.filter(s =>
@@ -250,17 +279,35 @@ export default function AutoScheduler({ modules, onBack }) {
 
   const tabSchedules = useMemo(() => {
     switch (activeTab) {
-      case 'overdue': return filteredSchedules.filter(s => s.status === 'Overdue');
+      case 'overdue':   return filteredSchedules.filter(s => s.status === 'Overdue');
       case 'completed': return filteredSchedules.filter(s => s.status === 'Completed');
-      case 'failed': return filteredSchedules.filter(s => s.status === 'Failed');
-      case 'upcoming': return filteredSchedules.filter(s => s.dueDate > todayStr && s.status === 'Pending');
-      default: return filteredSchedules;
+      case 'failed':    return filteredSchedules.filter(s => s.status === 'Failed');
+      case 'upcoming':  return filteredSchedules.filter(s => s.dueDate > todayStr && s.status === 'Pending');
+      default:          return filteredSchedules;
     }
   }, [filteredSchedules, activeTab, todayStr]);
 
+  const sortedDisplaySchedules = useMemo(() => {
+    const arr = [...tabSchedules];
+    arr.sort((a, b) => {
+      let av = sortConfig.key === 'priority'
+        ? (PRIORITY_ORDER[a.priority] ?? 99)
+        : (a[sortConfig.key] ?? '');
+      let bv = sortConfig.key === 'priority'
+        ? (PRIORITY_ORDER[b.priority] ?? 99)
+        : (b[sortConfig.key] ?? '');
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return sortConfig.dir === 'asc'
+        ? (av < bv ? -1 : av > bv ? 1 : 0)
+        : (av > bv ? -1 : av < bv ? 1 : 0);
+    });
+    return arr;
+  }, [tabSchedules, sortConfig]);
+
   const workload = useMemo(() =>
     INSPECTORS.map(ins => {
-      const tasks = schedules.filter(s => s.assignedOperator === ins.name);
+      const tasks     = schedules.filter(s => s.assignedOperator === ins.name);
       const completed = tasks.filter(s => s.status === 'Completed').length;
       return { ...ins, total: tasks.length, completed, pct: tasks.length ? Math.round((completed / tasks.length) * 100) : 0 };
     }).filter(w => w.total > 0),
@@ -274,29 +321,46 @@ export default function AutoScheduler({ modules, onBack }) {
   }, [schedules]);
 
   const overdueItems = useMemo(() => schedules.filter(s => s.status === 'Overdue').slice(0, 6), [schedules]);
-  const failedItems = useMemo(() => schedules.filter(s => s.status === 'Failed').slice(0, 6), [schedules]);
-  const uniqueTypes = useMemo(() => [...new Set(schedules.map(s => s.equipmentType).filter(Boolean))], [schedules]);
+  const failedItems  = useMemo(() => schedules.filter(s => s.status === 'Failed').slice(0, 6),  [schedules]);
+  const uniqueTypes  = useMemo(() => [...new Set(schedules.map(s => s.equipmentType).filter(Boolean))], [schedules]);
+
+  const complianceRate = useMemo(() =>
+    tabSchedules.length ? Math.round((tabSchedules.filter(s => s.status === 'Completed').length / tabSchedules.length) * 100) : 0,
+    [tabSchedules]
+  );
 
   const TABS = [
-    { key: 'today', label: "Today's Tasks", count: filteredSchedules.length },
-    { key: 'upcoming', label: 'Upcoming', count: filteredSchedules.filter(s => s.dueDate > todayStr && s.status === 'Pending').length },
-    { key: 'overdue', label: 'Overdue', count: summary.overdue, accent: 'red' },
-    { key: 'completed', label: 'Completed', count: summary.completed },
-    { key: 'failed', label: 'Failed', count: summary.failed, accent: 'orange' },
+    { key: 'today',    label: "Today's Tasks", count: filteredSchedules.length },
+    { key: 'upcoming', label: 'Upcoming',      count: filteredSchedules.filter(s => s.dueDate > todayStr && s.status === 'Pending').length },
+    { key: 'overdue',  label: 'Overdue',       count: summary.overdue,   accent: 'red'    },
+    { key: 'completed',label: 'Completed',     count: summary.completed                   },
+    { key: 'failed',   label: 'Failed',        count: summary.failed,    accent: 'orange' },
   ];
 
-  const setFilter = (key, val) => setFilters(f => ({ ...f, [key]: val }));
-  const clearFilters = () => setFilters({ shift: '', building: '', zone: '', equipmentType: '', operator: '', status: '', search: '' });
-  const hasFilters = Object.values(filters).some(Boolean);
+  const setFilter    = (key, val) => setFilters(f => ({ ...f, [key]: val }));
+  const clearFilters = ()         => setFilters({ shift: '', building: '', zone: '', equipmentType: '', operator: '', status: '', search: '' });
+  const hasFilters   = Object.values(filters).some(Boolean);
+  const statusClass  = (status) => `status-${(status || '').toLowerCase().replace(/\s+/g, '-')}`;
 
-  const statusClass = (status) => `status-${(status || '').toLowerCase().replace(/\s+/g, '-')}`;
+  const toggleSort = (key) => setSortConfig(prev => ({
+    key, dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc'
+  }));
+
+  const SortIcon = ({ col }) => {
+    const active = sortConfig.key === col;
+    return (
+      <span className={`as-sort-icon ${active ? 'active' : ''}`}>
+        {active && sortConfig.dir === 'desc' ? '↓' : '↑'}
+      </span>
+    );
+  };
 
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="as-container">
 
-      {/* ── Page Header (light, matches Reports style) ── */}
+      {/* ── Page Header ── */}
       <div className="as-page-header">
         <div className="as-page-header-left">
           <button className="as-back-btn" onClick={onBack} title="Back">
@@ -310,8 +374,8 @@ export default function AutoScheduler({ modules, onBack }) {
               strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
+              <line x1="8"  y1="2" x2="8"  y2="6" />
+              <line x1="3"  y1="10" x2="21" y2="10" />
             </svg>
           </div>
           <div>
@@ -436,75 +500,160 @@ export default function AutoScheduler({ modules, onBack }) {
         {/* ── Task Table ── */}
         <div className="as-list-view">
           <div className="as-list-header">
-            <span>Auto-Generated Inspection Tasks</span>
-            <span className="as-list-count">{tabSchedules.length} tasks</span>
+            <div className="as-list-header-left">
+              <span>Auto-Generated Inspection Tasks</span>
+              <span className="as-list-count">{sortedDisplaySchedules.length} tasks</span>
+            </div>
+            {tabSchedules.length > 0 && (
+              <div className="as-compliance-wrap">
+                <span className="as-compliance-label">Completion</span>
+                <div className="as-compliance-bar">
+                  <div
+                    className="as-compliance-fill"
+                    style={{
+                      width: `${complianceRate}%`,
+                      background: complianceRate >= 70 ? '#22c55e' : complianceRate >= 40 ? '#3b82f6' : '#f59e0b'
+                    }}
+                  />
+                </div>
+                <span className="as-compliance-pct" style={{
+                  color: complianceRate >= 70 ? '#16a34a' : complianceRate >= 40 ? '#1d4ed8' : '#b45309'
+                }}>
+                  {complianceRate}%
+                </span>
+              </div>
+            )}
           </div>
           <div className="as-table-wrap">
             <table className="as-table">
               <thead>
                 <tr>
-                  <th>Equipment</th>
-                  <th>Location</th>
-                  <th>Operator</th>
-                  <th>Due Date</th>
-                  <th>Status</th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('moduleName')}>
+                      Equipment <SortIcon col="moduleName" />
+                    </button>
+                  </th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('building')}>
+                      Location <SortIcon col="building" />
+                    </button>
+                  </th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('assignedOperator')}>
+                      Operator <SortIcon col="assignedOperator" />
+                    </button>
+                  </th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('dueDate')}>
+                      Due Date <SortIcon col="dueDate" />
+                    </button>
+                  </th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('priority')}>
+                      Priority <SortIcon col="priority" />
+                    </button>
+                  </th>
+                  <th>
+                    <button className="as-sort-btn" onClick={() => toggleSort('status')}>
+                      Status <SortIcon col="status" />
+                    </button>
+                  </th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {tabSchedules.length === 0 ? (
+                {sortedDisplaySchedules.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="as-empty-row">
-                      {schedules.length === 0
-                        ? 'No inspections yet. Click "Generate Schedule" to start.'
-                        : 'No tasks match the current filters.'}
+                    <td colSpan="7" className="as-empty-row">
+                      <div className="as-empty-state">
+                        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+                          <rect x="8" y="10" width="48" height="48" rx="6" stroke="#cbd5e1" strokeWidth="3" fill="#f8fafc"/>
+                          <line x1="20" y1="24" x2="44" y2="24" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"/>
+                          <line x1="20" y1="32" x2="44" y2="32" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"/>
+                          <line x1="20" y1="40" x2="34" y2="40" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"/>
+                          <line x1="20" y1="8"  x2="20" y2="16" stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round"/>
+                          <line x1="44" y1="8"  x2="44" y2="16" stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        <div className="as-empty-title">
+                          {schedules.length === 0 ? 'No inspections scheduled yet' : 'No tasks match the current filters'}
+                        </div>
+                        <div className="as-empty-sub">
+                          {schedules.length === 0
+                            ? 'Click "Generate Schedule" to auto-assign inspection tasks based on compliance rules.'
+                            : 'Try adjusting your filters or clearing them to see all tasks.'}
+                        </div>
+                        {schedules.length === 0 && (
+                          <button className="as-run-btn" style={{ marginTop: 8 }} onClick={handleRunScheduler} disabled={isRunning}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                              strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
+                              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                            </svg>
+                            Generate Schedule
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  tabSchedules.map(s => (
-                    <tr key={s.id}>
-                      <td>
-                        <div className="as-equip-cell">
-                          <span className="as-equip-emoji">{MODULE_EMOJIS[s.moduleCode] || '📦'}</span>
-                          <div>
-                            <div className="as-equip-name">{s.moduleName}</div>
-                            <div className="as-sos-code">{s.sosCode}</div>
+                  sortedDisplaySchedules.map(s => {
+                    const due = formatDueDate(s.dueDate);
+                    const avatarGradient = INSPECTOR_COLORS[s.assignedOperatorId] || 'linear-gradient(135deg, #2563eb, #7c3aed)';
+                    return (
+                      <tr key={s.id} className={s.status === 'Overdue' ? 'as-row-overdue' : ''}>
+                        <td>
+                          <div className="as-equip-cell">
+                            <span className="as-equip-emoji">{MODULE_EMOJIS[s.moduleCode] || '📦'}</span>
+                            <div>
+                              <div className="as-equip-name">{s.moduleName}</div>
+                              <div className="as-sos-code">{s.sosCode}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="as-loc-cell">
-                          <span style={{ fontWeight: 500, color: '#334155' }}>{s.building || '—'}</span>
-                          <span className="as-zone-tag">{s.zone || '—'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="as-operator-cell">
-                          <div className="as-operator-avatar">{(s.assignedOperator || 'U')[0]}</div>
-                          <span style={{ fontWeight: 500, color: '#334155' }}>{s.assignedOperator || '—'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="as-due-cell">
-                          <div style={{ fontWeight: 600, color: '#475569' }}>{s.dueDate}</div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`as-status-badge ${statusClass(s.status)}`}>{s.status}</span>
-                      </td>
-                      <td>
-                        <div className="as-action-row" style={{ justifyContent: 'flex-end' }}>
-                          <button className="as-btn-view" onClick={() => setSelectedTask(s)}>View</button>
-                          {s.status === 'Pending' && (
-                            <button className="as-action-btn start" onClick={() => handleStatusChange(s.id, 'In Progress')}>Start</button>
-                          )}
-                          {s.status === 'In Progress' && (
-                            <button className="as-action-btn complete" onClick={() => handleStatusChange(s.id, 'Completed')}>Done</button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td>
+                          <div className="as-loc-cell">
+                            <span style={{ fontWeight: 500, color: '#334155' }}>{s.building || '—'}</span>
+                            <div className="as-loc-meta">
+                              <span className="as-zone-tag">{s.zone || '—'}</span>
+                              <span className="as-shift-badge">Shift {s.shift}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="as-operator-cell">
+                            <div className="as-operator-avatar" style={{ background: avatarGradient }}>
+                              {(s.assignedOperator || 'U')[0]}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 12.5, color: '#334155' }}>{s.assignedOperator || '—'}</div>
+                              <div style={{ fontSize: 10.5, color: '#94a3b8' }}>{s.inspectorRole || ''}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className={`as-due-label ${due.cls}`}>{due.label}</div>
+                          <div className="as-due-time">{s.dueTime}</div>
+                        </td>
+                        <td>
+                          <span className={`as-priority-tag ${(s.priority || '').toLowerCase()}`}>{s.priority}</span>
+                          <div className="as-freq-tag">{s.frequency}</div>
+                        </td>
+                        <td>
+                          <span className={`as-status-badge ${statusClass(s.status)}`}>{s.status}</span>
+                        </td>
+                        <td>
+                          <div className="as-action-row" style={{ justifyContent: 'flex-end' }}>
+                            <button className="as-btn-view" onClick={() => setSelectedTask(s)}>View</button>
+                            {s.status === 'Pending' && (
+                              <button className="as-action-btn start" onClick={() => handleStatusChange(s.id, 'In Progress')}>Start</button>
+                            )}
+                            {s.status === 'In Progress' && (
+                              <button className="as-action-btn complete" onClick={() => handleStatusChange(s.id, 'Completed')}>Done</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -527,7 +676,9 @@ export default function AutoScheduler({ modules, onBack }) {
                     <tr key={w.id}>
                       <td>
                         <div className="as-operator-cell">
-                          <div className="as-operator-avatar">{w.name[0]}</div>
+                          <div className="as-operator-avatar" style={{ background: INSPECTOR_COLORS[w.id] }}>
+                            {w.name[0]}
+                          </div>
                           <div>
                             <div className="as-op-name">{w.name}</div>
                             <div className="as-op-role">{w.role}</div>
@@ -632,7 +783,12 @@ export default function AutoScheduler({ modules, onBack }) {
                 </div>
                 <div className="as-modal-sub">{selectedTask.taskId} · {selectedTask.sosCode}</div>
               </div>
-              <button className="as-modal-close" onClick={() => setSelectedTask(null)}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className={`as-priority-tag ${(selectedTask.priority || '').toLowerCase()}`}>
+                  {selectedTask.priority}
+                </span>
+                <button className="as-modal-close" onClick={() => setSelectedTask(null)}>✕</button>
+              </div>
             </div>
 
             <div className="as-modal-body">
@@ -656,8 +812,8 @@ export default function AutoScheduler({ modules, onBack }) {
                     </span>
                   </div>
                   <div className="as-modal-field">
-                    <span className="as-mf-label">Priority</span>
-                    <span className={`as-priority-tag ${(selectedTask.priority || '').toLowerCase()}`}>{selectedTask.priority}</span>
+                    <span className="as-mf-label">Frequency</span>
+                    <span>{selectedTask.frequency}</span>
                   </div>
                 </div>
               </div>
@@ -677,11 +833,10 @@ export default function AutoScheduler({ modules, onBack }) {
                     <span className="as-shift-badge">Shift {selectedTask.shift}</span>
                   </div>
                   <div className="as-modal-field">
-                    <span className="as-mf-label">Frequency</span><span>{selectedTask.frequency}</span>
-                  </div>
-                  <div className="as-modal-field">
                     <span className="as-mf-label">Due Date</span>
-                    <span style={{ fontWeight: 700 }}>{selectedTask.dueDate}</span>
+                    <span className={`as-due-label ${formatDueDate(selectedTask.dueDate).cls}`} style={{ fontWeight: 700 }}>
+                      {formatDueDate(selectedTask.dueDate).label}
+                    </span>
                   </div>
                   <div className="as-modal-field">
                     <span className="as-mf-label">Due Time</span><span>{selectedTask.dueTime}</span>
@@ -691,7 +846,7 @@ export default function AutoScheduler({ modules, onBack }) {
                     <span className={`as-status-badge ${statusClass(selectedTask.status)}`}>{selectedTask.status}</span>
                   </div>
                   {selectedTask.failureReason && (
-                    <div className="as-modal-field">
+                    <div className="as-modal-field" style={{ gridColumn: '1 / -1' }}>
                       <span className="as-mf-label">Failure Reason</span>
                       <span className="as-failure-text">{selectedTask.failureReason}</span>
                     </div>
@@ -703,7 +858,9 @@ export default function AutoScheduler({ modules, onBack }) {
               <div className="as-modal-section">
                 <div className="as-modal-section-title">Assignment Info</div>
                 <div className="as-operator-cell" style={{ marginBottom: 14 }}>
-                  <div className="as-operator-avatar">{(selectedTask.assignedOperator || 'U')[0]}</div>
+                  <div className="as-operator-avatar" style={{ background: INSPECTOR_COLORS[selectedTask.assignedOperatorId] }}>
+                    {(selectedTask.assignedOperator || 'U')[0]}
+                  </div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{selectedTask.assignedOperator}</div>
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>{selectedTask.inspectorRole}</div>
@@ -716,9 +873,9 @@ export default function AutoScheduler({ modules, onBack }) {
                     <thead><tr><th>Rule</th><th>Result</th></tr></thead>
                     <tbody>
                       {[
-                        ['Shift Match', selectedTask.whyAssigned?.shiftMatch],
-                        ['Lowest Workload', selectedTask.whyAssigned?.lowestWorkload],
-                        ['Nearby Location', selectedTask.whyAssigned?.nearbyLocation],
+                        ['Shift Match',      selectedTask.whyAssigned?.shiftMatch],
+                        ['Lowest Workload',  selectedTask.whyAssigned?.lowestWorkload],
+                        ['Nearby Location',  selectedTask.whyAssigned?.nearbyLocation],
                       ].map(([rule, val]) => (
                         <tr key={rule}>
                           <td>{rule}</td>
@@ -757,6 +914,19 @@ export default function AutoScheduler({ modules, onBack }) {
           </div>
         </div>
       )}
+
+      {/* ── Toast Notifications ── */}
+      <div className="as-toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`as-toast as-toast-${t.type}`}>
+            <span className="as-toast-icon">
+              {t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : 'ℹ'}
+            </span>
+            <span className="as-toast-msg">{t.msg}</span>
+            <button className="as-toast-close" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>✕</button>
+          </div>
+        ))}
+      </div>
 
     </div>
   );

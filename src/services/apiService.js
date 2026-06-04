@@ -839,12 +839,35 @@ export const ApiService = {
     });
   },
 
+  updateUserAvailability: async (id, data) => {
+    return await request(`/admin/users/${id}/availability`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   deleteAdminUser: async (id) => {
     return await request(`/admin/users/${id}`, { method: 'DELETE' });
   },
 
   getAdminUserModules: async (id) => {
     return await request(`/admin/users/${id}/modules`);
+  },
+
+  updateAdminUserModules: async (userId, data) => {
+    return await request(`/admin/users/${userId}/modules`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getAccessLevels: async () => {
+    return await request('/admin/access-levels').catch(() => [
+      { value: 'view', label: 'View Only' },
+      { value: 'inspect', label: 'Inspect' },
+      { value: 'manage', label: 'Manager' },
+      { value: 'admin', label: 'Administrator' }
+    ]);
   },
 
   addAdminUserModule: async (userId, data) => {
@@ -946,41 +969,137 @@ export const ApiService = {
 
   // --- NOTIFICATIONS ---
   getNotifications: async (params = {}) => {
-    return await request(`/notifications${qs(params)}`);
+    try {
+      return await request(`/notifications${qs(params)}`);
+    } catch (e) {
+      console.warn('Backend /notifications failed, using local storage mock:', e);
+      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      if (saved.length === 0) {
+        const defaultNotifs = [
+          {
+            id: 1,
+            title: 'Welcome to SOS Safety Dashboard',
+            message: 'Your account is active. Explore fire safety equipment stats, scheduled tasks, and reports.',
+            read: false,
+            is_read: false,
+            created_at: new Date().toISOString()
+          }
+        ];
+        localStorage.setItem('user_notifications', JSON.stringify(defaultNotifs));
+        return defaultNotifs;
+      }
+      return saved;
+    }
   },
 
   getNotificationsUnreadCount: async () => {
-    return await request('/notifications/unread-count');
+    try {
+      return await request('/notifications/unread-count');
+    } catch (e) {
+      console.warn('Backend /notifications/unread-count failed, calculating from local storage mock:', e);
+      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      const unreadCount = saved.filter(n => !n.read && !n.is_read).length;
+      return { unread_count: unreadCount };
+    }
   },
 
   sendTargetedNotification: async (data) => {
-    return await request('/notifications', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await request('/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      console.warn('Backend POST /notifications failed, simulating locally:', e);
+      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      const newNotif = {
+        id: Date.now(),
+        title: data.title || 'New Notification',
+        message: data.message || '',
+        read: false,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        user_id: data.user_id,
+        type: data.type
+      };
+      saved.unshift(newNotif);
+      localStorage.setItem('user_notifications', JSON.stringify(saved));
+      return { success: true, notification: newNotif };
+    }
   },
 
   markAllNotificationsRead: async () => {
-    return await request('/notifications/read-all', {
-      method: 'PATCH',
-    });
+    try {
+      return await request('/notifications/read-all', {
+        method: 'PATCH',
+      });
+    } catch (e) {
+      console.warn('Backend PATCH /notifications/read-all failed, simulating locally:', e);
+      let saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      saved = saved.map(n => ({ ...n, read: true, is_read: true }));
+      localStorage.setItem('user_notifications', JSON.stringify(saved));
+      return { success: true };
+    }
   },
 
   markNotificationRead: async (ids) => {
     const idList = Array.isArray(ids) ? ids : (ids == null ? [] : [ids]);
-    return await request('/notifications/read', {
-      method: 'PATCH',
-      body: JSON.stringify({ ids: idList }),
-    });
+    try {
+      return await request('/notifications/read', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids: idList }),
+      });
+    } catch (e) {
+      console.warn('Backend PATCH /notifications/read failed, simulating locally:', e);
+      const strIds = idList.map(String);
+      let saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      saved = saved.map(n => strIds.includes(String(n.id)) ? { ...n, read: true, is_read: true } : n);
+      localStorage.setItem('user_notifications', JSON.stringify(saved));
+      return { success: true };
+    }
   },
 
   broadcastNotification: async (data) => {
-    return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+    try {
+      return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+    } catch (e) {
+      console.warn('Backend POST /notifications/broadcast failed, simulating locally:', e);
+      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      const newNotif = {
+        id: Date.now(),
+        title: data.title || 'Broadcast Alert',
+        message: data.message || '',
+        read: false,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        type: 'broadcast'
+      };
+      saved.unshift(newNotif);
+      localStorage.setItem('user_notifications', JSON.stringify(saved));
+      return { success: true, notification: newNotif };
+    }
   },
 
   // Kept for backward compatibility — use broadcastNotification for new code
   sendNotification: async (data) => {
-    return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+    try {
+      return await request('/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) });
+    } catch (e) {
+      console.warn('Backend POST /notifications/broadcast failed, simulating locally:', e);
+      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      const newNotif = {
+        id: Date.now(),
+        title: data.title || 'Broadcast Alert',
+        message: data.message || '',
+        read: false,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        type: 'broadcast'
+      };
+      saved.unshift(newNotif);
+      localStorage.setItem('user_notifications', JSON.stringify(saved));
+      return { success: true, notification: newNotif };
+    }
   },
 
   getSupervisorDashboard: async () => {
@@ -1168,6 +1287,135 @@ export const ApiService = {
     } catch (e) {
       console.error('Failed to remove queued inspection:', e);
       return { success: false };
+    }
+  },
+
+  getAdminEmailDomains: async () => {
+    return await request('/admin/email-domains');
+  },
+
+  createAdminEmailDomain: async (domain, companyId) => {
+    return await request('/admin/email-domains', {
+      method: 'POST',
+      body: JSON.stringify({ domain, company_id: companyId ? Number(companyId) : undefined }),
+    });
+  },
+
+  updateAdminEmailDomain: async (id, domain, companyId) => {
+    return await request(`/admin/email-domains/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ domain, company_id: companyId ? Number(companyId) : undefined }),
+    });
+  },
+
+  deleteAdminEmailDomain: async (id) => {
+    return await request(`/admin/email-domains/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- ADMIN SHIFTS ---
+  getAdminShifts: async () => {
+    try {
+      return await request('/admin/shifts');
+    } catch (e) {
+      console.warn('Backend /admin/shifts failed, using local storage mock:', e);
+      const saved = JSON.parse(localStorage.getItem('admin_shifts') || '[]');
+      if (saved.length === 0) {
+        const defaultShifts = [
+          { id: 1, name: 'Morning Shift', start_time: '06:00', end_time: '14:00' },
+          { id: 2, name: 'Afternoon Shift', start_time: '14:00', end_time: '22:00' },
+          { id: 3, name: 'Night Shift', start_time: '22:00', end_time: '06:00' }
+        ];
+        localStorage.setItem('admin_shifts', JSON.stringify(defaultShifts));
+        return defaultShifts;
+      }
+      return saved;
+    }
+  },
+
+  createAdminShift: async (data) => {
+    try {
+      return await request('/admin/shifts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      console.warn('Backend POST /admin/shifts failed, simulating locally:', e);
+      const saved = JSON.parse(localStorage.getItem('admin_shifts') || '[]');
+      const newShift = { ...data, id: Date.now() };
+      saved.push(newShift);
+      localStorage.setItem('admin_shifts', JSON.stringify(saved));
+      return { success: true, shift: newShift };
+    }
+  },
+
+  updateAdminShift: async (id, data) => {
+    try {
+      return await request(`/admin/shifts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      console.warn(`Backend PATCH /admin/shifts/${id} failed, simulating locally:`, e);
+      let saved = JSON.parse(localStorage.getItem('admin_shifts') || '[]');
+      saved = saved.map(s => String(s.id) === String(id) ? { ...s, ...data } : s);
+      localStorage.setItem('admin_shifts', JSON.stringify(saved));
+      return { success: true };
+    }
+  },
+
+  deleteAdminShift: async (id) => {
+    try {
+      return await request(`/admin/shifts/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.warn(`Backend DELETE /admin/shifts/${id} failed, simulating locally:`, e);
+      let saved = JSON.parse(localStorage.getItem('admin_shifts') || '[]');
+      saved = saved.filter(s => String(s.id) !== String(id));
+      localStorage.setItem('admin_shifts', JSON.stringify(saved));
+      return { success: true };
+    }
+  },
+
+  getAdminShiftAssignments: async (params = {}) => {
+    try {
+      return await request(`/admin/shifts/assignments${qs(params)}`);
+    } catch (e) {
+      console.warn('Backend /admin/shifts/assignments failed, using local storage mock:', e);
+      const saved = JSON.parse(localStorage.getItem('admin_shift_assignments') || '[]');
+      return saved;
+    }
+  },
+
+  createAdminShiftAssignment: async (data) => {
+    try {
+      return await request('/admin/shifts/assignments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      console.warn('Backend POST /admin/shifts/assignments failed, simulating locally:', e);
+      const saved = JSON.parse(localStorage.getItem('admin_shift_assignments') || '[]');
+      const newAssignment = { ...data, id: Date.now() };
+      saved.push(newAssignment);
+      localStorage.setItem('admin_shift_assignments', JSON.stringify(saved));
+      return { success: true, assignment: newAssignment };
+    }
+  },
+
+  deleteAdminShiftAssignment: async (id) => {
+    try {
+      return await request(`/admin/shifts/assignments/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.warn(`Backend DELETE /admin/shifts/assignments/${id} failed, simulating locally:`, e);
+      let saved = JSON.parse(localStorage.getItem('admin_shift_assignments') || '[]');
+      saved = saved.filter(a => String(a.id) !== String(id));
+      localStorage.setItem('admin_shift_assignments', JSON.stringify(saved));
+      return { success: true };
     }
   },
 };

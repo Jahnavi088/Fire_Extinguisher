@@ -99,7 +99,8 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
     admin: 'Admin',
     agm: 'Asst. General Manager',
     supervisor: 'Supervisor',
-    user: 'User',
+    user: 'Inspector',
+    inspector: 'Inspector',
   };
   const userRole = ROLE_LABELS[user?.role] || user?.role || 'Safety Officer';
 
@@ -182,10 +183,11 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
               <span className="nav-icon-small">🏢</span>
               <span className="nav-label-small">Add Company</span>
             </div>
-            <div className={`nav-submenu-item ${activePage === 'setup-modules' ? 'active' : ''}`} onClick={() => setActivePage('setup-modules')}>
-              <span className="nav-icon-small">⚙️</span>
-              <span className="nav-label-small">Module Config</span>
+            <div className={`nav-submenu-item ${activePage === 'setup-domains' ? 'active' : ''}`} onClick={() => setActivePage('setup-domains')}>
+              <span className="nav-icon-small">🌐</span>
+              <span className="nav-label-small">Email Domains</span>
             </div>
+
           </div>
 
           {/* Users dropdown */}

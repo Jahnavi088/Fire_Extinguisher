@@ -32,11 +32,12 @@ const CompanyManagement = ({ onBack }) => {
   const [addForm, setAddForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
   const [editForm, setEditForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
   const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState({ name: '', companyId: '', email: '', phone: '' });
   const [editingItemId, setEditingItemId] = useState(null);
   const [editingItemValue, setEditingItemValue] = useState('');
   const [selectedLocationCompany, setSelectedLocationCompany] = useState(null);
   const [locationForm, setLocationForm] = useState({ buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
-  
+
   // Local parent selection states for hierarchal location creation
   const [selectedParentBld, setSelectedParentBld] = useState('');
   const [selectedParentZn, setSelectedParentZn] = useState('');
@@ -149,22 +150,48 @@ const CompanyManagement = ({ onBack }) => {
   };
 
   const openAdd = () => {
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
     setShowAddModal(true);
   };
 
   const closeAdd = () => {
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setShowAddModal(false);
     setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
   };
 
   const saveAdd = async () => {
-    if (!addForm.name.trim()) return;
-    const requestedRef = addForm.companyId.trim();
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
+    const errors = {};
     const requestedName = addForm.name.trim();
+    const requestedRef = addForm.companyId.trim();
 
+    if (!requestedName) {
+      errors.name = 'Company Name is required.';
+    }
     if (!requestedRef) {
-      alert('Please enter a unique Company ID.');
+      errors.companyId = 'Company ID is required.';
+    }
+
+    const emailVal = addForm.email.trim();
+    if (emailVal) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailVal)) {
+        errors.email = 'Invalid email address.';
+      }
+    }
+
+    const phoneVal = addForm.phone.trim();
+    if (phoneVal) {
+      const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+      if (!phoneRegex.test(phoneVal)) {
+        errors.phone = 'Invalid phone number.';
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
 
@@ -180,7 +207,7 @@ const CompanyManagement = ({ onBack }) => {
       });
 
       if (duplicateId) {
-        alert(`Company ID "${requestedRef}" is already registered to "${duplicateId.name}". Please use a unique ID.`);
+        setFormErrors(prev => ({ ...prev, companyId: 'Company ID is already taken.' }));
         setSaving(false);
         return;
       }
@@ -191,7 +218,7 @@ const CompanyManagement = ({ onBack }) => {
       });
 
       if (duplicateName) {
-        alert(`A company named "${requestedName}" is already registered. Please use a unique name.`);
+        setFormErrors(prev => ({ ...prev, name: 'Company Name is already taken.' }));
         setSaving(false);
         return;
       }
@@ -256,6 +283,7 @@ const CompanyManagement = ({ onBack }) => {
   };
 
   const openEdit = (company) => {
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setEditTarget(company);
 
     let bldList = [];
@@ -275,7 +303,7 @@ const CompanyManagement = ({ onBack }) => {
           flCount = String(match.floors.length - 1);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     setEditForm({
       name: company.name,
@@ -299,15 +327,45 @@ const CompanyManagement = ({ onBack }) => {
   };
 
   const closeEdit = () => {
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setShowEditModal(false);
     setEditTarget(null);
     setEditForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
   };
 
   const saveEdit = async () => {
-    if (!editForm.name.trim() || !editTarget) return;
-    const requestedRef = editForm.companyId.trim();
+    setFormErrors({ name: '', companyId: '', email: '', phone: '' });
+    const errors = {};
     const requestedName = editForm.name.trim();
+    const requestedRef = editForm.companyId.trim();
+
+    if (!requestedName) {
+      errors.name = 'Company Name is required.';
+    }
+    if (!requestedRef) {
+      errors.companyId = 'Company ID is required.';
+    }
+
+    const emailVal = editForm.email.trim();
+    if (emailVal) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailVal)) {
+        errors.email = 'Invalid email address.';
+      }
+    }
+
+    const phoneVal = editForm.phone.trim();
+    if (phoneVal) {
+      const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+      if (!phoneRegex.test(phoneVal)) {
+        errors.phone = 'Invalid phone number.';
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
 
     const originalRef = String(editTarget.comapany_ref || editTarget.company_ref || editTarget.company_id || editTarget.companyId || '').trim();
     const originalName = String(editTarget.name || '').trim();
@@ -322,7 +380,7 @@ const CompanyManagement = ({ onBack }) => {
         return id === requestedRef.toLowerCase();
       });
       if (duplicateId) {
-        alert(`Company ID "${requestedRef}" is already used by "${duplicateId.name}".`);
+        setFormErrors(prev => ({ ...prev, companyId: 'Company ID is already taken.' }));
         return;
       }
     }
@@ -333,7 +391,7 @@ const CompanyManagement = ({ onBack }) => {
         return name === requestedName.toLowerCase();
       });
       if (duplicateName) {
-        alert(`A company named "${requestedName}" already exists.`);
+        setFormErrors(prev => ({ ...prev, name: 'Company Name already exists.' }));
         return;
       }
     }
@@ -420,7 +478,7 @@ const CompanyManagement = ({ onBack }) => {
           flCount = String(match.floors.length - 1);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (flList.length === 0) {
       flList.push({ id: 'FLR-GF', name: 'Ground Floor' });
@@ -564,8 +622,8 @@ const CompanyManagement = ({ onBack }) => {
             <div style={{ display: 'flex', gap: '3px', background: '#f1f5f9', padding: '3px', borderRadius: '7px', width: 'fit-content' }}>
               {[
                 { mode: 'building', label: '1. Branch / Building' },
-                { mode: 'zone',     label: '2. Zone / Wing' },
-                { mode: 'area',     label: '3. Area / Spot' }
+                { mode: 'zone', label: '2. Zone / Wing' },
+                { mode: 'area', label: '3. Area / Spot' }
               ].map(opt => (
                 <button
                   key={opt.mode}
@@ -624,7 +682,7 @@ const CompanyManagement = ({ onBack }) => {
                   if (!name) { alert('Please enter a zone name.'); return; }
                   if (locationForm.zones.some(z => z.name.toLowerCase() === name.toLowerCase() && z.building_id === selectedParentBld)) { alert('Zone already exists under this branch.'); return; }
                   const id = `ZN-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                  try { ApiService.createBranchZone(selectedParentBld, { name }).catch(() => {}); } catch (e) {}
+                  try { ApiService.createBranchZone(selectedParentBld, { name }).catch(() => { }); } catch (e) { }
                   setLocationForm(f => ({ ...f, zones: [...f.zones, { id, name, building_id: selectedParentBld }], new_zone: '' }));
                 }}>
                   + Add Zone
@@ -680,7 +738,7 @@ const CompanyManagement = ({ onBack }) => {
                           {editingItemId === bld.id ? (
                             <>
                               <button style={smallSave} onClick={() => {
-                                try { ApiService.updateBranch(bld.id, { name: editingItemValue }).catch(() => {}); } catch (e) {}
+                                try { ApiService.updateBranch(bld.id, { name: editingItemValue }).catch(() => { }); } catch (e) { }
                                 setLocationForm(f => ({ ...f, buildings: f.buildings.map(b => b.id === bld.id ? { ...b, name: editingItemValue } : b) }));
                                 setEditingItemId(null);
                               }}>Save</button>
@@ -732,7 +790,7 @@ const CompanyManagement = ({ onBack }) => {
                                     </button>
                                     <button style={iconDelBtn} title="Delete" onClick={() => {
                                       if (window.confirm(`Delete zone "${zn.name}"?`)) {
-                                        try { ApiService.deleteBranchZone(bld.id, zn.id).catch(() => {}); } catch (e) {}
+                                        try { ApiService.deleteBranchZone(bld.id, zn.id).catch(() => { }); } catch (e) { }
                                         setLocationForm(f => ({ ...f, zones: f.zones.filter(z => z.id !== zn.id), areas: f.areas.filter(a => a.zone_id !== zn.id) }));
                                       }
                                     }}>
@@ -832,7 +890,7 @@ const CompanyManagement = ({ onBack }) => {
                 const floors = locationForm.floors || [];
                 if (floors.some(f => f.name.toLowerCase() === name.toLowerCase())) { alert('Floor already exists.'); return; }
                 const firstBldId = locationForm.buildings[0]?.id;
-                if (firstBldId) { try { ApiService.createBranchFloor(firstBldId, { name }).catch(() => {}); } catch (e) {} }
+                if (firstBldId) { try { ApiService.createBranchFloor(firstBldId, { name }).catch(() => { }); } catch (e) { } }
                 setLocationForm(f => ({ ...f, floors: [...(f.floors || []), { id: `FLR-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, name }], new_floor: '' }));
               }}>
                 + Add Floor
@@ -876,7 +934,7 @@ const CompanyManagement = ({ onBack }) => {
                               <button style={iconDelBtn} title="Delete" onClick={() => {
                                 if (window.confirm(`Delete floor "${flr.name}"?`)) {
                                   const firstBldId = locationForm.buildings[0]?.id;
-                                  if (firstBldId) { try { ApiService.deleteBranchFloor(firstBldId, flr.id).catch(() => {}); } catch (e) {} }
+                                  if (firstBldId) { try { ApiService.deleteBranchFloor(firstBldId, flr.id).catch(() => { }); } catch (e) { } }
                                   setLocationForm(f => ({ ...f, floors: f.floors.filter(fl => fl.id !== flr.id) }));
                                 }
                               }}>
@@ -913,7 +971,7 @@ const CompanyManagement = ({ onBack }) => {
                 if (!name) { alert('Please enter a department name.'); return; }
                 const depts = locationForm.departments || [];
                 if (depts.some(d => d.name.toLowerCase() === name.toLowerCase())) { alert('Department already exists.'); return; }
-                try { ApiService.createDepartment({ name }).catch(() => {}); } catch (e) {}
+                try { ApiService.createDepartment({ name }).catch(() => { }); } catch (e) { }
                 setLocationForm(f => ({ ...f, departments: [...(f.departments || []), { id: `DEP-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, name }], new_department: '' }));
               }}>
                 + Add Department
@@ -946,7 +1004,7 @@ const CompanyManagement = ({ onBack }) => {
                           </button>
                           <button style={iconDelBtn} title="Delete" onClick={() => {
                             if (window.confirm(`Delete department "${dept.name}"?`)) {
-                              try { ApiService.deleteDepartment(dept.id).catch(() => {}); } catch (e) {}
+                              try { ApiService.deleteDepartment(dept.id).catch(() => { }); } catch (e) { }
                               setLocationForm(f => ({ ...f, departments: f.departments.filter(d => d.id !== dept.id) }));
                             }
                           }}>
@@ -1131,6 +1189,7 @@ const CompanyManagement = ({ onBack }) => {
                   value={addForm.name}
                   onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
                 />
+                {formErrors.name && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.name}</span>}
               </div>
               <div className="cm-field">
                 <label className="cm-label">Company ID <span className="cm-required">*</span></label>
@@ -1141,6 +1200,7 @@ const CompanyManagement = ({ onBack }) => {
                   value={addForm.companyId}
                   onChange={(e) => setAddForm((f) => ({ ...f, companyId: e.target.value }))}
                 />
+                {formErrors.companyId && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.companyId}</span>}
               </div>
               <div className="cm-field">
                 <label className="cm-label">Company Gmail</label>
@@ -1151,7 +1211,9 @@ const CompanyManagement = ({ onBack }) => {
                   value={addForm.email}
                   onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
                 />
+                {formErrors.email && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.email}</span>}
               </div>
+
               <div className="cm-field">
                 <label className="cm-label">Company Address</label>
                 <textarea
@@ -1167,10 +1229,11 @@ const CompanyManagement = ({ onBack }) => {
                 <input
                   className="cm-input"
                   type="tel"
-                  placeholder="+1 234 567"
+                  placeholder="+91 XXXXXXXXXX"
                   value={addForm.phone}
                   onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))}
                 />
+                {formErrors.phone && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.phone}</span>}
               </div>
 
 
@@ -1227,6 +1290,7 @@ const CompanyManagement = ({ onBack }) => {
                   value={editForm.name}
                   onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                 />
+                {formErrors.name && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.name}</span>}
               </div>
               <div className="cm-field">
                 <label className="cm-label">Company ID <span className="cm-required">*</span></label>
@@ -1237,6 +1301,7 @@ const CompanyManagement = ({ onBack }) => {
                   value={editForm.companyId}
                   onChange={(e) => setEditForm((f) => ({ ...f, companyId: e.target.value }))}
                 />
+                {formErrors.companyId && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.companyId}</span>}
               </div>
               <div className="cm-field">
                 <label className="cm-label">Company Gmail</label>
@@ -1247,7 +1312,9 @@ const CompanyManagement = ({ onBack }) => {
                   value={editForm.email}
                   onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
                 />
+                {formErrors.email && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.email}</span>}
               </div>
+
               <div className="cm-field">
                 <label className="cm-label">Company Address</label>
                 <textarea
@@ -1267,6 +1334,7 @@ const CompanyManagement = ({ onBack }) => {
                   value={editForm.phone}
                   onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
                 />
+                {formErrors.phone && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.phone}</span>}
               </div>
 
 

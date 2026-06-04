@@ -247,6 +247,38 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       }));
       
       localStorage.setItem('approved_inspections', JSON.stringify(approvedLocally));
+
+      // Send targeted notifications to submitting users for each approved item
+      selectedItemsList.forEach(item => {
+         const toUser = item.submitted_by_id || item.inspector_id || item.user_id;
+         if (toUser) {
+            ApiService.sendTargetedNotification({
+               user_id: toUser,
+               title: 'Inspection Approved Successfully',
+               message: `Your inspection submission for ${item.sos_code || item.equipment_code} has been approved successfully.`,
+               type: 'success'
+            }).catch(console.error);
+         }
+      });
+
+      // Send a single summary notification to AGM users for the bulk approval
+      try {
+         ApiService.getAdminUsers({ role: 'agm' }).then(res => {
+            const users = Array.isArray(res) ? res : (res?.users || res?.items || res?.data || []);
+            const agms = users.filter(u => String(u.role).toLowerCase() === 'agm');
+            agms.forEach(agm => {
+               ApiService.sendTargetedNotification({
+                  user_id: agm.id,
+                  title: 'Bulk Inspections Approved',
+                  message: `${selectedItemsList.length} inspection submissions have been approved successfully.`,
+                  type: 'success'
+               }).catch(console.error);
+            });
+         }).catch(console.error);
+      } catch (err) {
+         console.error('Failed to notify AGM users of bulk approval:', err);
+      }
+
       setSelectedIds([]);
       setRetry(r => r + 1);
     } catch (e) {
@@ -425,21 +457,39 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         try { await ApiService.approveInspection(selectedItem.id, remarksInput.trim() || undefined); } catch(e) {}
       }
       
-      // Send notification
+      // Send notification to submitter
       const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
       if (toUser) {
-         ApiService.broadcastNotification({
+         ApiService.sendTargetedNotification({
             user_id: toUser,
-            title: 'Approval Accepted',
-            message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was approved.`,
+            title: 'Inspection Approved Successfully',
+            message: `Your inspection submission for ${selectedItem.sos_code || selectedItem.equipment_code} has been approved successfully.`,
             type: 'success'
          }).catch(console.error);
       } else {
          ApiService.broadcastNotification({
-            title: 'Approval Accepted',
-            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was approved.`,
+            title: 'Inspection Approved Successfully',
+            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'Inspector'} has been approved successfully.`,
             type: 'success'
          }).catch(console.error);
+      }
+
+      // Send notification to AGM users
+      try {
+         ApiService.getAdminUsers({ role: 'agm' }).then(res => {
+            const users = Array.isArray(res) ? res : (res?.users || res?.items || res?.data || []);
+            const agms = users.filter(u => String(u.role).toLowerCase() === 'agm');
+            agms.forEach(agm => {
+               ApiService.sendTargetedNotification({
+                  user_id: agm.id,
+                  title: 'New Inspection Approved',
+                  message: `Inspection for ${selectedItem.sos_code || selectedItem.equipment_code} (submitted by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'Inspector'}) has been approved successfully.`,
+                  type: 'success'
+               }).catch(console.error);
+            });
+         }).catch(console.error);
+      } catch (err) {
+         console.error('Failed to notify AGM users:', err);
       }
       
       setModalMode(null);
@@ -479,7 +529,7 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       // Send notification
       const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
       if (toUser) {
-         ApiService.broadcastNotification({
+         ApiService.sendTargetedNotification({
             user_id: toUser,
             title: 'Approval Rejected',
             message: `Your submission for ${selectedItem.sos_code || selectedItem.equipment_code} was rejected. Reason: ${rejectInput}`,
@@ -488,7 +538,7 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       } else {
          ApiService.broadcastNotification({
             title: 'Approval Rejected',
-            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'User'} was rejected. Reason: ${rejectInput}`,
+            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'Inspector'} was rejected. Reason: ${rejectInput}`,
             type: 'error'
          }).catch(console.error);
       }
@@ -648,6 +698,11 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                       <td>
                         <span className="rpt-cell-text-dark">{item.submitted_by_name || item.inspector_name || item.user_name || 'Unknown'}</span>
                         <div style={{ fontSize: '10px', color: '#64748b' }}>{item.submitted_by_role || ''}</div>
+                        {item.escalated_to_id && (
+                          <div style={{ fontSize: '9px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', fontWeight: 'bold', marginTop: '4px', border: '1px solid rgba(245,158,11,0.3)' }}>
+                            ⚠️ Escalated to AGM
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span className="rpt-cell-mono-dark">{item.sos_code || item.equipment_code || '—'}</span>
@@ -746,6 +801,13 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                     {selectedItem.remarks && (
                       <div className="pa-meta-remarks" style={{ fontSize: '11px', marginTop: '8px', paddingTop: '8px' }}>
                         <strong>Inspector Remarks:</strong> "{selectedItem.remarks || selectedItem.notes || selectedItem.description}"
+                      </div>
+                    )}
+                    {selectedItem.escalated_to_id && (
+                      <div style={{ background: 'rgba(245,158,11,0.08)', borderTop: '1px dashed rgba(245,158,11,0.3)', padding: '10px 0 0 0', marginTop: '8px', fontSize: '11px', color: '#f59e0b', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span><strong>⚠️ On-Leave Escalation Alert:</strong></span>
+                        <span>This inspection was automatically escalated to the AGM on {fmt(selectedItem.escalated_at)} at {fmtTime(selectedItem.escalated_at)} because the assigned supervisor was on leave.</span>
+                        <span><strong>Reason:</strong> "{selectedItem.escalation_reason || 'Supervisor unavailable'}"</span>
                       </div>
                     )}
                   </div>

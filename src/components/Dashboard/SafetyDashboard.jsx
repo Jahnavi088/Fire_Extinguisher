@@ -46,6 +46,8 @@ import PendingApprovals from './PendingApprovals';
 import Onboarding from './Onboarding';
 import EquipmentOnboarding from './EquipmentOnboarding';
 import ModuleManagement from './ModuleManagement';
+import EmailDomains from './EmailDomains';
+import ShiftManagement from './ShiftManagement';
 import AutoScheduler from './AutoScheduler';
 import CODetectorStats from './CODetectorStats';
 import FireDoorStats from './FireDoorStats';
@@ -78,7 +80,7 @@ const STATIC_MODULES = [
   { module_id: 41, name: 'Fire Blankets', code: 'fire_blanket', health_score: 93, category: 'fire', image: '/images/fireblanket1.png' },
   { module_id: 59, name: 'Muster Points', code: 'muster_point', health_score: 100, category: 'permit', image: '/images/muster_point1.png' },
   { module_id: 40, name: 'CO Detectors', code: 'co_detector', health_score: 100, category: 'fire', image: '/images/smoke_detector1.png' },
-  { module_id: 43, name: 'Fire Doors', code: 'fire_door', health_score: 100, category: 'fire', image: '/images/emergency_exitdoor1.png' },
+  { module_id: 43, name: 'Fire Doors', code: 'fire_door', health_score: 100, category: 'fire', image: '/images/fire_door1.png' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
@@ -341,6 +343,65 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   }, [equipmentAccess]);
 
   useEffect(() => {
+    if (!user) return;
+    const isAllowed = (page) => {
+      if (page === 'grid' || page === 'overview') return true;
+      let code = page;
+      if (page === 'work-orders') code = 'work_orders';
+      if (page === 'pending-updates') code = 'pending_updates';
+      if (page === 'auto-scheduler') code = 'auto_scheduler';
+      if (page === 'setup-shifts') code = 'shifts';
+      if (page === 'audit-logs') code = 'audit_logs';
+      if (page === 'device-monitoring') code = 'device_monitoring';
+      if (page === 'setup-company') code = 'setup_company';
+      if (page === 'setup-domains') code = 'setup_domains';
+      if (page === 'equipment-onboarding') code = 'add_equipment';
+      if (page === 'users-manage') code = 'user_manage';
+      if (page === 'users-equipment-access') code = 'equipment_access';
+      if (page === 'setup-modules') return false; // Completely disabled
+      
+      return isNavAllowed(code);
+    };
+
+    if (activePage !== 'grid' && !isAllowed(activePage)) {
+      setActivePage('grid');
+    }
+  }, [activePage, user, navAccessList, equipmentAccessList]);
+
+  useEffect(() => {
+    if (!user) return;
+    const role = (user.role || '').toLowerCase();
+    const isGlobal = role === 'superadmin' || role === 'admin' || role === 'safety_manager';
+
+    if (!isGlobal && (!equipmentAccess || equipmentAccess.length === 0)) {
+      ApiService.getEquipment({ limit: 1000 })
+        .then(res => {
+          const eqList = Array.isArray(res) ? res : (res?.items || res?.data || []);
+          if (eqList.length > 0) {
+            const moduleIds = new Set();
+            const moduleCodes = new Set();
+            eqList.forEach(eq => {
+              if (eq.module_id) moduleIds.add(Number(eq.module_id));
+              if (eq.module_code) moduleCodes.add(eq.module_code);
+              else if (eq.equipment_type) moduleCodes.add(eq.equipment_type);
+            });
+
+            const inheritedMods = STATIC_MODULES.filter(m =>
+              moduleIds.has(m.module_id) ||
+              moduleCodes.has(m.code)
+            );
+
+            if (inheritedMods.length > 0) {
+              setEquipmentAccessList(inheritedMods);
+            }
+          }
+        })
+        .catch(err => {
+          console.error("Failed to load equipment list for inheritance:", err);
+        });
+    }
+  }, [user, equipmentAccess]);
+  useEffect(() => {
     if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
     ApiService.getModuleChecklists(selectedEq.module_id || selectedEq.id)
       .then(d => {
@@ -481,6 +542,60 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       }
     };
     fetchSummaries();
+
+    // Check supervisor inactivity and notify AGM
+    const checkSupervisorInactivity = async () => {
+      try {
+        const usersData = await ApiService.getAdminUsers();
+        const usersList = Array.isArray(usersData) ? usersData : (usersData?.users || usersData?.data || []);
+        const supervisorsList = usersList.filter(u => u.role === 'supervisor');
+
+        // Fetch inspections from last 3 days
+        const today = new Date();
+        const startDateStr = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const endDateStr = today.toISOString().split('T')[0];
+        const reportsRes = await ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr });
+        const reportsList = Array.isArray(reportsRes) ? reportsRes : (reportsRes?.items || reportsRes?.reports || reportsRes?.inspections || []);
+
+        supervisorsList.forEach(supervisor => {
+          const targetAgmId = supervisor.agm_id || supervisor.agmId;
+          if (!targetAgmId) return; // Must have an AGM assigned to notify
+
+          // Check if supervisor has any inspection in the last 24 hours
+          const last24h = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+          const hasInspection = reportsList.some(report => {
+            const reportDate = new Date(report.created_at || report.inspected_at);
+            const isBySupervisor = String(report.submitted_by_id || report.inspector_id) === String(supervisor.id) ||
+              String(report.user_id) === String(supervisor.id) ||
+              report.inspector_name === supervisor.name ||
+              report.submitted_by_name === supervisor.name;
+            return isBySupervisor && reportDate >= last24h;
+          });
+
+          if (!hasInspection) {
+            // Check localStorage to avoid duplicate notifications within 24 hours
+            const key = `notified_inactivity_${supervisor.id}`;
+            const lastNotified = localStorage.getItem(key);
+            const oneDayMs = 24 * 60 * 60 * 1000;
+            if (!lastNotified || (Date.now() - Number(lastNotified) > oneDayMs)) {
+              ApiService.sendTargetedNotification({
+                user_id: targetAgmId,
+                title: 'Supervisor Inactivity Alert',
+                message: `Supervisor ${supervisor.name || supervisor.username} has not performed any inspection in the last 24 hours.`,
+                type: 'warning'
+              }).then(() => {
+                localStorage.setItem(key, String(Date.now()));
+              }).catch(console.error);
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to check supervisor inactivity:", err);
+      }
+    };
+
+    // Run after a short delay
+    setTimeout(checkSupervisorInactivity, 5000);
   }, []);
 
   useEffect(() => {
@@ -504,11 +619,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     updateShift();
     const shiftTimer = setInterval(updateShift, 60000);
 
-    const drillDate = new Date('2026-05-15T09:00:00');
+    const drillDate = new Date('2026-09-01T09:00:00');
     const updateDrill = () => {
       const diff = drillDate - new Date();
       if (diff <= 0) {
-        setDrillTime('🚨 DRILL NOW');
+        setDrillTime('Not Scheduled');
         return;
       }
       const d = Math.floor(diff / 86400000);
@@ -531,7 +646,10 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const filteredModules = useMemo(() => {
     let list = modules;
     const isGlobalUser = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'safety_manager';
-    if (!isGlobalUser && (equipmentAccessList || navAccessList)) {
+    const hasExplicitAccess = (Array.isArray(equipmentAccessList) && equipmentAccessList.length > 0) ||
+      (Array.isArray(navAccessList) && navAccessList.length > 0);
+
+    if (hasExplicitAccess || (!isGlobalUser && (equipmentAccessList || navAccessList))) {
       const allowedCodes = new Set();
       if (equipmentAccessList) {
         equipmentAccessList.forEach(m => {
@@ -540,6 +658,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             allowedCodes.add(code);
             if (code === 'scba_unit') allowedCodes.add('scba');
             if (code === 'scba') allowedCodes.add('scba_unit');
+            if (code === 'fire_alarm') allowedCodes.add('fpca');
+            if (code === 'fpca') allowedCodes.add('fire_alarm');
             if (code === 'exit_sign' || code === 'emergency_door') allowedCodes.add('emergency_exit');
             if (code === 'emergency_exit') {
               allowedCodes.add('exit_sign');
@@ -554,6 +674,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             allowedCodes.add(code);
             if (code === 'scba_unit') allowedCodes.add('scba');
             if (code === 'scba') allowedCodes.add('scba_unit');
+            if (code === 'fire_alarm') allowedCodes.add('fpca');
+            if (code === 'fpca') allowedCodes.add('fire_alarm');
             if (code === 'exit_sign' || code === 'emergency_door') allowedCodes.add('emergency_exit');
             if (code === 'emergency_exit') {
               allowedCodes.add('exit_sign');
@@ -562,7 +684,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           }
         });
       }
-      list = modules.filter(m => allowedCodes.has(m.code));
+      if (allowedCodes.size > 0) {
+        list = modules.filter(m => allowedCodes.has(m.code));
+      } else if (!isGlobalUser) {
+        list = [];
+      }
+    } else if (!isGlobalUser) {
+      list = [];
     }
 
     if (eqSearchQuery.trim()) {
@@ -688,25 +816,63 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const saveCo = () => alert(companyName.trim() ? `Company saved: ${companyName}` : 'Enter a company name first');
 
-  // navAccess: null = unrestricted (admin/superadmin), array = allowed module codes
   const isNavAllowed = (code) => {
-    if (code === 'pending_updates') return true; // ALWAYS allowed for every role globally
-    const isGlobalUser = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'safety_manager';
-    if (isGlobalUser) return true; // global roles see everything
-    if (!navAccessList) return true; // admins see everything
-    if (navAccessList.includes(code)) return true;
-    if (code === 'scba' && navAccessList.includes('scba_unit')) return true;
-    if (code === 'scba_unit' && navAccessList.includes('scba')) return true;
-    if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
-        (navAccessList.includes('emergency_exit') || navAccessList.includes('exit_sign') || navAccessList.includes('emergency_door'))) return true;
-    if (equipmentAccessList) {
-      const allowedCodes = equipmentAccessList.map(m => typeof m === 'string' ? m : (m.code || m.module_code));
-      if (allowedCodes.includes(code)) return true;
-      if (code === 'scba' && allowedCodes.includes('scba_unit')) return true;
-      if (code === 'scba_unit' && allowedCodes.includes('scba')) return true;
-      if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
-          (allowedCodes.includes('emergency_exit') || allowedCodes.includes('exit_sign') || allowedCodes.includes('emergency_door'))) return true;
+    if (!code) return false;
+    if (code === 'shifts') return true;
+    const role = (user?.role || '').toLowerCase();
+    if (code === 'pending_updates') return role !== 'user' && role !== 'inspector';
+
+    const isAdminOrSuper = role === 'superadmin' || role === 'admin';
+    const isGlobal = isAdminOrSuper || role === 'safety_manager';
+
+    // 1. Role-based hard boundaries (Security Overrides)
+    if (code === 'user_manage' || code === 'equipment_access' || code === 'add_equipment' || code === 'setup_company' || code === 'setup_domains') {
+      if (!isAdminOrSuper) return false;
     }
+    if (code === 'audit_logs' || code === 'device_monitoring') {
+      if (!isGlobal) return false;
+    }
+    if (code === 'auto_scheduler') {
+      if (role === 'user' || role === 'inspector') return false;
+    }
+
+    // 2. Global users see everything
+    if (isGlobal) return true;
+
+    const hasNavList = Array.isArray(navAccessList) && navAccessList.length > 0;
+    const hasEqList = Array.isArray(equipmentAccessList) && equipmentAccessList.length > 0;
+    const isStandardNav = ['overview', 'reports', 'work_orders', 'auto_scheduler', 'audit_logs', 'device_monitoring'].includes(code);
+
+    if (hasNavList || (hasEqList && !isStandardNav)) {
+      const allowedNav = hasNavList ? navAccessList : [];
+      const allowedEq = hasEqList && !isStandardNav ? equipmentAccessList.map(m => typeof m === 'string' ? m : (m.code || m.module_code)) : [];
+
+      if (allowedNav.includes(code)) return true;
+      if (code === 'scba' && allowedNav.includes('scba_unit')) return true;
+      if (code === 'scba_unit' && allowedNav.includes('scba')) return true;
+      if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
+        (allowedNav.includes('emergency_exit') || allowedNav.includes('exit_sign') || allowedNav.includes('emergency_door'))) return true;
+
+      if (allowedEq.includes(code)) return true;
+      if (code === 'scba' && allowedEq.includes('scba_unit')) return true;
+      if (code === 'scba_unit' && allowedEq.includes('scba')) return true;
+      if ((code === 'emergency_exit' || code === 'exit_sign' || code === 'emergency_door') &&
+        (allowedEq.includes('emergency_exit') || allowedEq.includes('exit_sign') || allowedEq.includes('emergency_door'))) return true;
+
+      return false;
+    }
+
+    // 4. Default role fallback if list is entirely missing/null
+    if (role === 'agm') {
+      return !['user_manage', 'equipment_access', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring'].includes(code);
+    }
+    if (role === 'supervisor') {
+      return !['user_manage', 'equipment_access', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring', 'auto_scheduler'].includes(code);
+    }
+    if (role === 'user' || role === 'inspector') {
+      return ['overview', 'reports'].includes(code) || (!['work_orders', 'pending_updates', 'auto_scheduler', 'audit_logs', 'device_monitoring', 'user_manage', 'equipment_access', 'add_equipment', 'setup_company'].includes(code));
+    }
+
     return false;
   };
 
@@ -729,6 +895,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>, label: 'Work Orders', code: 'work_orders', active: activePage === 'work-orders', onClick: () => setActivePage('work-orders') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Pending Approvals', code: 'pending_updates', badge: pendingApprovalsCount, active: activePage === 'pending-updates', onClick: () => setActivePage('pending-updates') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Auto-Scheduler', code: 'auto_scheduler', active: activePage === 'auto-scheduler', onClick: () => setActivePage('auto-scheduler') },
+        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Shift Management', code: 'shifts', active: activePage === 'setup-shifts', onClick: () => setActivePage('setup-shifts') },
       ],
     },
     {
@@ -856,43 +1023,49 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           </div>
 
           <nav className="sb-scroll">
-            {navGroups.map((group) => (
-              <div className="sb-nav-group" key={group.label}>
-                {!navCollapsed && <div className="nav-section-label">{group.label}</div>}
-                {group.items.filter(item => isNavAllowed(item.code || '')).map((item) => (
-                  <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => { })}>
-                    <div className="nav-left">
-                      <span className="nav-icon">{item.icon}</span>
-                      {!navCollapsed && (
-                        <span className="nav-label" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                          {item.label}
-                          {item.badge ? (
-                            <span style={{
-                              position: 'absolute',
-                              top: '-8px',
-                              right: '-18px',
-                              background: '#dc2626',
-                              color: 'white',
-                              fontSize: '9px',
-                              fontWeight: 'bold',
-                              padding: '2px 5px',
-                              borderRadius: '10px',
-                              lineHeight: 1
-                            }}>
-                              {item.badge}
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
+            {navGroups.map((group) => {
+              const allowedItems = group.items.filter(item => isNavAllowed(item.code || ''));
+              if (allowedItems.length === 0) return null;
+              return (
+                <div className="sb-nav-group" key={group.label}>
+                  {!navCollapsed && <div className="nav-section-label">{group.label}</div>}
+                  {allowedItems.map((item) => (
+                    <div key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.onClick || (() => { })}>
+                      <div className="nav-left">
+                        <span className="nav-icon">{item.icon}</span>
+                        {!navCollapsed && (
+                          <span className="nav-label" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                            {item.label}
+                            {item.badge ? (
+                              <span style={{
+                                position: 'absolute',
+                                top: '-8px',
+                                right: '-18px',
+                                background: '#dc2626',
+                                color: 'white',
+                                fontSize: '9px',
+                                fontWeight: 'bold',
+                                padding: '2px 5px',
+                                borderRadius: '10px',
+                                lineHeight: 1
+                              }}>
+                                {item.badge}
+                              </span>
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
+                      {navCollapsed && <div className="sidenav-tip">{item.label}</div>}
                     </div>
-                    {navCollapsed && <div className="sidenav-tip">{item.label}</div>}
-                  </div>
-                ))}
-              </div>
-            ))}
+                  ))}
+                </div>
+              );
+            })}
 
             {/* MANAGEMENT section */}
-            {!navCollapsed && <div className="nav-section-label">Management</div>}
+            {!navCollapsed && ((user?.role === 'superadmin' || isNavAllowed('add_equipment') || isNavAllowed('user_manage') || isNavAllowed('equipment_access')) ? (
+              <div className="nav-section-label">Management</div>
+            ) : null)}
 
 
             {/* SETUP DROPDOWN */}
@@ -916,12 +1089,19 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       <span className="nav-label-small">Add Company</span>
                     </div>
                   )}
+                  {user?.role === 'superadmin' && (
+                    <div className={`nav-submenu-item ${activePage === 'setup-domains' ? 'active' : ''}`} onClick={() => setActivePage('setup-domains')}>
+                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></span>
+                      <span className="nav-label-small">Email Domains</span>
+                    </div>
+                  )}
                   {isNavAllowed('add_equipment') && (
                     <div className={`nav-submenu-item ${activePage === 'equipment-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('equipment-onboarding')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><rect x="3" y="3" width="18" height="18" rx="3" /></svg></span>
                       <span className="nav-label-small">Onboarding</span>
                     </div>
                   )}
+
                 </div>
               </>
             )}
@@ -966,7 +1146,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               {!navCollapsed && (
                 <div className="sb-user-info">
                   <div className="sb-user-name">{user?.name || user?.username || 'Admin User'}</div>
-                  <div className="sb-user-role">{user?.role === 'superadmin' ? ' ' : (user?.role || 'Safety Officer')}</div>
+                  <div className="sb-user-role">
+                    {user?.role === 'superadmin' ? 'Super Admin' :
+                      (user?.role === 'user' || user?.role === 'inspector') ? 'Inspector' :
+                        (user?.role || 'Safety Officer')}
+                  </div>
                 </div>
               )}
             </div>
@@ -1273,7 +1457,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
             {/* ── PENDING APPROVALS ── */}
             <section className={`page ${activePage === 'pending-updates' ? 'active' : ''}`}>
-              {activePage === 'pending-updates' && (
+              {activePage === 'pending-updates' && user?.role !== 'user' && (
                 <PendingApprovals user={user} onBack={() => setActivePage('grid')} allowedModules={filteredModules} />
               )}
             </section>
@@ -1287,7 +1471,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
             {/* ── MODULE MANAGEMENT ── */}
             <section className={`page ${activePage === 'setup-modules' ? 'active' : ''}`}>
-              {activePage === 'setup-modules' && <ModuleManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} />}
+              {activePage === 'setup-modules' && <ModuleManagement onBack={() => setActivePage('grid')} />}
             </section>
 
             {/* ── AUDIT LOGS ── */}
@@ -1341,10 +1525,17 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               )}
             </section>
 
+            {/* ── SETUP: EMAIL DOMAINS ── */}
+            <section className={`page ${activePage === 'setup-domains' ? 'active' : ''}`}>
+              {activePage === 'setup-domains' && (
+                <EmailDomains onBack={() => setActivePage('grid')} />
+              )}
+            </section>
+
             {/* ── USERS: MANAGE ── */}
             <section className={`page ${activePage === 'users-manage' ? 'active' : ''}`}>
               {activePage === 'users-manage' && (
-                <UserManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} />
+                <UserManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} navAccess={navAccessList} />
               )}
             </section>
 
@@ -1353,6 +1544,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                 <EquipmentAccess
                   onBack={() => setActivePage('grid')}
                   availableModules={filteredModules}
+                />
+              )}
+            </section>
+
+            <section className={`page ${activePage === 'setup-shifts' ? 'active' : ''}`}>
+              {activePage === 'setup-shifts' && (
+                <ShiftManagement
+                  onBack={() => setActivePage('grid')}
                 />
               )}
             </section>

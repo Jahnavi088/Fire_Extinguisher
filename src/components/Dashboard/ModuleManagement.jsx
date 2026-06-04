@@ -22,17 +22,17 @@ const ModuleManagement = ({ onBack, allowedModules }) => {
         ApiService.getAdminModules(),
         ApiService.getAdminModuleWeights(),
       ]);
-      
+
       const mods = Array.isArray(modulesRes) ? modulesRes : (modulesRes?.data || []);
       const wgts = Array.isArray(weightsRes) ? weightsRes : (weightsRes?.data || []);
-      
+
       // Filter modules to only those in the specified IDs, and if allowedModules is passed, restrict further
       let allowedIds = MODULE_IDS;
       if (allowedModules) {
         const allowedSet = new Set(allowedModules.map(m => m.id || m.module_id));
         allowedIds = MODULE_IDS.filter(id => allowedSet.has(id));
       }
-      
+
       const filteredMods = mods.filter(m => allowedIds.includes(m.id || m.module_id));
       setModules(filteredMods);
       setWeights(wgts);
@@ -109,10 +109,10 @@ const ModuleManagement = ({ onBack, allowedModules }) => {
               </tr>
             </thead>
             <tbody>
-              { (allowedModules ? MODULE_IDS.filter(id => (new Set(allowedModules.map(m => m.id || m.module_id))).has(id)) : MODULE_IDS).map(id => {
+              {(allowedModules ? MODULE_IDS.filter(id => (new Set(allowedModules.map(m => m.id || m.module_id))).has(id)) : MODULE_IDS).map(id => {
                 const mod = modules.find(m => (m.id || m.module_id) === id) || { id, name: `Module ${id}`, code: `mod_${id}`, is_active: false };
                 const weight = getWeightForModule(id);
-                
+
                 return (
                   <tr key={id}>
                     <td className="um-td-num">{id}</td>
@@ -120,9 +120,9 @@ const ModuleManagement = ({ onBack, allowedModules }) => {
                     <td className="um-mono">{mod.code}</td>
                     <td>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={mod.is_active} 
+                        <input
+                          type="checkbox"
+                          checked={mod.is_active}
                           onChange={(e) => handleUpdateModule(id, 'is_active', e.target.checked)}
                           disabled={saving}
                         />
@@ -132,8 +132,8 @@ const ModuleManagement = ({ onBack, allowedModules }) => {
                       </label>
                     </td>
                     <td>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         value={weight}
                         onChange={(e) => handleUpdateWeight(id, parseFloat(e.target.value) || 0)}
                         disabled={saving}

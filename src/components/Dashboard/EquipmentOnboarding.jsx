@@ -133,7 +133,7 @@ const CustomSelect = ({ value, onChange, options, placeholder, disabled }) => {
   );
 };
 
-const ShiftDropdown = ({ value, onChange, placeholder, error }) => {
+const ShiftDropdown = ({ value, onChange, placeholder, error, shifts = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef(null);
 
@@ -150,6 +150,10 @@ const ShiftDropdown = ({ value, onChange, placeholder, error }) => {
       onChange([...value, shift]);
     }
   };
+
+  const options = shifts.length > 0
+    ? shifts.map(s => s.name || s.shift_name).filter(Boolean)
+    : SHIFT_OPTIONS;
 
   return (
     <div className={`eob-custom-select ${isOpen ? 'is-open' : ''} ${error ? 'has-error' : ''}`} ref={ref}>
@@ -169,15 +173,15 @@ const ShiftDropdown = ({ value, onChange, placeholder, error }) => {
         </svg>
       </div>
       <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`} style={{ maxHeight: '200px', overflowY: 'auto' }}>
-        {SHIFT_OPTIONS.map(shift => {
-          const isSelected = value.includes(shift);
+        {options.map(opt => {
+          const isSelected = value.includes(opt);
           return (
             <div
-              key={shift}
+              key={opt}
               className={`eob-select-option ${isSelected ? 'selected' : ''}`}
               onMouseDown={(e) => {
                 e.preventDefault(); e.stopPropagation();
-                toggleShift(shift);
+                toggleShift(opt);
               }}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px' }}
             >
@@ -187,7 +191,7 @@ const ShiftDropdown = ({ value, onChange, placeholder, error }) => {
                 readOnly
                 style={{ cursor: 'pointer', accentColor: '#3b82f6' }}
               />
-              <span style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.7)' }}>{shift}</span>
+              <span style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.7)' }}>{opt}</span>
             </div>
           );
         })}
@@ -219,15 +223,23 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
   const [errors, setErrors] = useState({});
   const [dynamicFloors, setDynamicFloors] = useState([]);
   const [successData, setSuccessData] = useState(null);
+  const [shifts, setShifts] = useState([]);
 
-  // Load companies on mount
+  // Load companies and shifts on mount
   useEffect(() => {
-    ApiService.getAdminCompanies()
-      .then(raw => {
-        const list = Array.isArray(raw) ? raw : (raw?.companies || raw?.data || []);
-        setCompanies(list);
-      })
-      .catch(() => {})
+    Promise.allSettled([
+      ApiService.getAdminCompanies(),
+      ApiService.getAdminShifts()
+    ]).then(([companiesRes, shiftsRes]) => {
+      const compList = companiesRes.status === 'fulfilled'
+        ? (Array.isArray(companiesRes.value) ? companiesRes.value : (companiesRes.value?.companies || companiesRes.value?.data || []))
+        : [];
+      const shiftList = shiftsRes.status === 'fulfilled'
+        ? (Array.isArray(shiftsRes.value) ? shiftsRes.value : (shiftsRes.value?.shifts || shiftsRes.value?.data || []))
+        : [];
+      setCompanies(compList);
+      setShifts(shiftList);
+    }).catch(() => {})
       .finally(() => setLoadingData(false));
   }, []);
 
@@ -587,6 +599,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               onChange={v => { set('shift_allowed', v); }}
               placeholder="Select Allowed Shifts"
               error={errors.shift_allowed}
+              shifts={shifts}
             />
           </Field>
         </div>
