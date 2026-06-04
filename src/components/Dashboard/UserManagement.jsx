@@ -8,7 +8,6 @@ const NAV_MODULES = [
 
   // --- OPERATIONS ---
   { code: 'reports', label: 'Service Reports', icon: '📄', category: 'Operations' },
-  { code: 'work_orders', label: 'Work Orders', icon: '🔧', category: 'Operations' },
   { code: 'pending_updates', label: 'Pending Approvals', icon: '⏳', category: 'Operations' },
   { code: 'auto_scheduler', label: 'Auto-Scheduler', icon: '📅', category: 'Operations' },
 
@@ -92,24 +91,24 @@ const CODE_TO_ID = {
   muster_point: 59
 };
 
-const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'inspector', status: 'active', company_id: '', supervisor_id: '', agm_id: '', availability_status: 'active', leave_start_at: '', leave_end_at: '', leave_reason: '' };
+const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'inspector', status: 'active', company_id: '', shift_id: '', supervisor_id: '', agm_id: '', availability_status: 'active', leave_start_at: '', leave_end_at: '', leave_reason: '' };
 const ROLE_ORDER = ['superadmin', 'admin', 'agm', 'supervisor', 'inspector'];
 const PAGE_SIZE = 10;
 
 const calculateSimilarity = (companyName, emailDomain) => {
   if (!companyName || !emailDomain) return 0;
-  
+
   // Extract main domain part (before first dot)
   const mainDomain = emailDomain.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
   const cleanCompany = companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
+
   if (!mainDomain || !cleanCompany) return 0;
-  
+
   // Find Longest Common Subsequence (LCS) length
   const m = mainDomain.length;
   const n = cleanCompany.length;
   const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
-  
+
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       if (mainDomain[i - 1] === cleanCompany[j - 1]) {
@@ -119,7 +118,7 @@ const calculateSimilarity = (companyName, emailDomain) => {
       }
     }
   }
-  
+
   const lcsLength = dp[m][n];
   const maxLen = Math.max(mainDomain.length, cleanCompany.length);
   const similarity = Math.round((lcsLength / maxLen) * 100);
@@ -136,9 +135,11 @@ const ensureArray = (val) => {
   if (Array.isArray(val)) return val;
   if (val && Array.isArray(val.users)) return val.users;
   if (val && Array.isArray(val.companies)) return val.companies;
+  if (val && Array.isArray(val.shifts)) return val.shifts;
   if (val && Array.isArray(val.data)) return val.data;
   if (val && val.data && Array.isArray(val.data.users)) return val.data.users;
   if (val && val.data && Array.isArray(val.data.companies)) return val.data.companies;
+  if (val && val.data && Array.isArray(val.data.shifts)) return val.data.shifts;
   return [];
 };
 
@@ -187,6 +188,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
   const [formError, setFormError] = useState('');
 
   const [companies, setCompanies] = useState([]);
+  const [shifts, setShifts] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [agms, setAgms] = useState([]);
 
@@ -194,7 +196,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
     if (!form.email || !form.email.trim() || !form.company_id) return null;
     const company = companies.find(c => String(c.id || c.company_id) === String(form.company_id));
     if (!company) return null;
-    
+
     const companyName = company.name || company.company_name;
     const emailDomain = getDomainFromEmail(form.email.trim());
     if (!emailDomain) return null;
@@ -224,6 +226,12 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
         if (active) setCompanies(ensureArray(data));
       })
       .catch(() => { if (active) setCompanies([]); });
+
+    ApiService.getAdminShifts()
+      .then(data => {
+        if (active) setShifts(ensureArray(data));
+      })
+      .catch(() => { if (active) setShifts([]); });
 
     ApiService.getAdminUsers({ role: 'supervisor' })
       .then(data => {
@@ -267,12 +275,12 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
   const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
 
-  const openAdd = () => { 
+  const openAdd = () => {
     setShowPasswordText(false);
-    setEditUser(null); 
-    setForm(EMPTY_FORM); 
-    setFormError(''); 
-    setShowForm(true); 
+    setEditUser(null);
+    setForm(EMPTY_FORM);
+    setFormError('');
+    setShowForm(true);
   };
 
   const handleDelete = async (u) => {
@@ -296,6 +304,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
       role: u.role || 'user',
       status: u.status || 'active',
       company_id: u.company_id || '',
+      shift_id: u.shift_id || '',
       supervisor_id: u.supervisor_id || '',
       agm_id: u.agm_id || '',
       availability_status: u.availability_status || 'active',
@@ -317,6 +326,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
         role: actualUser.role || 'user',
         status: actualUser.status || 'active',
         company_id: actualUser.company_id || '',
+        shift_id: actualUser.shift_id || '',
         supervisor_id: actualUser.supervisor_id || '',
         agm_id: actualUser.agm_id || '',
         availability_status: actualUser.availability_status || 'active',
@@ -435,6 +445,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
           role: form.role,
           status: form.status,
           company_id: form.company_id,
+          shift_id: form.shift_id ? Number(form.shift_id) : null,
           supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
           agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
         };
@@ -461,6 +472,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
           role: form.role,
           status: form.status,
           company_id: form.company_id,
+          shift_id: form.shift_id ? Number(form.shift_id) : null,
           supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
           agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
         });
@@ -676,11 +688,11 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
                 <div className="um-form-field">
                   <label>{editUser ? 'New Password (leave blank to keep)' : 'Password *'}</label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input 
-                      type={showPasswordText ? 'text' : 'password'} 
-                      value={form.password} 
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))} 
-                      placeholder={editUser ? '••••••••' : 'Enter password'} 
+                    <input
+                      type={showPasswordText ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                      placeholder={editUser ? '••••••••' : 'Enter password'}
                       style={{ paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                     />
                     <button
@@ -728,6 +740,15 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
                     <option value="">No Company</option>
                     {companies.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="um-form-field">
+                  <label>Assign Shift</label>
+                  <select value={form.shift_id || ''} onChange={e => setForm(f => ({ ...f, shift_id: e.target.value }))}>
+                    <option value="">No Shift</option>
+                    {shifts.map(s => (
+                      <option key={s.id} value={s.id}>{s.shift_name || s.name} ({s.start_time} - {s.end_time})</option>
                     ))}
                   </select>
                 </div>

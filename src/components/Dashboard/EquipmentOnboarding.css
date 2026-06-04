@@ -454,9 +454,17 @@
 
 /* ── DISABLED SELECT ─────────────────────────────────────────────────────── */
 .eob-select-trigger.disabled {
-  opacity: 0.45;
+  background: #0d2d4a;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.eob-select-trigger.disabled span {
+  color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.eob-select-trigger.disabled .eob-select-icon {
+  color: rgba(95, 211, 243, 0.3) !important;
 }
 
 /* ── SHIFT MULTI-SELECT CHIPS ────────────────────────────────────────────── */

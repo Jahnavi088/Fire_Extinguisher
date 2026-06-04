@@ -64,6 +64,10 @@ const InspectionHistoryPanel = ({ moduleId }) => {
             const sc = parseFloat(rec.score) || 0;
             const col = scoreColor(sc);
             const isFail = rec.result === 'fail';
+            const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+            const isApproved = (rec.approval_status || rec.status || '').toUpperCase() === 'APPROVED' || approvedLocally.map(String).includes(String(rec.id));
+            const isPending = !isApproved && (rec.approval_status || rec.status || '').toUpperCase() === 'PENDING';
+
             return (
               <div key={rec.id} className="fe-ih-row fe-ih-row-data">
                 <div className="fe-ih-col fe-ih-col-date">
@@ -90,11 +94,17 @@ const InspectionHistoryPanel = ({ moduleId }) => {
                   <span className="fe-ih-num fe-ih-fail">{rec.false_count ?? '—'}</span>
                 </div>
                 <div className="fe-ih-col fe-ih-col-status">
-                  <span className={`fe-ih-result ${isFail ? 'fe-ih-result-issues' : 'fe-ih-result-pass'}`}>
-                    {isFail
-                      ? (rec.critical_fail ? '⚠ Critical' : 'Fail')
-                      : 'Pass'}
-                  </span>
+                  {isPending ? (
+                    <span className="fe-ih-result fe-ih-result-pending" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px' }}>
+                      Pending
+                    </span>
+                  ) : (
+                    <span className={`fe-ih-result ${isFail ? 'fe-ih-result-issues' : 'fe-ih-result-pass'}`}>
+                      {isFail
+                        ? (rec.critical_fail ? '⚠ Critical' : 'Fail')
+                        : 'Pass'}
+                    </span>
+                  )}
                 </div>
               </div>
             );

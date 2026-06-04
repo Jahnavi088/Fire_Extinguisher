@@ -50,7 +50,7 @@ const getPendingEquipmentSosCodes = async (moduleId) => {
     iList.forEach(i => {
       const stStatus = (i.status || '').toUpperCase();
       const stApprov = (i.approval_status || '').toUpperCase();
-      const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id);
+      const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(i.id));
 
       if (!isApproved) {
         if (!moduleId || String(i.module_id) === String(moduleId)) {
@@ -967,10 +967,15 @@ export const ApiService = {
     return await request(`/admin/audit-log${qs(params)}`);
   },
 
-  // --- NOTIFICATIONS ---
   getNotifications: async (params = {}) => {
+    const currentUser = ApiService.getUser();
     try {
-      return await request(`/notifications${qs(params)}`);
+      let data = await request(`/notifications${qs(params)}`);
+      let list = Array.isArray(data) ? data : (data?.notifications || data?.items || data?.data || []);
+      if (currentUser) {
+        list = list.filter(n => !n.user_id || String(n.user_id) === String(currentUser.id));
+      }
+      return list;
     } catch (e) {
       console.warn('Backend /notifications failed, using local storage mock:', e);
       const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
@@ -988,16 +993,24 @@ export const ApiService = {
         localStorage.setItem('user_notifications', JSON.stringify(defaultNotifs));
         return defaultNotifs;
       }
+      if (currentUser) {
+        return saved.filter(n => !n.user_id || String(n.user_id) === String(currentUser.id));
+      }
       return saved;
     }
   },
 
   getNotificationsUnreadCount: async () => {
+    const currentUser = ApiService.getUser();
     try {
-      return await request('/notifications/unread-count');
+      const data = await request('/notifications/unread-count');
+      return data;
     } catch (e) {
       console.warn('Backend /notifications/unread-count failed, calculating from local storage mock:', e);
-      const saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      let saved = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+      if (currentUser) {
+        saved = saved.filter(n => !n.user_id || String(n.user_id) === String(currentUser.id));
+      }
       const unreadCount = saved.filter(n => !n.read && !n.is_read).length;
       return { unread_count: unreadCount };
     }
@@ -1260,6 +1273,9 @@ export const ApiService = {
         inspected_at: new Date().toISOString(),
         inspector_name: data.inspector_name || 'Inspector',
         submitted_by_name: data.inspector_name || 'Inspector',
+        inspector_id: data.inspector_id,
+        submitted_by_id: data.submitted_by_id,
+        user_id: data.user_id,
         remarks: data.remarks || 'Pending Approval',
         status: 'PENDING',
         approval_status: 'PENDING',

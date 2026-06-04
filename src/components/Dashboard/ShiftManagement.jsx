@@ -127,7 +127,7 @@ const ShiftManagement = ({ onBack }) => {
     setFormError('');
     try {
       const payload = {
-        name,
+        shift_name: name,
         start_time: templateForm.startTime,
         end_time: templateForm.endTime
       };
@@ -188,7 +188,6 @@ const ShiftManagement = ({ onBack }) => {
     setSaving(true);
     setFormError('');
     try {
-      // Find inspector name and shift name for UI fallback mapping
       const inspectorObj = inspectors.find(i => String(i.id) === String(assignmentForm.inspectorId));
       const shiftObj = shifts.find(s => String(s.id) === String(assignmentForm.shiftId));
 
@@ -197,8 +196,8 @@ const ShiftManagement = ({ onBack }) => {
         shift_id: Number(assignmentForm.shiftId),
         date: assignmentForm.date,
         // UI Helpers
-        inspector_name: inspectorObj ? `${inspectorObj.first_name || ''} ${inspectorObj.last_name || ''}`.trim() : `ID: ${assignmentForm.inspectorId}`,
-        shift_name: shiftObj ? shiftObj.name : 'Unknown Shift',
+        inspector_name: inspectorObj ? (inspectorObj.name || inspectorObj.username || '') : `ID: ${assignmentForm.inspectorId}`,
+        shift_name: shiftObj ? (shiftObj.shift_name || shiftObj.name) : 'Unknown Shift',
         start_time: shiftObj ? shiftObj.start_time : '00:00',
         end_time: shiftObj ? shiftObj.end_time : '00:00',
       };
@@ -560,7 +559,7 @@ const ShiftManagement = ({ onBack }) => {
                     <option value="" style={{ background: '#1e293b' }}>— Select Inspector —</option>
                     {inspectors.map(i => (
                       <option key={i.id} value={i.id} style={{ background: '#1e293b' }}>
-                        {i.first_name} {i.last_name} ({i.username || i.email})
+                        {i.name || i.username} ({i.username || i.email || 'No email'})
                       </option>
                     ))}
                   </select>
@@ -584,7 +583,7 @@ const ShiftManagement = ({ onBack }) => {
                     <option value="" style={{ background: '#1e293b' }}>— Select Shift Template —</option>
                     {shifts.map(s => (
                       <option key={s.id} value={s.id} style={{ background: '#1e293b' }}>
-                        {s.name} ({s.start_time} - {s.end_time})
+                        {s.shift_name || s.name} ({s.start_time} - {s.end_time})
                       </option>
                     ))}
                   </select>

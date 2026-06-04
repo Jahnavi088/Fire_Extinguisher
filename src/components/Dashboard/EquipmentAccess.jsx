@@ -61,6 +61,9 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [editingAssignment, setEditingAssignment] = useState(null);
+  const [editLevel, setEditLevel] = useState('user');
+  const [editLevelDropdownOpen, setEditLevelDropdownOpen] = useState(false);
 
   const getAccessLevelOptionLabel = (val) =>
     accessLevels.find(l => l.value === val)?.label || val || 'User';
@@ -118,8 +121,18 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   useEffect(() => {
     const adminId = currentUser?.id || currentUser?.user_id;
     if (!adminId || currentUser?.role === 'superadmin') return;
+
+    let targetId = adminId;
+    if (currentUser?.role === 'supervisor') {
+      const self = users.find(u => String(u.id) === String(adminId) || u.username === currentUser.username);
+      const agmId = self?.agm_id || self?.agmId || currentUser?.agm_id || currentUser?.agmId;
+      if (agmId) {
+        targetId = agmId;
+      }
+    }
+
     setAdminModulesLoading(true);
-    ApiService.getAdminUserModules(adminId)
+    ApiService.getAdminUserModules(targetId)
       .then(res => {
         const list = Array.isArray(res) ? res : (res?.modules || res?.data || []);
         setAdminModules(list);
@@ -128,13 +141,13 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
         console.error("Failed to load admin's modules:", err);
       })
       .finally(() => setAdminModulesLoading(false));
-  }, [currentUser]);
+  }, [currentUser, users]);
 
   // Filter dropdown modules: only show modules assigned to the current Admin
   const displayModules = useMemo(() => {
     if (!currentUser) return modules;
     if (currentUser.role === 'superadmin') return modules;
-    
+
     const allowedIds = new Set(adminModules.map(m => String(m.module_id || m.id)));
     return modules.filter(m => {
       const mId = m.module_id || m.id;
@@ -195,7 +208,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     try {
       const newAssignments = [];
       const promises = [];
-      
+
       selectedUsers.forEach(user => {
         selectedModules.forEach(m => {
           const moduleId = m.module_id || m.id;
@@ -247,6 +260,27 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
       alert(err.message || 'Failed to revoke access. Please try again.');
     } finally {
       setRemoving(null);
+    }
+  };
+
+  /* ── Update assignment ────────────────────────────────────────────── */
+  const handleUpdateAssignment = async () => {
+    if (!editingAssignment) return;
+    setSaving(true);
+    try {
+      await ApiService.addAdminUserModule(editingAssignment.userId, {
+        module_id: editingAssignment.moduleId,
+        access_level: editLevel,
+      });
+      dispatch({
+        type: 'add',
+        assignment: { ...editingAssignment, level: editLevel }
+      });
+      setEditingAssignment(null);
+    } catch (err) {
+      alert(err.message || 'Failed to update access level. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -302,7 +336,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                 <button className="ea-search-clear" onClick={() => setSearchQuery('')}>×</button>
               )}
             </div>
-            
+
             <button className="ea-add-nav-btn" onClick={() => setView('form')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
@@ -376,6 +410,20 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                               <td className="ea-date-cell">{formattedDate}</td>
                               <td style={{ textAlign: 'center' }}>
                                 <div className="ea-actions">
+                                  <button
+                                    className="ea-action-btn edit"
+                                    onClick={() => {
+                                      setEditingAssignment(a);
+                                      setEditLevel(a.level);
+                                      setEditLevelDropdownOpen(false);
+                                    }}
+                                    title="Edit Access"
+                                  >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                      <path d="M12 20h9" />
+                                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                    </svg>
+                                  </button>
                                   <button
                                     className="ea-action-btn delete"
                                     onClick={() => handleRemoveAssignment(a)}
@@ -491,12 +539,12 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                                   readOnly
                                   onClick={e => e.stopPropagation()}
                                 />
-                                  <span className="ea-option-main">
-                                    <span className="ea-option-name">{u.name || u.username}</span>
-                                    <span className="ea-option-sub">
-                                      {(u.role === 'user' || u.role === 'inspector') ? 'Inspector' : (u.role || 'Inspector')}
-                                    </span>
+                                <span className="ea-option-main">
+                                  <span className="ea-option-name">{u.name || u.username}</span>
+                                  <span className="ea-option-sub">
+                                    {(u.role === 'user' || u.role === 'inspector') ? 'Inspector' : (u.role || 'Inspector')}
                                   </span>
+                                </span>
                               </div>
                               {isSelected && <span className="ea-check">✓</span>}
                             </div>
@@ -618,6 +666,63 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
           </div>
         )}
       </div>
+
+      {editingAssignment && (
+        <div className="ea-modal-overlay" onClick={() => setEditingAssignment(null)}>
+          <div className="ea-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="ea-modal-header">
+              <span className="ea-modal-card-icon">✏️</span>
+              <div className="ea-modal-card-title">Update Access Level</div>
+            </div>
+            <div className="ea-modal-body">
+              <div className="ea-field">
+                <label className="ea-label">User</label>
+                <div className="ea-readonly-val">{editingAssignment.userName}</div>
+              </div>
+              <div className="ea-field">
+                <label className="ea-label">Equipment</label>
+                <div className="ea-readonly-val">{editingAssignment.moduleName}</div>
+              </div>
+              <div className="ea-field">
+                <label className="ea-label">Access Level</label>
+                <div className="ea-dropdown-wrap">
+                  <div
+                    className={`ea-dropdown-trigger ${editLevelDropdownOpen ? 'open' : ''}`}
+                    onClick={() => setEditLevelDropdownOpen(v => !v)}
+                  >
+                    <span className="ea-trigger-text">{getAccessLevelOptionLabel(editLevel)}</span>
+                    <svg className="ea-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
+                  {editLevelDropdownOpen && (
+                    <div className="ea-dropdown-options level-dropdown">
+                      {accessLevels.map(level => (
+                        <div
+                          key={level.value}
+                          className={`ea-option ${editLevel === level.value ? 'selected' : ''}`}
+                          onClick={() => { setEditLevel(level.value); setEditLevelDropdownOpen(false); }}
+                        >
+                          <div className="ea-option-main">
+                            <span className="ea-option-name">{level.label}</span>
+                          </div>
+                          {editLevel === level.value && <span className="ea-check">✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="ea-modal-footer">
+              <button className="ea-cancel-btn" onClick={() => setEditingAssignment(null)}>Cancel</button>
+              <button className="ea-submit-btn" onClick={handleUpdateAssignment} disabled={saving}>
+                {saving ? <><span className="ea-btn-spinner" /> Saving...</> : <>Save Changes</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(userDropdownOpen || moduleDropdownOpen || levelDropdownOpen) && (
         <div className="ea-overlay" onClick={closeDropdowns} />

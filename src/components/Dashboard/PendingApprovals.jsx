@@ -47,15 +47,18 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         start_date: startDateStr,
         end_date: endDateStr
       }),
-      ApiService.getPendingUpdates().catch(() => [])
-    ]).then(([inspectionsRes, updatesRes]) => {
+      ApiService.getPendingUpdates().catch(() => []),
+      ApiService.getAdminUsers().catch(() => [])
+    ]).then(([inspectionsRes, updatesRes, usersRes]) => {
       if (!active) return;
       
       const rawInspections = inspectionsRes.status === 'fulfilled' ? inspectionsRes.value : [];
       const rawUpdates = updatesRes.status === 'fulfilled' ? updatesRes.value : [];
+      const rawUsers = usersRes.status === 'fulfilled' ? usersRes.value : [];
       
       const iList = Array.isArray(rawInspections) ? rawInspections : (rawInspections?.items || rawInspections?.reports || rawInspections?.inspections || rawInspections?.data || []);
       const uList = Array.isArray(rawUpdates) ? rawUpdates : (rawUpdates?.items || rawUpdates?.updates || rawUpdates?.data || []);
+      const uListUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.users || rawUsers?.data || []);
       
       const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
       
@@ -85,6 +88,31 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
         const allowedIds = new Set(allowedModules.map(m => String(m.module_id)));
         merged = merged.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
       }
+
+      // If current user is a supervisor or admin, restrict list to their managed/company inspectors
+      const role = (user?.role || '').toLowerCase();
+      if (role === 'supervisor') {
+        const supervisorId = String(user?.id || user?.user_id);
+        const controlled = uListUsers.filter(u => String(u.supervisor_id || u.supervisorId) === supervisorId);
+        const controlledIds = new Set(controlled.map(u => String(u.id)));
+        
+        merged = merged.filter(item => {
+          const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+          return itemUserId === supervisorId || controlledIds.has(itemUserId);
+        });
+      } else if (role === 'admin') {
+        const adminCompanyId = user?.company_id || user?.companyId;
+        if (adminCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(adminCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          
+          merged = merged.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+      }
+
       merged.sort((a, b) => new Date(b.created_at || b.inspected_at || 0) - new Date(a.created_at || a.inspected_at || 0));
       
       setItems(merged);
@@ -583,48 +611,55 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
           </div>
           {!loading && items.length > 0 && (
             <div className="rpt-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {selectedIds.length > 0 && (
-                <div style={{ display: 'flex', gap: '8px', marginRight: '12px' }}>
-                  <button
-                    onClick={handleBulkApprove}
-                    disabled={bulkActionLoading}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '11px',
-                      background: '#16a34a',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    Approve Selected ({selectedIds.length})
-                  </button>
-                  <button
-                    onClick={handleBulkReject}
-                    disabled={bulkActionLoading}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '11px',
-                      background: '#dc2626',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    Reject Selected ({selectedIds.length})
-                  </button>
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: '8px', marginRight: '12px', alignItems: 'center' }}>
+                <label style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none', marginRight: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  Select All
+                </label>
+                <button
+                  onClick={handleBulkApprove}
+                  disabled={bulkActionLoading || selectedIds.length === 0}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    background: selectedIds.length > 0 ? '#16a34a' : 'rgba(255,255,255,0.05)',
+                    color: selectedIds.length > 0 ? '#fff' : 'rgba(255,255,255,0.3)',
+                    border: selectedIds.length > 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  Approve Selected ({selectedIds.length})
+                </button>
+                <button
+                  onClick={handleBulkReject}
+                  disabled={bulkActionLoading || selectedIds.length === 0}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    background: selectedIds.length > 0 ? '#dc2626' : 'rgba(255,255,255,0.05)',
+                    color: selectedIds.length > 0 ? '#fff' : 'rgba(255,255,255,0.3)',
+                    border: selectedIds.length > 0 ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  Reject Selected ({selectedIds.length})
+                </button>
+              </div>
               <input 
                 type="text" 
                 placeholder="Search requests..." 

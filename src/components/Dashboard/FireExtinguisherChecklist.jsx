@@ -100,6 +100,9 @@ export default function FireExtinguisherChecklist({ selectedEq, equipmentType, d
     try {
       const payload = {
         inspector_name: ApiService.getUser()?.name || 'Inspector',
+        inspector_id: ApiService.getUser()?.id,
+        submitted_by_id: ApiService.getUser()?.id,
+        user_id: ApiService.getUser()?.id,
         remarks: '[PENDING] Submitted via Web Dashboard',
         status: 'PENDING',
         approval_status: 'PENDING',
@@ -114,13 +117,18 @@ export default function FireExtinguisherChecklist({ selectedEq, equipmentType, d
         }
       };
 
-      // Use the specific equipment SOS code — queue locally for approval first
+      // Use the specific equipment SOS code — submit to backend
       const extPayload = {
         ...payload,
         module_id: module_id,
         equipment_name: displayName || selectedEq?.name || 'Fire Extinguisher'
       };
-      await ApiService.queueInspection(equipmentSosCode.trim(), extPayload);
+      try {
+        await ApiService.createInspection(equipmentSosCode.trim(), extPayload);
+      } catch (apiErr) {
+        console.warn('Backend submission failed, falling back to local queue:', apiErr);
+        await ApiService.queueInspection(equipmentSosCode.trim(), extPayload);
+      }
       setSubmitted(true);
     } catch (err) {
       console.error('Submission failed:', err);

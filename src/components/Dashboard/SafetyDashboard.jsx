@@ -39,7 +39,6 @@ import EmergencyExitStats from './EmergencyExitStats';
 import EmergencyLightingStats from './EmergencyLightingStats';
 import Reports from './Reports';
 import ChecklistConfig from './ChecklistConfig';
-import WorkOrders from './WorkOrders';
 import AuditLog from './AuditLog';
 import DeviceManagement from './DeviceManagement';
 import PendingApprovals from './PendingApprovals';
@@ -188,6 +187,43 @@ const CHECKLIST_TYPE_LABELS = {
   wind_sock: { label: 'Wind Sock', icon: '📍' },
 };
 
+const PAGE_TO_MODULE_MAP = {
+  'fire-stats': 'fire_extinguisher',
+  'sprinkler-stats': 'sprinkler',
+  'hose-stats': 'hose_reel',
+  'drum-stats': 'drum_hose',
+  'hydrant-stats': 'hydrant',
+  'fire-trolley-stats': 'fire_trolley',
+  'suppression-system-stats': 'suppression_system',
+  'fire-blanket-stats': 'fire_blanket',
+  'fire-alarm-panel-stats': 'fpca',
+  'smoke-detector-stats': 'smoke_detector',
+  'heat-detector-stats': 'heat_detector',
+  'emergency-exit-stats': 'emergency_exit',
+  'emergency-door-stats': 'emergency_door',
+  'co-detector-stats': 'co_detector',
+  'fire-door-stats': 'fire_door',
+  'emergency-lighting-stats': 'emergency_light',
+  'pa-siren-stats': 'pa_system',
+  'wind-sock-stats': 'wind_sock',
+  'scba-stats': 'scba',
+  'ambulance-stats': 'ambulance',
+  'first-aid-stats': 'first_aid_kit',
+  'emergency-shower-stats': 'safety_shower',
+  'eyewash-station-stats': 'eyewash_station',
+  'chemical-shower-stats': 'chemical_shower',
+  'spill-kit-stats': 'spill_kit',
+  'ppe-station-stats': 'ppe_station',
+  'safety-signage-stats': 'safety_signage',
+  'emergency-comm-stats': 'emergency_comm',
+  'muster-point-stats': 'muster_point',
+  'fire-brigade-stats': 'fire_brigade',
+  'volunteer-stats': 'volunteers',
+  'shift-volunteer-stats': 'shift_volunteers',
+  'trained-shift-stats': 'trained_shift',
+  'fire-noc-stats': 'fire_noc'
+};
+
 const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const getCompanyLogo = () => {
     const logo = user?.logo_url || user?.company_logo || user?.company?.logo || user?.logo || user?.company?.logo_url;
@@ -262,11 +298,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [topbarVisible, setTopbarVisible] = useState(true);
   const [adminCompanies, setAdminCompanies] = useState([]);
   const lastScrollY = React.useRef(0);
-  const [workOrderPrefill, setWorkOrderPrefill] = useState(null);
-  const handleRaiseWorkOrder = (sosCode) => {
-    setWorkOrderPrefill(sosCode);
-    setActivePage('work-orders');
-  };
+
 
   const fetchNotifications = async () => {
     setNotifLoading(true);
@@ -347,7 +379,10 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     const isAllowed = (page) => {
       if (page === 'grid' || page === 'overview') return true;
       let code = page;
-      if (page === 'work-orders') code = 'work_orders';
+      if (PAGE_TO_MODULE_MAP[page]) {
+        code = PAGE_TO_MODULE_MAP[page];
+      }
+
       if (page === 'pending-updates') code = 'pending_updates';
       if (page === 'auto-scheduler') code = 'auto_scheduler';
       if (page === 'setup-shifts') code = 'shifts';
@@ -458,7 +493,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         pendingItems = pendingItems.concat(iList.filter(i => {
           const stStatus = (i.status || '').toUpperCase();
           const stApprov = (i.approval_status || '').toUpperCase();
-          return !(stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.includes(i.id));
+          return !(stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(i.id)));
         }).map(i => ({ ...i, _itemType: 'inspection' })));
       }
 
@@ -466,7 +501,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         const raw = updatesRes.value;
         const uList = Array.isArray(raw) ? raw : (raw?.items || raw?.updates || raw?.data || []);
         pendingItems = pendingItems.concat(uList.filter(u => {
-          if (approvedLocally.includes(u.id)) return false;
+          if (approvedLocally.map(String).includes(String(u.id))) return false;
           const stStatus = (u.status || '').toUpperCase();
           const stApprov = (u.approval_status || '').toUpperCase();
           return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
@@ -549,19 +584,102 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         const usersData = await ApiService.getAdminUsers();
         const usersList = Array.isArray(usersData) ? usersData : (usersData?.users || usersData?.data || []);
         const supervisorsList = usersList.filter(u => u.role === 'supervisor');
+        const inspectorsList = usersList.filter(u => u.role === 'inspector' || u.role === 'user');
 
-        // Fetch inspections from last 3 days
         const today = new Date();
-        const startDateStr = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+
+        // Check supervisor review inactivity on inspections (older than 2 days)
+        const startDateStr = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const endDateStr = today.toISOString().split('T')[0];
         const reportsRes = await ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr });
         const reportsList = Array.isArray(reportsRes) ? reportsRes : (reportsRes?.items || reportsRes?.reports || reportsRes?.inspections || []);
 
+        reportsList.forEach(report => {
+          const stStatus = (report.status || '').toUpperCase();
+          const stApprov = (report.approval_status || '').toUpperCase();
+          const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(report.id));
+
+          if (!isApproved) {
+            const submitDate = new Date(report.created_at || report.inspected_at);
+            const diffMs = today.getTime() - submitDate.getTime();
+            const diffDays = diffMs / (24 * 60 * 60 * 1000);
+
+            if (diffDays >= 2) {
+              const inspectorId = report.submitted_by_id || report.inspector_id || report.user_id;
+              const inspector = inspectorsList.find(u => String(u.id) === String(inspectorId));
+              if (inspector) {
+                const supervisorId = inspector.supervisor_id || inspector.supervisorId;
+                const supervisor = supervisorsList.find(u => String(u.id) === String(supervisorId));
+                if (supervisor) {
+                  const targetAgmId = supervisor.agm_id || supervisor.agmId;
+                  if (targetAgmId) {
+                    const key = `notified_review_inactivity_${supervisor.id}_insp_${report.id}`;
+                    const lastNotified = localStorage.getItem(key);
+                    if (!lastNotified) {
+                      ApiService.sendTargetedNotification({
+                        user_id: targetAgmId,
+                        title: 'Supervisor Review Inactivity Alert',
+                        message: `Supervisor ${supervisor.name || supervisor.username} has not reviewed the pending inspection for ${report.sos_code || report.equipment_code} submitted by inspector ${inspector.name || inspector.username} for 2 days.`,
+                        type: 'warning'
+                      }).then(() => {
+                        localStorage.setItem(key, String(Date.now()));
+                      }).catch(console.error);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // Also check supervisor review inactivity on proposed updates (older than 2 days)
+        const updatesRes = await ApiService.getPendingUpdates().catch(() => []);
+        const updatesList = Array.isArray(updatesRes) ? updatesRes : (updatesRes?.items || updatesRes?.updates || updatesRes?.data || []);
+
+        updatesList.forEach(update => {
+          const stStatus = (update.status || '').toUpperCase();
+          const stApprov = (update.approval_status || '').toUpperCase();
+          const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(update.id));
+
+          if (!isApproved) {
+            const submitDate = new Date(update.created_at || update.submitted_at);
+            const diffMs = today.getTime() - submitDate.getTime();
+            const diffDays = diffMs / (24 * 60 * 60 * 1000);
+
+            if (diffDays >= 2) {
+              const inspectorId = update.submitted_by_id || update.inspector_id || update.user_id;
+              const inspector = inspectorsList.find(u => String(u.id) === String(inspectorId));
+              if (inspector) {
+                const supervisorId = inspector.supervisor_id || inspector.supervisorId;
+                const supervisor = supervisorsList.find(u => String(u.id) === String(supervisorId));
+                if (supervisor) {
+                  const targetAgmId = supervisor.agm_id || supervisor.agmId;
+                  if (targetAgmId) {
+                    const key = `notified_review_inactivity_${supervisor.id}_upd_${update.id}`;
+                    const lastNotified = localStorage.getItem(key);
+                    if (!lastNotified) {
+                      ApiService.sendTargetedNotification({
+                        user_id: targetAgmId,
+                        title: 'Supervisor Review Inactivity Alert',
+                        message: `Supervisor ${supervisor.name || supervisor.username} has not reviewed the pending update for ${update.sos_code || update.equipment_code} submitted by inspector ${inspector.name || inspector.username} for 2 days.`,
+                        type: 'warning'
+                      }).then(() => {
+                        localStorage.setItem(key, String(Date.now()));
+                      }).catch(console.error);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // Fallback: Also check if supervisor has not submitted any reports in 24 hours
         supervisorsList.forEach(supervisor => {
           const targetAgmId = supervisor.agm_id || supervisor.agmId;
-          if (!targetAgmId) return; // Must have an AGM assigned to notify
+          if (!targetAgmId) return;
 
-          // Check if supervisor has any inspection in the last 24 hours
           const last24h = new Date(today.getTime() - 24 * 60 * 60 * 1000);
           const hasInspection = reportsList.some(report => {
             const reportDate = new Date(report.created_at || report.inspected_at);
@@ -573,7 +691,6 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           });
 
           if (!hasInspection) {
-            // Check localStorage to avoid duplicate notifications within 24 hours
             const key = `notified_inactivity_${supervisor.id}`;
             const lastNotified = localStorage.getItem(key);
             const oneDayMs = 24 * 60 * 60 * 1000;
@@ -826,11 +943,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     const isGlobal = isAdminOrSuper || role === 'safety_manager';
 
     // 1. Role-based hard boundaries (Security Overrides)
-    if (code === 'user_manage' || code === 'equipment_access' || code === 'add_equipment' || code === 'setup_company' || code === 'setup_domains') {
+    if (code === 'user_manage' || code === 'add_equipment' || code === 'setup_company' || code === 'setup_domains') {
       if (!isAdminOrSuper) return false;
     }
+    if (code === 'equipment_access') {
+      if (!isAdminOrSuper && role !== 'agm' && role !== 'supervisor') return false;
+    }
     if (code === 'audit_logs' || code === 'device_monitoring') {
-      if (!isGlobal) return false;
+      if (!isGlobal || role === 'admin') return false;
     }
     if (code === 'auto_scheduler') {
       if (role === 'user' || role === 'inspector') return false;
@@ -841,7 +961,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
     const hasNavList = Array.isArray(navAccessList) && navAccessList.length > 0;
     const hasEqList = Array.isArray(equipmentAccessList) && equipmentAccessList.length > 0;
-    const isStandardNav = ['overview', 'reports', 'work_orders', 'auto_scheduler', 'audit_logs', 'device_monitoring'].includes(code);
+    const isStandardNav = ['overview', 'reports', 'auto_scheduler', 'audit_logs', 'device_monitoring'].includes(code);
 
     if (hasNavList || (hasEqList && !isStandardNav)) {
       const allowedNav = hasNavList ? navAccessList : [];
@@ -864,13 +984,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
     // 4. Default role fallback if list is entirely missing/null
     if (role === 'agm') {
-      return !['user_manage', 'equipment_access', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring'].includes(code);
+      return !['user_manage', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring'].includes(code);
     }
     if (role === 'supervisor') {
-      return !['user_manage', 'equipment_access', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring', 'auto_scheduler'].includes(code);
+      return !['user_manage', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring', 'auto_scheduler'].includes(code);
     }
     if (role === 'user' || role === 'inspector') {
-      return ['overview', 'reports'].includes(code) || (!['work_orders', 'pending_updates', 'auto_scheduler', 'audit_logs', 'device_monitoring', 'user_manage', 'equipment_access', 'add_equipment', 'setup_company'].includes(code));
+      return ['overview', 'reports'].includes(code) || (!['pending_updates', 'auto_scheduler', 'audit_logs', 'device_monitoring', 'user_manage', 'equipment_access', 'add_equipment', 'setup_company'].includes(code));
     }
 
     return false;
@@ -892,7 +1012,6 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       label: 'Field Operations',
       items: [
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>, label: 'Service Reports', code: 'reports', active: activePage === 'reports', onClick: () => setActivePage('reports') },
-        { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>, label: 'Work Orders', code: 'work_orders', active: activePage === 'work-orders', onClick: () => setActivePage('work-orders') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Pending Approvals', code: 'pending_updates', badge: pendingApprovalsCount, active: activePage === 'pending-updates', onClick: () => setActivePage('pending-updates') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>, label: 'Auto-Scheduler', code: 'auto_scheduler', active: activePage === 'auto-scheduler', onClick: () => setActivePage('auto-scheduler') },
         { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: 'Shift Management', code: 'shifts', active: activePage === 'setup-shifts', onClick: () => setActivePage('setup-shifts') },
@@ -1336,103 +1455,103 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
 
             <section className={`page ${activePage === 'fire-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
-              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'hose-stats' ? 'active' : ''}`}>
-              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'drum-stats' ? 'active' : ''}`}>
-              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'hydrant-stats' ? 'active' : ''}`}>
-              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-trolley-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
-              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-blanket-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-alarm-panel-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'heat-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'heat-detector-stats' && <HeatDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'heat-detector-stats' && <HeatDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'co-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'co-detector-stats' && <CODetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'co-detector-stats' && <CODetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-door-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-door-stats' && <FireDoorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-door-stats' && <FireDoorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'emergency-lighting-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
-              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'wind-sock-stats' ? 'active' : ''}`}>
-              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'scba-stats' ? 'active' : ''}`}>
-              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'ambulance-stats' ? 'active' : ''}`}>
-              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'first-aid-stats' ? 'active' : ''}`}>
-              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'emergency-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'eyewash-station-stats' ? 'active' : ''}`}>
-              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'chemical-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'spill-kit-stats' ? 'active' : ''}`}>
-              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'ppe-station-stats' ? 'active' : ''}`}>
-              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'safety-signage-stats' ? 'active' : ''}`}>
-              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'emergency-comm-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'muster-point-stats' ? 'active' : ''}`}>
-              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-brigade-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'shift-volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'trained-shift-stats' ? 'active' : ''}`}>
-              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
             <section className={`page ${activePage === 'fire-noc-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll} onRaiseWorkOrder={handleRaiseWorkOrder} />}
+              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
             </section>
 
             {/* ── REPORTS ── */}
@@ -1440,20 +1559,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               {activePage === 'reports' && <Reports onBack={() => setActivePage('grid')} allowedModules={filteredModules} />}
             </section>
 
-            {/* ── WORK ORDERS ── */}
-            <section className={`page ${activePage === 'work-orders' ? 'active' : ''}`}>
-              {activePage === 'work-orders' && (
-                <WorkOrders
-                  allowedModules={filteredModules}
-                  onBack={() => {
-                    setActivePage('grid');
-                    setWorkOrderPrefill(null);
-                  }}
-                  prefill={workOrderPrefill}
-                  clearPrefill={() => setWorkOrderPrefill(null)}
-                />
-              )}
-            </section>
+
 
             {/* ── PENDING APPROVALS ── */}
             <section className={`page ${activePage === 'pending-updates' ? 'active' : ''}`}>

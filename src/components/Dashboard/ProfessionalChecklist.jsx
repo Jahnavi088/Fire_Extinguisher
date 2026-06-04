@@ -40,6 +40,9 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
     try {
       const payload = {
         inspector_name: ApiService.getUser()?.name || 'Inspector',
+        inspector_id: ApiService.getUser()?.id,
+        submitted_by_id: ApiService.getUser()?.id,
+        user_id: ApiService.getUser()?.id,
         remarks: '[PENDING] Submitted via Professional Checklist',
         status: 'PENDING',
         approval_status: 'PENDING',
@@ -59,7 +62,12 @@ const ProfessionalChecklist = ({ module, items, onBack, onComplete }) => {
         module_id: module.module_id || module.id,
         equipment_name: module.name || 'Equipment'
       };
-      await ApiService.queueInspection(String(module.module_id || module.id), extPayload);
+      try {
+        await ApiService.createInspection(String(module.module_id || module.id), extPayload);
+      } catch (apiErr) {
+        console.warn('Backend submission failed, falling back to local queue:', apiErr);
+        await ApiService.queueInspection(String(module.module_id || module.id), extPayload);
+      }
       alert('Inspection submitted successfully!');
       if (onComplete) onComplete();
       onBack();

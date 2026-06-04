@@ -645,7 +645,7 @@
 
 /* Autofill adjustments to prevent white backgrounds */
 .um-form-field input:-webkit-autofill,
-.um-form-field input:-webkit-autofill:hover, 
+.um-form-field input:-webkit-autofill:hover,
 .um-form-field input:-webkit-autofill:focus,
 .um-form-field input:-webkit-autofill:active {
   -webkit-text-fill-color: #fff !important;

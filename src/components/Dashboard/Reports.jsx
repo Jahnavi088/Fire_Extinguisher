@@ -633,6 +633,46 @@ ${checklistHtml}
         const allowedIds = new Set(allowedModules.map(m => String(m.module_id)));
         finalData = finalData.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
       }
+
+      // If the current user is an inspector/end user, only show their own reports
+      const currentUser = ApiService.getUser();
+      const role = (currentUser?.role || '').toLowerCase();
+      if (role === 'user' || role === 'inspector') {
+        const currentUserId = String(currentUser?.id || currentUser?.user_id);
+        finalData = finalData.filter(r => {
+          const repUserId = String(r.submitted_by_id || r.inspector_id || r.user_id || '');
+          return repUserId === currentUserId;
+        });
+      } else if (role === 'supervisor' || role === 'admin') {
+        try {
+          const rawUsers = await ApiService.getAdminUsers();
+          const userList = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.users || rawUsers?.data || []);
+          
+          if (role === 'supervisor') {
+            const controlled = userList.filter(u => String(u.supervisor_id || u.supervisorId) === String(currentUser.id || currentUser.user_id));
+            const controlledUserIds = new Set(controlled.map(u => String(u.id)));
+            
+            finalData = finalData.filter(r => {
+              const repUserId = String(r.submitted_by_id || r.inspector_id || r.user_id || '');
+              const currentUserId = String(currentUser?.id || currentUser?.user_id);
+              return repUserId === currentUserId || controlledUserIds.has(repUserId);
+            });
+          } else if (role === 'admin') {
+            const adminCompanyId = currentUser.company_id || currentUser.companyId;
+            if (adminCompanyId) {
+              const companyUsers = userList.filter(u => String(u.company_id || u.companyId) === String(adminCompanyId));
+              const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+              
+              finalData = finalData.filter(r => {
+                const repUserId = String(r.submitted_by_id || r.inspector_id || r.user_id || '');
+                return companyUserIds.has(repUserId);
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load users for supervisor/admin filtering", e);
+        }
+      }
       
       setData(finalData);
     } catch (err) {
