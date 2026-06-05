@@ -91,19 +91,50 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
 
       // If current user is a supervisor or admin, restrict list to their managed/company inspectors
       const role = (user?.role || '').toLowerCase();
+      const currentUserId = String(user?.id || user?.user_id || '');
+      const userCompanyId = user?.company_id || user?.companyId;
+
       if (role === 'supervisor') {
-        const supervisorId = String(user?.id || user?.user_id);
-        const controlled = uListUsers.filter(u => String(u.supervisor_id || u.supervisorId) === supervisorId);
+        const controlled = uListUsers.filter(u => String(u.supervisor_id || u.supervisorId) === currentUserId);
         const controlledIds = new Set(controlled.map(u => String(u.id)));
         
-        merged = merged.filter(item => {
+        let teamFiltered = merged.filter(item => {
           const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
-          return itemUserId === supervisorId || controlledIds.has(itemUserId);
+          return itemUserId === currentUserId || controlledIds.has(itemUserId);
         });
-      } else if (role === 'admin') {
-        const adminCompanyId = user?.company_id || user?.companyId;
-        if (adminCompanyId) {
-          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(adminCompanyId));
+
+        // Fallback to company-wide if team list is empty but we have company ID
+        if (teamFiltered.length === 0 && userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          teamFiltered = merged.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+        merged = teamFiltered;
+      } else if (role === 'agm') {
+        const controlled = uListUsers.filter(u => String(u.agm_id || u.agmId) === currentUserId);
+        const controlledIds = new Set(controlled.map(u => String(u.id)));
+        
+        let teamFiltered = merged.filter(item => {
+          const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+          return itemUserId === currentUserId || controlledIds.has(itemUserId);
+        });
+
+        // Fallback to company-wide if team list is empty but we have company ID
+        if (teamFiltered.length === 0 && userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          teamFiltered = merged.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+        merged = teamFiltered;
+      } else if (role === 'admin' || role === 'superadmin') {
+        if (userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
           const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
           
           merged = merged.filter(item => {
@@ -278,12 +309,12 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
 
       // Send targeted notifications to submitting users for each approved item
       selectedItemsList.forEach(item => {
-         const toUser = item.submitted_by_id || item.inspector_id || item.user_id;
+         const toUser = item.submitted_by_id || item.submittedById || item.inspector_id || item.inspectorId || item.user_id || item.userId;
          if (toUser) {
             ApiService.sendTargetedNotification({
                user_id: toUser,
-               title: 'Inspection Approved Successfully',
-               message: `Your inspection submission for ${item.sos_code || item.equipment_code} has been approved successfully.`,
+               title: 'Inspection Successful',
+               message: `Your inspection submission for ${item.sos_code || item.equipment_code} has been approved and marked successful.`,
                type: 'success'
             }).catch(console.error);
          }
@@ -486,18 +517,18 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       }
       
       // Send notification to submitter
-      const toUser = selectedItem.submitted_by_id || selectedItem.inspector_id || selectedItem.user_id;
+      const toUser = selectedItem.submitted_by_id || selectedItem.submittedById || selectedItem.inspector_id || selectedItem.inspectorId || selectedItem.user_id || selectedItem.userId;
       if (toUser) {
          ApiService.sendTargetedNotification({
             user_id: toUser,
-            title: 'Inspection Approved Successfully',
-            message: `Your inspection submission for ${selectedItem.sos_code || selectedItem.equipment_code} has been approved successfully.`,
+            title: 'Inspection Successful',
+            message: `Your inspection submission for ${selectedItem.sos_code || selectedItem.equipment_code} has been approved and marked successful.`,
             type: 'success'
          }).catch(console.error);
       } else {
          ApiService.broadcastNotification({
-            title: 'Inspection Approved Successfully',
-            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'Inspector'} has been approved successfully.`,
+            title: 'Inspection Successful',
+            message: `Submission for ${selectedItem.sos_code || selectedItem.equipment_code} by ${selectedItem.submitted_by_name || selectedItem.inspector_name || 'Inspector'} has been approved and marked successful.`,
             type: 'success'
          }).catch(console.error);
       }

@@ -76,11 +76,7 @@ function App() {
           const isAdmin = role === 'admin' || role === 'superadmin';
 
           if (userId) {
-            if (isAdmin) {
-              setNavAccess(await loadNavAccess(userId));
-            } else {
-              setNavAccess(null);
-            }
+            setNavAccess(await loadNavAccess(userId));
             setEquipmentAccess(await loadEquipmentAccess(userId));
           }
         } catch (error) {
@@ -102,16 +98,10 @@ function App() {
 
     const u = userData?.user || userData;
     const userId = u?.id || u?.user_id;
-    const role = (u?.role || '').toLowerCase();
-    const isAdmin = role === 'admin' || role === 'superadmin';
 
     if (userId) {
       try {
-        if (isAdmin) {
-          setNavAccess(await loadNavAccess(userId));
-        } else {
-          setNavAccess(null);
-        }
+        setNavAccess(await loadNavAccess(userId));
       } catch (err) {
         console.error("Failed to load nav access on login:", err);
       }

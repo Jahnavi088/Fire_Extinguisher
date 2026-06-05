@@ -40,7 +40,7 @@ function dataReducer(state, action) {
   }
 }
 
-const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin = false }) => {
+const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin = false, initialSearchQuery = '', initialSelectedUserId = null, onOpenModule }) => {
   const [dataState, dispatch] = useReducer(dataReducer, {
     loading: true, error: null, users: [], assignments: [],
   });
@@ -49,10 +49,26 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [view, setView] = useState('list'); // 'list' or 'form'
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+
+  useEffect(() => {
+    setSearchQuery(initialSearchQuery);
+  }, [initialSearchQuery]);
+
+  useEffect(() => {
+    if (initialSelectedUserId && users.length > 0) {
+      const user = users.find(u => String(u.id) === String(initialSelectedUserId));
+      if (user) {
+        setSelectedUsers([user]);
+        setView('form');
+      }
+    }
+  }, [initialSelectedUserId, users]);
 
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [selectedModules, setSelectedModules] = useState([]);
+  const [viewingUserModules, setViewingUserModules] = useState(null);
   const [accessLevels, setAccessLevels] = useState(ACCESS_LEVELS);
   const [accessLevel, setAccessLevel] = useState('user');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -94,6 +110,12 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     setCurrentPage(1);
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (!userDropdownOpen) {
+      setUserSearchQuery('');
+    }
+  }, [userDropdownOpen]);
+
   const modules = availableModules.length > 0 ? availableModules : [];
 
   const currentUser = ApiService.getUser();
@@ -107,12 +129,18 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     }
   }
 
-  // Filter dropdown users: only show users assigned to the current Admin's company
+  // Filter dropdown users: only show users assigned to the current Admin's company and matching the search query
   const filteredUsersForDropdown = users.filter(u => {
     if (!currentUser) return true;
     if (currentUser.role === 'superadmin') return true;
     if (!adminCompanyId) return true; // Fallback to showing all if we can't find the company ID yet
     return String(u.company_id) === String(adminCompanyId);
+  }).filter(u => {
+    const q = userSearchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const name = (u.name || u.username || '').toLowerCase();
+    const role = (u.role || '').toLowerCase();
+    return name.includes(q) || role.includes(q);
   });
 
   const [adminModules, setAdminModules] = useState([]);
@@ -123,13 +151,6 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     if (!adminId || currentUser?.role === 'superadmin') return;
 
     let targetId = adminId;
-    if (currentUser?.role === 'supervisor') {
-      const self = users.find(u => String(u.id) === String(adminId) || u.username === currentUser.username);
-      const agmId = self?.agm_id || self?.agmId || currentUser?.agm_id || currentUser?.agmId;
-      if (agmId) {
-        targetId = agmId;
-      }
-    }
 
     setAdminModulesLoading(true);
     ApiService.getAdminUserModules(targetId)
@@ -155,17 +176,45 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     });
   }, [modules, currentUser, adminModules]);
 
+  // Pre-populate selectedModules with currently assigned modules when exactly one user is selected
+  useEffect(() => {
+    if (selectedUsers.length === 1) {
+      const userId = selectedUsers[0].id;
+      const userAssignments = assignments.filter(a => String(a.userId) === String(userId));
+      const preselected = modules.filter(m =>
+        userAssignments.some(a => String(a.moduleId) === String(m.module_id || m.id))
+      );
+      setSelectedModules(preselected);
+    } else {
+      setSelectedModules([]);
+    }
+  }, [selectedUsers, assignments, modules]);
+
   /* ── Load users + their module assignments ─────────────────────── */
   useEffect(() => {
     let active = true;
     const run = async () => {
       try {
+        let userList = [];
+        const role = (currentUser?.role || '').toLowerCase();
+        const currentUserId = currentUser?.id || currentUser?.user_id;
+
         const raw = await ApiService.getAdminUsers();
         if (!active) return;
-        const userList = Array.isArray(raw) ? raw : (raw?.users || raw?.data || []);
+        userList = Array.isArray(raw) ? raw : (raw?.users || raw?.data || []);
+
+        // Deduplicate user list by ID
+        const seen = new Set();
+        const uniqueUserList = [];
+        userList.forEach(u => {
+          if (u && u.id && !seen.has(u.id)) {
+            seen.add(u.id);
+            uniqueUserList.push(u);
+          }
+        });
 
         const results = await Promise.allSettled(
-          userList.map(u => ApiService.getAdminUserModules(u.id).then(d => ({ user: u, data: d })))
+          uniqueUserList.map(u => ApiService.getAdminUserModules(u.id).then(d => ({ user: u, data: d })))
         );
         if (!active) return;
 
@@ -200,50 +249,53 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   /* ── Add assignment ───────────────────────────────────────────────── */
   /* ── Add assignment ───────────────────────────────────────────────── */
   const handleAddAssignment = async () => {
-    if (selectedUsers.length === 0 || selectedModules.length === 0) {
-      alert('Please select at least one user and at least one equipment module.');
+    if (selectedUsers.length === 0) {
+      alert('Please select at least one user.');
       return;
     }
     setSaving(true);
     try {
-      const newAssignments = [];
       const promises = [];
 
       selectedUsers.forEach(user => {
+        const userAssignments = assignments.filter(a => String(a.userId) === String(user.id));
+        const assignedIds = new Set(userAssignments.map(a => String(a.moduleId)));
+        const selectedIds = new Set(selectedModules.map(m => String(m.module_id || m.id)));
+
+        // Modules to add: selected, but not currently assigned
         selectedModules.forEach(m => {
           const moduleId = m.module_id || m.id;
-          promises.push(
-            ApiService.addAdminUserModule(user.id, {
-              module_id: moduleId,
-              access_level: accessLevel,
-            }).then(() => {
-              newAssignments.push({
-                id: `${user.id}_${moduleId}`,
-                userId: user.id,
-                userName: user.name || user.username || 'Unknown',
-                moduleId,
-                moduleName: m.name,
-                moduleCode: m.code || '',
-                level: accessLevel,
-                date: new Date().toISOString().split('T')[0],
-              });
-            })
-          );
+          if (!assignedIds.has(String(moduleId))) {
+            promises.push(
+              ApiService.addAdminUserModule(user.id, {
+                module_id: moduleId,
+                access_level: accessLevel,
+              })
+            );
+          }
+        });
+
+        // Modules to remove: currently assigned, but not selected
+        userAssignments.forEach(a => {
+          if (!selectedIds.has(String(a.moduleId))) {
+            promises.push(
+              ApiService.removeAdminUserModule(user.id, a.moduleId)
+            );
+          }
         });
       });
 
       await Promise.all(promises);
 
-      dispatch({
-        type: 'add_batch',
-        assignments: newAssignments,
-      });
+      // Reload assignments list from server
+      setRefreshKey(k => k + 1);
+
       setSelectedUsers([]);
       setSelectedModules([]);
       setAccessLevel('user');
       setView('list');
     } catch (err) {
-      alert(err.message || 'Failed to assign access. Please try again.');
+      alert(err.message || 'Failed to update access assignments. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -301,7 +353,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   });
 
   return (
-    <div className="ea-page">
+    <div className="setup-page ea-page">
       <div className="setup-header">
         <button className="setup-back-btn" onClick={view === 'list' ? onBack : () => setView('list')} title="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -321,23 +373,23 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
         </div>
         {view === 'list' && (
           <div className="setup-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="ea-search-wrap">
-              <svg className="ea-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="um-search-wrap" style={{ margin: 0 }}>
+              <svg className="um-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input
                 type="text"
-                className="ea-search"
+                className="um-search"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               {searchQuery && (
-                <button className="ea-search-clear" onClick={() => setSearchQuery('')}>×</button>
+                <button className="um-search-clear" onClick={() => setSearchQuery('')}>×</button>
               )}
             </div>
 
-            <button className="ea-add-nav-btn" onClick={() => setView('form')}>
+            <button className="um-add-btn" onClick={() => setView('form')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" />
               </svg>
@@ -422,6 +474,24 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
                                       <path d="M12 20h9" />
                                       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    className="ea-action-btn view-module"
+                                    onClick={() => {
+                                      const u = users.find(usr => String(usr.id) === String(a.userId));
+                                      if (u) {
+                                        setViewingUserModules(u);
+                                      } else {
+                                        alert('User details not found.');
+                                      }
+                                    }}
+                                    title="View Assigned Modules"
+                                    style={{ color: '#10b981' }}
+                                  >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                      <circle cx="12" cy="12" r="3" />
                                     </svg>
                                   </button>
                                   <button
@@ -513,43 +583,61 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                       </svg>
                     </div>
                     {userDropdownOpen && !usersLoading && (
-                      <div className="ea-dropdown-options">
-                        {filteredUsersForDropdown.length === 0 ? (
-                          <div className="ea-option-empty">No users found</div>
-                        ) : filteredUsersForDropdown.map(u => {
-                          const isSelected = selectedUsers.some(item => item.id === u.id);
-                          return (
-                            <div
-                              key={u.id}
-                              className={`ea-option ${isSelected ? 'selected' : ''}`}
-                              onClick={() => {
-                                const exists = selectedUsers.some(item => item.id === u.id);
-                                if (exists) {
-                                  setSelectedUsers(selectedUsers.filter(item => item.id !== u.id));
-                                } else {
-                                  setSelectedUsers([...selectedUsers, u]);
-                                }
-                              }}
-                            >
-                              <div className="ea-option-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <input
-                                  type="checkbox"
-                                  className="ea-module-checkbox"
-                                  checked={isSelected}
-                                  readOnly
-                                  onClick={e => e.stopPropagation()}
-                                />
-                                <span className="ea-option-main">
-                                  <span className="ea-option-name">{u.name || u.username}</span>
-                                  <span className="ea-option-sub">
-                                    {(u.role === 'user' || u.role === 'inspector') ? 'Inspector' : (u.role || 'Inspector')}
+                      <div className="ea-dropdown-options with-search">
+                        <div className="ea-dropdown-search-container" onClick={e => e.stopPropagation()}>
+                          <svg className="ea-dropdown-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                          <input
+                            type="text"
+                            className="ea-dropdown-search-input"
+                            placeholder="Search by name or role..."
+                            value={userSearchQuery}
+                            onChange={e => setUserSearchQuery(e.target.value)}
+                            autoFocus
+                          />
+                          {userSearchQuery && (
+                            <button className="ea-dropdown-search-clear-btn" onClick={() => setUserSearchQuery('')}>×</button>
+                          )}
+                        </div>
+                        <div className="ea-dropdown-options-list">
+                          {filteredUsersForDropdown.length === 0 ? (
+                            <div className="ea-option-empty">No users found</div>
+                          ) : filteredUsersForDropdown.map(u => {
+                            const isSelected = selectedUsers.some(item => item.id === u.id);
+                            return (
+                              <div
+                                key={u.id}
+                                className={`ea-option ${isSelected ? 'selected' : ''}`}
+                                onClick={() => {
+                                  const exists = selectedUsers.some(item => item.id === u.id);
+                                  if (exists) {
+                                    setSelectedUsers(selectedUsers.filter(item => item.id !== u.id));
+                                  } else {
+                                    setSelectedUsers([...selectedUsers, u]);
+                                  }
+                                }}
+                              >
+                                <div className="ea-option-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <input
+                                    type="checkbox"
+                                    className="ea-module-checkbox"
+                                    checked={isSelected}
+                                    readOnly
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  <span className="ea-option-main">
+                                    <span className="ea-option-name">{u.name || u.username}</span>
+                                    <span className="ea-option-sub">
+                                      {(u.role === 'user' || u.role === 'inspector') ? 'Inspector' : (u.role || 'Inspector')}
+                                    </span>
                                   </span>
-                                </span>
+                                </div>
+                                {isSelected && <span className="ea-check">✓</span>}
                               </div>
-                              {isSelected && <span className="ea-check">✓</span>}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -575,52 +663,40 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </div>
-                    {moduleDropdownOpen && (() => {
-                      const assignedModuleIds = selectedUsers.length === 1
-                        ? assignments.filter(a => String(a.userId) === String(selectedUsers[0].id)).map(a => String(a.moduleId))
-                        : [];
-                      return (
-                        <div className="ea-dropdown-options">
-                          {displayModules.map(m => {
-                            const mId = m.module_id || m.id;
-                            const isAssigned = assignedModuleIds.includes(String(mId));
-                            const isSelected = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
-                            const isChecked = isAssigned || isSelected;
-                            return (
-                              <div
-                                key={mId}
-                                className={`ea-option ${isSelected ? 'selected' : ''} ${isAssigned ? 'already-assigned' : ''}`}
-                                onClick={() => {
-                                  if (!isAssigned) {
-                                    const exists = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
-                                    if (exists) {
-                                      setSelectedModules(selectedModules.filter(item => String(item.module_id || item.id) !== String(mId)));
-                                    } else {
-                                      setSelectedModules([...selectedModules, m]);
-                                    }
-                                  }
-                                }}
-                              >
-                                <div className="ea-option-row">
-                                  <input
-                                    type="checkbox"
-                                    className="ea-module-checkbox"
-                                    checked={isChecked}
-                                    readOnly
-                                    onClick={e => e.stopPropagation()}
-                                  />
-                                  <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
-                                  <span className="ea-option-name">{m.name}</span>
-                                </div>
-                                {isAssigned && (
-                                  <span className="ea-assigned-label">Assigned</span>
-                                )}
+                    {moduleDropdownOpen && (
+                      <div className="ea-dropdown-options">
+                        {displayModules.map(m => {
+                          const mId = m.module_id || m.id;
+                          const isSelected = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
+                          return (
+                            <div
+                              key={mId}
+                              className={`ea-option ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                const exists = selectedModules.some(item => String(item.module_id || item.id) === String(mId));
+                                if (exists) {
+                                  setSelectedModules(selectedModules.filter(item => String(item.module_id || item.id) !== String(mId)));
+                                } else {
+                                  setSelectedModules([...selectedModules, m]);
+                                }
+                              }}
+                            >
+                              <div className="ea-option-row">
+                                <input
+                                  type="checkbox"
+                                  className="ea-module-checkbox"
+                                  checked={isSelected}
+                                  readOnly
+                                  onClick={e => e.stopPropagation()}
+                                />
+                                <span className="ea-option-icon">{MODULE_EMOJI[m.code] || '📦'}</span>
+                                <span className="ea-option-name">{m.name}</span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -723,6 +799,46 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
           </div>
         </div>
       )}
+
+      {viewingUserModules && (() => {
+        const userAssignments = assignments.filter(a => String(a.userId) === String(viewingUserModules.id));
+        return (
+          <div className="ea-modal-overlay" onClick={() => setViewingUserModules(null)}>
+            <div className="ea-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <div className="ea-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <span className="ea-modal-card-icon">🗂️</span>
+                <div className="ea-modal-card-title" style={{ fontSize: '18px' }}>
+                  Assigned Modules — {viewingUserModules.name || viewingUserModules.username}
+                </div>
+                <button className="ea-modal-close-btn" onClick={() => setViewingUserModules(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '20px', cursor: 'pointer', outline: 'none' }}>&times;</button>
+              </div>
+              <div className="ea-modal-body" style={{ maxHeight: '350px', overflowY: 'auto', padding: '16px 20px' }}>
+                {userAssignments.length === 0 ? (
+                  <div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '20px 0' }}>No modules assigned.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {userAssignments.map(a => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '18px' }}>{MODULE_EMOJI[a.moduleCode] || '📦'}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: '#fff', fontSize: '14px', fontWeight: '600' }}>{a.moduleName}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Assigned on: {a.date}</div>
+                        </div>
+                        <span className={`ea-level-tag ${(a.level || '').toLowerCase()}`} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px' }}>
+                          {getLevelLabel(a.level)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="ea-modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 20px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="ea-submit-btn" onClick={() => setViewingUserModules(null)} style={{ padding: '8px 16px', fontSize: '13px' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {(userDropdownOpen || moduleDropdownOpen || levelDropdownOpen) && (
         <div className="ea-overlay" onClick={closeDropdowns} />

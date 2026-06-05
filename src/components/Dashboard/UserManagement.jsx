@@ -10,6 +10,7 @@ const NAV_MODULES = [
   { code: 'reports', label: 'Service Reports', icon: '📄', category: 'Operations' },
   { code: 'pending_updates', label: 'Pending Approvals', icon: '⏳', category: 'Operations' },
   { code: 'auto_scheduler', label: 'Auto-Scheduler', icon: '📅', category: 'Operations' },
+  { code: 'shifts', label: 'Shift Management', icon: '⏰', category: 'Operations' },
 
   // --- SYSTEM & SECURITY ---
   { code: 'audit_logs', label: 'Audit Logs', icon: '📝', category: 'System & Security' },
@@ -152,7 +153,7 @@ function fetchReducer(state, action) {
   }
 }
 
-const UserManagement = ({ onBack, allowedModules, navAccess }) => {
+const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAccess }) => {
   const [fetchState, dispatch] = useReducer(fetchReducer, { loading: true, error: null, users: [] });
   const { loading, error, users } = fetchState;
 
@@ -212,6 +213,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
   const [modLoading, setModLoading] = useState(false);
   const [moduleChecks, setModuleChecks] = useState({});
   const [initialChecks, setInitialChecks] = useState({});
+  const [userAssignments, setUserAssignments] = useState([]);
   const [modSaving, setModSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPasswordText, setShowPasswordText] = useState(false);
@@ -343,36 +345,94 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
     setViewUser(u);
     setModLoading(true);
 
-    ApiService.getAdminUserModules(u.id)
-      .then(data => {
-        const list = Array.isArray(data) ? data : (data?.modules || data?.data || []);
-        const apiCodes = new Set(list.map(m => m.code || m.module_code || ''));
+    Promise.allSettled([
+      ApiService.getAdminUserModules(u.id),
+      ApiService.getAdminUserNavAccess(u.id)
+    ])
+      .then(([modulesRes, navRes]) => {
         const checks = {};
-        displayModules.forEach(m => {
-          checks[m.code] = apiCodes.has(m.code);
-        });
+        let hasData = false;
+
+        // 1. Process nav-access response
+        let navList = [];
+        if (navRes.status === 'fulfilled' && navRes.value) {
+          const val = navRes.value;
+          if (Array.isArray(val)) {
+            navList = val;
+          } else if (Array.isArray(val.modules)) {
+            navList = val.modules;
+          } else if (val.data) {
+            if (Array.isArray(val.data)) {
+              navList = val.data;
+            } else if (Array.isArray(val.data.modules)) {
+              navList = val.data.modules;
+            }
+          }
+        }
+
+        if (navList.length > 0) {
+          hasData = true;
+          navList.forEach(code => {
+            if (code) checks[code] = true;
+          });
+        }
+
+        // 2. Process equipment modules response (just in case)
+        if (modulesRes.status === 'fulfilled' && modulesRes.value) {
+          const eqList = Array.isArray(modulesRes.value) ? modulesRes.value : (modulesRes.value.modules || modulesRes.value.data || []);
+          setUserAssignments(eqList);
+          if (eqList.length > 0) {
+            hasData = true;
+            eqList.forEach(m => {
+              const code = m.code || m.module_code;
+              if (code) checks[code] = true;
+            });
+          }
+        }
+
+        // If neither endpoint returned data, fallback to localStorage
+        if (!hasData) {
+          const stored = localStorage.getItem(`nav_access_${u.id}`);
+          try {
+            const parsed = stored ? JSON.parse(stored) : null;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              parsed.forEach(code => { checks[code] = true; });
+              hasData = true;
+            }
+          } catch { }
+        }
+
+        // Default based on role fallback if still no data
+        if (!hasData) {
+          const role = (u.role || '').toLowerCase();
+          displayModules.forEach(m => {
+            if (role === 'superadmin' || role === 'admin') {
+              checks[m.code] = true;
+              if ((m.code === 'audit_logs' || m.code === 'device_monitoring') && role === 'admin') {
+                checks[m.code] = false;
+              }
+            } else if (role === 'agm') {
+              checks[m.code] = !['user_manage', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring'].includes(m.code);
+            } else if (role === 'supervisor') {
+              checks[m.code] = !['user_manage', 'add_equipment', 'setup_company', 'audit_logs', 'device_monitoring', 'auto_scheduler'].includes(m.code);
+            } else { // inspector / user
+              checks[m.code] = ['overview', 'reports'].includes(m.code) || (!['pending_updates', 'auto_scheduler', 'audit_logs', 'device_monitoring', 'user_manage', 'equipment_access', 'add_equipment', 'setup_company'].includes(m.code));
+            }
+          });
+        } else {
+          // Fill in false for any displayModules not present in checks
+          displayModules.forEach(m => {
+            if (checks[m.code] === undefined) {
+              checks[m.code] = false;
+            }
+          });
+        }
+
         setModuleChecks(checks);
         setInitialChecks(checks);
       })
       .catch(err => {
-        console.error("Failed to load user modules:", err);
-        // Fallback to local storage
-        const stored = localStorage.getItem(`nav_access_${u.id}`);
-        try {
-          const parsed = stored ? JSON.parse(stored) : null;
-          if (Array.isArray(parsed)) {
-            const checks = {};
-            displayModules.forEach(m => { checks[m.code] = parsed.includes(m.code); });
-            setModuleChecks(checks);
-            setInitialChecks(checks);
-            return;
-          }
-        } catch { }
-        // Default to all true if no config exists
-        const defaults = {};
-        displayModules.forEach(m => { defaults[m.code] = true; });
-        setModuleChecks(defaults);
-        setInitialChecks(defaults);
+        console.error("Failed to load user access:", err);
       })
       .finally(() => setModLoading(false));
   };
@@ -386,47 +446,72 @@ const UserManagement = ({ onBack, allowedModules, navAccess }) => {
     setModSaving(true);
     try {
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
+      const enabledNavCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
 
-      // Collect all checked modules for bulk update
-      const selectedModules = [];
+      const promises = [];
+
+      // Compare current moduleChecks with initialChecks to find additions and removals
       displayModules.forEach(m => {
-        if (moduleChecks[m.code]) {
+        if (m.category === 'Modules') {
+          const wasChecked = !!initialChecks[m.code];
+          const isChecked = !!moduleChecks[m.code];
           const moduleId = CODE_TO_ID[m.code];
-          if (moduleId !== undefined) {
-            selectedModules.push({
-              module_id: moduleId,
-              id: moduleId,
-              module_code: m.code,
-              code: m.code,
-              module_name: m.label,
-              name: m.label,
-              access_level: 'admin',
-              assigned_at: new Date().toISOString()
-            });
+
+          if (isChecked && !wasChecked && moduleId !== undefined) {
+            // Add access
+            promises.push(
+              ApiService.addAdminUserModule(userId, {
+                module_id: moduleId,
+                access_level: 'admin'
+              })
+            );
+          } else if (!isChecked && wasChecked && moduleId !== undefined) {
+            // Remove access: find corresponding assignment record ID
+            const assignment = userAssignments.find(a => 
+              String(a.module_id || a.id) === String(moduleId) || 
+              (a.code === m.code || a.module_code === m.code)
+            );
+            if (assignment && assignment.id) {
+              promises.push(
+                ApiService.removeAdminUserModule(userId, assignment.id)
+              );
+            }
           }
         }
       });
 
-      const payload = {
-        user_id: Number(userId),
-        total: selectedModules.length,
-        modules: selectedModules
-      };
+      // Save navigation access and all module additions/removals in parallel
+      await Promise.all([
+        ApiService.updateAdminUserNavAccess(userId, enabledNavCodes),
+        ...promises
+      ]);
 
-      await ApiService.updateAdminUserModules(userId, payload);
+      const selectedModules = displayModules
+        .filter(m => moduleChecks[m.code] && m.category === 'Modules')
+        .map(m => ({
+          module_id: CODE_TO_ID[m.code],
+          id: CODE_TO_ID[m.code],
+          module_code: m.code,
+          code: m.code,
+          module_name: m.label,
+          name: m.label,
+          access_level: 'admin',
+          assigned_at: new Date().toISOString()
+        }));
 
-      // Save list to local storage fallback
-      const enabledCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
-      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
+      // Save lists to local storage fallback
+      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledNavCodes));
       localStorage.setItem(`eq_access_${userId}`, JSON.stringify(selectedModules));
     } catch (err) {
-      console.error('Failed to save module access via API bulk update, falling back to localStorage:', err);
+      console.error('Failed to save access via API, falling back to localStorage:', err);
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
-      const enabledCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
-      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledCodes));
+      const enabledNavCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
+      localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledNavCodes));
+      alert('Failed to save access on server. Changes saved locally in this browser.');
     } finally {
       setModSaving(false);
       setViewUser(null);
+      setRefreshKey(k => k + 1); // Trigger refresh to sync the lists from server
     }
   };
 

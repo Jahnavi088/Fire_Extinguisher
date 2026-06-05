@@ -268,6 +268,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [pendingRawItems, setPendingRawItems] = useState([]);
+  const [teamActivities, setTeamActivities] = useState([]);
   const [checklistTypes, setChecklistTypes] = useState([]);
   const [selectedChecklistType, setSelectedChecklistType] = useState(
     () => sessionStorage.getItem('sd_checklistType') || null
@@ -275,6 +276,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [searchFilter, setSearchFilter] = useState('All');
   const [eqSearchQuery, setEqSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [eaInitialSearchQuery, setEaInitialSearchQuery] = useState('');
+  const [eaInitialSelectedUserId, setEaInitialSelectedUserId] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [modules, setModules] = useState(STATIC_MODULES);
   // Nav access: array of module codes the user is allowed to see (null = unrestricted)
@@ -531,6 +534,51 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         })
         .catch(err => {
           console.error("Failed to load supervisor dashboard stats:", err);
+        });
+
+      ApiService.getAdminUsers()
+        .then(async (usersRes) => {
+          const today = new Date();
+          const endDateStr = today.toISOString().split('T')[0];
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(today.getDate() - 30);
+          const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+          const reportsRes = await ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }).catch(() => []);
+          
+          const usersList = Array.isArray(usersRes) ? usersRes : (usersRes?.users || usersRes?.data || []);
+          const inspectors = usersList.filter(u => u.role === 'inspector' || u.role === 'user');
+          const reportsList = Array.isArray(reportsRes) ? reportsRes : (reportsRes?.items || reportsRes?.reports || reportsRes?.inspections || reportsRes?.data || []);
+          
+          const todayStr = new Date().toISOString().split('T')[0];
+          const activities = inspectors.map(inspector => {
+            const inspectorReportsToday = reportsList.filter(r => {
+              const repUserId = r.submitted_by_id || r.inspector_id || r.user_id;
+              const repDateStr = new Date(r.created_at || r.inspected_at).toISOString().split('T')[0];
+              return String(repUserId) === String(inspector.id) && repDateStr === todayStr;
+            });
+            
+            const inspectorAllReports = reportsList.filter(r => {
+              const repUserId = r.submitted_by_id || r.inspector_id || r.user_id;
+              return String(repUserId) === String(inspector.id);
+            });
+            inspectorAllReports.sort((a, b) => new Date(b.created_at || b.inspected_at) - new Date(a.created_at || a.inspected_at));
+            const lastReport = inspectorAllReports[0];
+            
+            return {
+              id: inspector.id,
+              name: inspector.name || inspector.username,
+              role: inspector.role,
+              inspectionsCount: inspectorReportsToday.length,
+              lastActive: lastReport ? new Date(lastReport.created_at || lastReport.inspected_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Inactive',
+              lastModule: lastReport ? (lastReport.equipment_name || lastReport.module_name || 'Inspection') : '—',
+              status: inspectorReportsToday.length > 0 ? 'Active' : 'Pending'
+            };
+          });
+          setTeamActivities(activities);
+        })
+        .catch(err => {
+          console.error("Failed to load supervisor team activities:", err);
         });
     }
 
@@ -935,9 +983,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const isNavAllowed = (code) => {
     if (!code) return false;
-    if (code === 'shifts') return true;
     const role = (user?.role || '').toLowerCase();
-    if (code === 'pending_updates') return role !== 'user' && role !== 'inspector';
+    if (code === 'pending_updates') {
+      if (role === 'supervisor' || role === 'agm' || role === 'admin' || role === 'superadmin') return true;
+      return role !== 'user' && role !== 'inspector';
+    }
 
     const isAdminOrSuper = role === 'superadmin' || role === 'admin';
     const isGlobal = isAdminOrSuper || role === 'safety_manager';
@@ -1303,8 +1353,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                 )}
 
                 {/* Summary White Card */}
-                <div className="overview-summary-card">
-                  <div className="osc-section" style={{ flex: 1, alignItems: 'flex-start' }}>
+                <div className={`overview-summary-card ${(user?.role === 'user' || user?.role === 'inspector') ? 'inspector-mode' : ''}`}>
+                  <div className="osc-section" style={{ flex: 1, alignItems: (user?.role === 'user' || user?.role === 'inspector') ? 'center' : 'flex-start' }}>
                     <span className="osc-label">Equipment Status:</span>
                     <div className="osc-cards-wrapper">
                       <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
@@ -1349,34 +1399,79 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                     </div>
                   </div>
 
-                  <div className="osc-divider"></div>
-
-                  <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
-                    <span className="osc-label">Pending Approvals:</span>
-                    <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '24px', fontWeight: '900', color: '#f39c12', marginTop: '8px' }}>
-                      <span className="osc-symbol" style={{ fontSize: '28px' }}>📋</span>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
-                        <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
-                        <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                  {!(user?.role === 'user' || user?.role === 'inspector') && (
+                    <>
+                      <div className="osc-divider"></div>
+                      <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                        <span className="osc-label">Pending Approvals:</span>
+                        <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '24px', fontWeight: '900', color: '#f39c12', marginTop: '8px' }}>
+                          <span className="osc-symbol" style={{ fontSize: '28px' }}>📋</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+                            <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
+                            <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                          </div>
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ width: '18px', height: '18px', color: '#adb5bd', marginLeft: '4px', cursor: 'pointer', transition: 'color 0.2s' }}
+                            onClick={() => setActivePage('pending-updates')}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#adb5bd'}
+                            title="View Pending Approvals"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </div>
                       </div>
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ width: '18px', height: '18px', color: '#adb5bd', marginLeft: '4px', cursor: 'pointer', transition: 'color 0.2s' }}
-                        onClick={() => setActivePage('pending-updates')}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = '#adb5bd'}
-                        title="View Pending Approvals"
-                      >
-                        <path d="M9 18l6-6-6-6" />
-                      </svg>
+                    </>
+                  )}
+                </div>
+
+                {/* Team Daily Activity Tracker — Supervisor Only */}
+                {user?.role === 'supervisor' && teamActivities.length > 0 && (
+                  <div className="supervisor-tracker-card">
+                    <div className="stc-header">
+                      <h3>👥 Team Daily Activity Tracker</h3>
+                      <span className="stc-date">Today: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                    <div className="stc-body">
+                      {teamActivities.map(act => (
+                        <div key={act.id} className={`stc-item ${act.status.toLowerCase()}`}>
+                          <div className="stc-user-info">
+                            <div className="stc-avatar">{(act.name).charAt(0).toUpperCase()}</div>
+                            <div>
+                              <div className="stc-name">{act.name}</div>
+                              <div className="stc-role">{act.role.toUpperCase()}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="stc-stat">
+                            <span className="stc-stat-label">Tasks Done Today</span>
+                            <span className="stc-stat-val">{act.inspectionsCount}</span>
+                          </div>
+
+                          <div className="stc-stat">
+                            <span className="stc-stat-label">Last Activity</span>
+                            <span className="stc-stat-val">{act.lastActive}</span>
+                          </div>
+
+                          <div className="stc-stat">
+                            <span className="stc-stat-label">Last Inspected</span>
+                            <span className="stc-stat-val">{act.lastModule}</span>
+                          </div>
+
+                          <div className={`stc-badge ${act.status.toLowerCase()}`}>
+                            {act.status === 'Active' ? '✓ COMPLETED' : '⏳ PENDING'}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="eq-grid">
                   {filteredModules.filter(m => statusFilter === 'all' || getStatus(m) === statusFilter).map((mod) => (
@@ -1641,15 +1736,28 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── USERS: MANAGE ── */}
             <section className={`page ${activePage === 'users-manage' ? 'active' : ''}`}>
               {activePage === 'users-manage' && (
-                <UserManagement onBack={() => setActivePage('grid')} allowedModules={filteredModules} navAccess={navAccessList} />
+                <UserManagement
+                  onBack={() => setActivePage('grid')}
+                  allowedModules={filteredModules}
+                  navAccess={navAccessList}
+                  onViewEquipmentAccess={(userId) => {
+                    setEaInitialSelectedUserId(userId);
+                    setActivePage('users-equipment-access');
+                  }}
+                />
               )}
             </section>
 
             <section className={`page ${activePage === 'users-equipment-access' ? 'active' : ''}`}>
               {activePage === 'users-equipment-access' && (
                 <EquipmentAccess
-                  onBack={() => setActivePage('grid')}
+                  onBack={() => {
+                    setEaInitialSelectedUserId(null);
+                    setActivePage('users-manage');
+                  }}
                   availableModules={filteredModules}
+                  initialSelectedUserId={eaInitialSelectedUserId}
+                  onOpenModule={(mod) => handleOpenModule(mod)}
                 />
               )}
             </section>
