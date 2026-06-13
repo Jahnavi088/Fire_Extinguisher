@@ -221,18 +221,40 @@ const EmergencyCommStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
         <div className="fe-panels">
           <div className="fe-panel">
-            <div className="fe-panel-title">🔔 Connectivity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
+            <div className="fe-panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>🔔 Connectivity Alerts</span>
+              <span className="fe-panel-title-count" style={{ border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', padding: '2px 8px', borderRadius: '4px', fontSize: '14px' }}>{totalAlerts}</span>
+            </div>
+            
+            {topAlerts.length > 0 && (
+              <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
+                Showing latest {Math.min(topAlerts.length, 5)} alerts
+              </div>
+            )}
+            
             <div className="fe-alert-list">
-              {topAlerts.length === 0 ? <div className="fe-empty">No active comms alerts.</div> : topAlerts.map((a, i) => (
-                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+              {topAlerts.length === 0 ? <div className="fe-empty">No active comms alerts.</div> : topAlerts.slice(0, 5).map((a, i) => (
+                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] || '#ef4444' }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
                     <div className="fe-alert-loc">{a.location_name}</div>
-                    <div className="fe-alert-reason">{a.alert_label}</div>
+                    <div className="fe-alert-reason" style={{ fontWeight: 700 }}>{a.alert_label || 'EXPIRED UNIT'}</div>
                   </div>
                 </div>
               ))}
             </div>
+            
+            {topAlerts.length > 5 && (
+              <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                <span 
+                  style={{ color: '#3b82f6', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'color 0.2s' }}
+                  onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                  onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+                >
+                  View All Alerts &rarr;
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="fe-panel">

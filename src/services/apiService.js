@@ -66,6 +66,107 @@ const getPendingEquipmentSosCodes = async (moduleId) => {
   return codes;
 };
 
+let globalLocMap = null;
+let globalLocMapTime = 0;
+
+const enhanceLocation = async (item) => {
+  if (!item) return item;
+  
+  const now = Date.now();
+  if (!globalLocMap || (now - globalLocMapTime > 300000)) { // 5 minute cache
+    try {
+      const user = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      const compId = user.company_id || user.companyId || 21;
+      
+      const bMap = {}; const fMap = {}; const zMap = {}; const dMap = {};
+      
+      // Fetch dropdowns as base
+      try {
+        const remoteData = await request(`/onboarding/dropdowns?company_id=${encodeURIComponent(compId)}`).catch(() => ({}));
+        const data = remoteData?.data || remoteData || {};
+        (data.buildings || data.branches || []).forEach(x => bMap[String(x.id)] = x.building_name || x.name);
+        (data.floors || []).forEach(x => fMap[String(x.id)] = x.floor_name || x.name);
+        (data.zones || []).forEach(x => zMap[String(x.id)] = x.zone_name || x.name);
+        (data.departments || []).forEach(x => dMap[String(x.id)] = x.department_name || x.name);
+      } catch (e) {}
+
+      // Fetch recursively to ensure all nested structures are covered
+      try {
+        const branches = await request(`/branches?company_id=${compId}`).catch(() => []);
+        const bList = Array.isArray(branches) ? branches : (branches?.data || branches?.branches || []);
+        
+        const depts = await request(`/departments?company_id=${compId}`).catch(() => []);
+        const dList = Array.isArray(depts) ? depts : (depts?.data || depts?.departments || []);
+        dList.forEach(dept => { dMap[String(dept.id)] = dept.department_name || dept.name; });
+
+        for (const branch of bList) {
+           bMap[String(branch.id)] = branch.branch_name || branch.name;
+           
+           const bldgs = await request(`/branches/${branch.id}/buildings`).catch(() => []);
+           const blList = Array.isArray(bldgs) ? bldgs : (bldgs?.data || bldgs?.buildings || []);
+           for (const bldg of blList) {
+               bMap[String(bldg.id)] = bldg.building_name || bldg.name;
+               const floors = await request(`/buildings/${bldg.id}/floors`).catch(() => []);
+               const fList = Array.isArray(floors) ? floors : (floors?.data || floors?.floors || []);
+               for (const floor of fList) {
+                   fMap[String(floor.id)] = floor.floor_name || floor.name;
+                   const zones = await request(`/floors/${floor.id}/zones`).catch(() => []);
+                   const zList = Array.isArray(zones) ? zones : (zones?.data || zones?.zones || []);
+                   for (const zone of zList) {
+                       zMap[String(zone.id)] = zone.zone_name || zone.name;
+                   }
+               }
+           }
+        }
+      } catch (e) {}
+      
+      globalLocMap = { bMap, fMap, zMap, dMap };
+      globalLocMapTime = now;
+    } catch(e) {
+      if (!globalLocMap) globalLocMap = { bMap:{}, fMap:{}, zMap:{}, dMap:{} };
+    }
+  }
+
+  const map = globalLocMap;
+  
+  const mapItem = (cloned) => {
+    const b = map.bMap[String(cloned.building_name)] || map.bMap[String(cloned.building_id)];
+    const f = map.fMap[String(cloned.floor_name)] || map.fMap[String(cloned.floor_id)];
+    const z = map.zMap[String(cloned.zone_name)] || map.zMap[String(cloned.zone_id)];
+    const d = map.dMap[String(cloned.department_name)] || map.dMap[String(cloned.department_id)];
+
+    let changed = false;
+    if (b && b !== String(cloned.building_name)) { cloned.building_name = b; changed = true; }
+    if (f && f !== String(cloned.floor_name)) { cloned.floor_name = f; changed = true; }
+    if (z && z !== String(cloned.zone_name)) { cloned.zone_name = z; changed = true; }
+    if (d && d !== String(cloned.department_name)) { cloned.department_name = d; changed = true; }
+
+    if (changed || (cloned.location_name && !isNaN(cloned.location_name.split(' / ')[0]))) {
+       const newLoc = [
+         cloned.building_name || cloned.building_id, 
+         cloned.floor_name ? (String(cloned.floor_name).toLowerCase().includes('floor') ? cloned.floor_name : `Floor ${cloned.floor_name}`) : null, 
+         cloned.zone_name ? (String(cloned.zone_name).toLowerCase().includes('zone') ? cloned.zone_name : `Zone ${cloned.zone_name}`) : null
+       ].filter(Boolean).join(' / ');
+       cloned.location_name = newLoc || cloned.location_name;
+       changed = true;
+    }
+    return changed;
+  };
+
+  const cloned = { ...item };
+  let itemChanged = mapItem(cloned);
+  
+  if (cloned.details) {
+    const detailsCloned = { ...cloned.details };
+    if (mapItem(detailsCloned)) {
+      cloned.details = detailsCloned;
+      itemChanged = true;
+    }
+  }
+
+  return itemChanged ? cloned : item;
+};
+
 const getMockUsers = () => {
   let users = [];
   try {
@@ -77,7 +178,7 @@ const getMockUsers = () => {
         localStorage.removeItem('mock_user_modules');
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
   if (users.length === 0) {
     users = [
@@ -85,7 +186,7 @@ const getMockUsers = () => {
       { id: 72, username: 'supervisor_user', name: 'Suresh Supervisor', role: 'supervisor', company_id: 21, status: 'active', agm_id: 71 },
       { id: 73, username: 'inspector_user1', name: 'Rahul Inspector', role: 'inspector', company_id: 21, status: 'active', supervisor_id: 72, agm_id: 71 },
       { id: 75, username: 'inspector_user2', name: 'Amit Inspector', role: 'inspector', company_id: 21, status: 'active', supervisor_id: 72, agm_id: 71 },
-      
+
       // Real environment users
       { id: 74, username: 'AGM1', name: 'AGM1', role: 'agm', company_id: 29, status: 'active' },
       { id: 76, username: 'SPV1', name: 'SPV1', role: 'supervisor', company_id: 29, status: 'active', agm_id: 74 },
@@ -109,7 +210,7 @@ const getMockUsers = () => {
         supervisor_id: current.supervisor_id || current.supervisorId || null
       });
     }
-  } catch (e) {}
+  } catch (e) { }
 
   localStorage.setItem('mock_admin_users', JSON.stringify(users));
   return users;
@@ -120,7 +221,7 @@ const getMockUserModules = (userId) => {
   try {
     const stored = localStorage.getItem('mock_user_modules');
     if (stored) assignments = JSON.parse(stored);
-  } catch (e) {}
+  } catch (e) { }
 
   if (assignments.length === 0) {
     const defaultModules = [
@@ -174,7 +275,7 @@ const getMockUserModules = (userId) => {
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     localStorage.setItem('mock_user_modules', JSON.stringify(assignments));
   }
@@ -195,7 +296,7 @@ const addMockUserModule = (userId, data) => {
   try {
     const stored = localStorage.getItem('mock_user_modules');
     if (stored) assignments = JSON.parse(stored);
-  } catch (e) {}
+  } catch (e) { }
 
   const defaultModules = [
     { module_id: 30, name: 'Fire Extinguisher', code: 'fire_extinguisher' },
@@ -233,7 +334,7 @@ const removeMockUserModule = (userId, moduleId) => {
   try {
     const stored = localStorage.getItem('mock_user_modules');
     if (stored) assignments = JSON.parse(stored);
-  } catch (e) {}
+  } catch (e) { }
 
   assignments = assignments.filter(a => !(String(a.userId) === String(userId) && String(a.module.module_id || a.module.id) === String(moduleId)));
   localStorage.setItem('mock_user_modules', JSON.stringify(assignments));
@@ -378,6 +479,18 @@ export const ApiService = {
     return await request('/health');
   },
 
+  // --- OPERATOR MAPPING ---
+  getOperatorMappings: async () => {
+    return await request('/operator-mappings');
+  },
+
+  createOperatorMapping: async (data) => {
+    return await request('/operator-mappings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- DASHBOARD ---
   getDashboard: async () => {
     return await request('/dashboard');
@@ -441,17 +554,22 @@ export const ApiService = {
       }
 
       if (Array.isArray(res)) {
-        return items;
+        return await Promise.all(items.map(i => enhanceLocation(i)));
       }
       return {
         ...res,
-        items: items,
+        items: await Promise.all(items.map(i => enhanceLocation(i))),
         total: items.length,
-        data: items
+        data: await Promise.all(items.map(i => enhanceLocation(i)))
       };
     }
 
-    return await request(`/equipment${qs(params)}`);
+    const res = await request(`/equipment${qs(params)}`);
+    if (Array.isArray(res)) {
+       return await Promise.all(res.map(i => enhanceLocation(i)));
+    }
+    const finalItems = await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i)));
+    return { ...res, items: finalItems, data: finalItems };
   },
 
   createEquipment: async (data) => {
@@ -459,7 +577,8 @@ export const ApiService = {
   },
 
   getEquipmentBySosCode: async (sosCode) => {
-    return await request(`/equipment/${sosCode}`);
+    const res = await request(`/equipment/${sosCode}`);
+    return await enhanceLocation(res);
   },
 
   getInspections: async (sosCode) => {
@@ -516,8 +635,8 @@ export const ApiService = {
         }
         // Also adjust the readiness score if calculated in frontend or backend
         if (res.readiness_score !== undefined || res.health_score !== undefined || res.score !== undefined) {
-          const total = res.total ?? res.total_units ?? 0;
-          const expired = res.expired ?? 0;
+          const total = res.total ?? res.total_units ?? res.total_assets ?? res.total_equipment ?? 0;
+          const expired = res.expired ?? res.expired_assets ?? res.expired_equipment ?? res.expired_count ?? 0;
           const needsService = res.needs_service ?? 0;
           const dueInspection = res.due_inspection ?? 0;
           const issues = expired + needsService + dueInspection;
@@ -549,6 +668,16 @@ export const ApiService = {
     return await request(`/modules/${id}/schedule${qs(params)}`);
   },
 
+  // --- FREQUENCIES ---
+  getFrequencies: async () => {
+    return await request('/onboarding/frequencies');
+  },
+
+  // --- STATUSES ---
+  getStatuses: async () => {
+    return await request('/onboarding/statuses');
+  },
+
   // --- CHECKLISTS ---
   getChecklists: async () => {
     return await request('/checklists');
@@ -563,9 +692,16 @@ export const ApiService = {
   // safely do alertsData.alerts regardless of whether the server returns a
   // bare array or a wrapped object.
   getAlerts: async (params = {}) => {
-    const data = await request(`/alerts${qs(params)}`);
-    if (Array.isArray(data)) return { alerts: data };
-    if (data && !data.alerts) return { ...data, alerts: data.data || [] };
+    let data = await request(`/alerts${qs(params)}`);
+    if (Array.isArray(data)) {
+      data = { alerts: data };
+    } else if (data && !data.alerts) {
+      data = { ...data, alerts: data.data || [] };
+    }
+    
+    if (data && Array.isArray(data.alerts)) {
+      data.alerts = await Promise.all(data.alerts.map(a => enhanceLocation(a)));
+    }
     return data;
   },
 
@@ -588,6 +724,59 @@ export const ApiService = {
 
   getCriticalAlertsReports: async (params = {}) => {
     return await request(`/reports/alerts${qs(params)}`);
+  },
+
+  // --- AUTO SCHEDULER ---
+  getSchedules: async (params = {}) => {
+    return await request(`/schedules${qs(params)}`);
+  },
+
+  getUpcomingSchedules: async (params = {}) => {
+    return await request(`/schedules/upcoming${qs(params)}`);
+  },
+
+  getOverdueSchedules: async (params = {}) => {
+    return await request(`/schedules/overdue${qs(params)}`);
+  },
+
+  getCompletedSchedules: async (params = {}) => {
+    return await request(`/schedules/completed${qs(params)}`);
+  },
+
+  getSchedulesSummary: async () => {
+    return await request('/schedules/summary');
+  },
+
+  getSchedulesWorkload: async () => {
+    return await request('/schedules/workload');
+  },
+
+  generateSchedule: async (data) => {
+    return await request('/auto-scheduler/generate', {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  },
+
+  updateScheduleStatus: async (id, status) => {
+    return await request(`/schedules/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  assignSchedule: async (id, operatorId) => {
+    return await request(`/schedules/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ assignedOperatorId: operatorId }),
+    });
+  },
+
+  bulkAssignSchedules: async (taskIds, operatorId) => {
+    return await request('/schedules/bulk-assign', {
+      method: 'POST',
+      body: JSON.stringify({ taskIds, assignedOperatorId: operatorId }),
+    });
   },
 
   // --- SYNC ---
@@ -712,23 +901,19 @@ export const ApiService = {
 
   // --- ONBOARDING (new v1 endpoints) ---
   getOnboardingDropdowns: async (companyId) => {
-    const remoteData = await request(`/onboarding/dropdowns?company_id=${encodeURIComponent(companyId)}`).catch(() => ({ buildings: [], zones: [], areas: [], departments: [] }));
-    try {
-      const localLocs = JSON.parse(localStorage.getItem('local_onboarding_locations') || '{}');
-      const match = localLocs[companyId];
-      if (match) {
-        return {
-          buildings: [...(remoteData.buildings || []), ...(match.buildings || [])],
-          zones: [...(remoteData.zones || []), ...(match.zones || [])],
-          areas: [...(remoteData.areas || []), ...(match.areas || [])],
-          departments: [...(remoteData.departments || []), ...(match.departments || [])],
-          floors: match.floors || []
-        };
-      }
-    } catch (e) {
-      console.error('Failed to merge local locations:', e);
-    }
-    return remoteData;
+    const remoteData = await request(`/onboarding/dropdowns?company_id=${encodeURIComponent(companyId)}`)
+      .catch(() => ({ buildings: [], zones: [], areas: [], departments: [] }));
+
+    // Check if data is nested in 'data' object
+    const data = remoteData?.data || remoteData || {};
+
+    return {
+      buildings: data.buildings || data.branches || [],
+      zones: data.zones || [],
+      areas: data.areas || [],
+      departments: data.departments || [],
+      floors: data.floors || []
+    };
   },
 
   onboardEquipment: async (data) => {
@@ -740,11 +925,17 @@ export const ApiService = {
 
   // --- ADMIN EQUIPMENT ---
   getAdminEquipment: async () => {
-    return await request('/admin/equipment');
+    const res = await request('/admin/equipment');
+    if (Array.isArray(res)) {
+       return await Promise.all(res.map(i => enhanceLocation(i)));
+    }
+    const finalItems = await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i)));
+    return { ...res, items: finalItems, data: finalItems };
   },
 
   getAdminEquipmentBySosCode: async (sosCode) => {
-    return await request(`/admin/equipment/${sosCode}`);
+    const res = await request(`/admin/equipment/${sosCode}`);
+    return await enhanceLocation(res);
   },
 
   createAdminEquipment: async (data) => {
@@ -846,16 +1037,50 @@ export const ApiService = {
     });
   },
 
-  getBranchById: async (branchId) => {
-    return await request(`/admin/branches/${branchId}`);
-  },
-
-  updateBranch: async (branchId, data) => {
-    return await request(`/admin/branches/${branchId}`, {
+  updateBranchZone: async (branchId, zoneId, data) => {
+    return await request(`/admin/branches/${branchId}/zones/${zoneId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
+
+  getBranches: async (params = {}) => {
+    let url = '/branches';
+    if (params && Object.keys(params).length > 0) {
+      const parts = Object.entries(params)
+        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+      if (parts.length > 0) {
+        url += `?${parts.join('&')}`;
+      }
+    }
+    return await request(url);
+  },
+
+  createBranch: async (data) => {
+    return await request('/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getBranchById: async (branchId) => {
+    return await request(`/branches/${branchId}`);
+  },
+
+  updateBranch: async (branchId, data) => {
+    return await request(`/branches/${branchId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteBranch: async (branchId) => {
+    return await request(`/branches/${branchId}`, {
+      method: 'DELETE',
+    });
+  },
+
 
   // --- ADMIN BRANCH FLOORS ---
   getBranchFloors: async (branchId) => {
@@ -871,6 +1096,104 @@ export const ApiService = {
 
   deleteBranchFloor: async (branchId, floorId) => {
     return await request(`/admin/branches/${branchId}/floors/${floorId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- HIERARCHICAL LOCATION APIS ---
+  // --- BUILDINGS ---
+  getBranchBuildings: async (branchId) => {
+    return await request(`/branches/${branchId}/buildings`);
+  },
+  createBuilding: async (data) => {
+    return await request('/buildings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateBuilding: async (id, data) => {
+    return await request(`/buildings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteBuilding: async (id) => {
+    return await request(`/buildings/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- FLOORS ---
+  getBuildingFloors: async (buildingId) => {
+    return await request(`/buildings/${buildingId}/floors`);
+  },
+  getFloorById: async (floorId) => {
+    return await request(`/floors/${floorId}`);
+  },
+  createFloor: async (data) => {
+    return await request('/floors', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateFloor: async (id, data) => {
+    return await request(`/floors/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteFloor: async (id) => {
+    return await request(`/floors/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- ZONES ---
+  getFloorZones: async (floorId) => {
+    return await request(`/floors/${floorId}/zones`);
+  },
+  getZoneById: async (zoneId) => {
+    return await request(`/zones/${zoneId}`);
+  },
+  createZone: async (data) => {
+    return await request('/zones', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateZone: async (id, data) => {
+    return await request(`/zones/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteZone: async (id) => {
+    return await request(`/zones/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- DEPARTMENTS ---
+  getZoneDepartments: async (zoneId) => {
+    return await request(`/zones/${zoneId}/departments`);
+  },
+  getDepartmentById: async (departmentId) => {
+    return await request(`/departments/${departmentId}`);
+  },
+  createDepartmentHierarchy: async (data) => {
+    return await request('/departments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateDepartmentHierarchy: async (id, data) => {
+    return await request(`/departments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteDepartmentHierarchy: async (id) => {
+    return await request(`/departments/${id}`, {
       method: 'DELETE',
     });
   },
@@ -1002,8 +1325,8 @@ export const ApiService = {
         const currentUserId = current.id || current.user_id;
         const currentAgmId = current.agm_id || current.agmId;
         if (current.role === 'supervisor') {
-          return usersList.filter(u => 
-            String(u.supervisor_id) === String(currentUserId) || 
+          return usersList.filter(u =>
+            String(u.supervisor_id) === String(currentUserId) ||
             String(u.id) === String(currentUserId) ||
             (currentAgmId && String(u.id) === String(currentAgmId))
           );
@@ -1025,8 +1348,8 @@ export const ApiService = {
           const currentUserId = current.id || current.user_id;
           const currentAgmId = current.agm_id || current.agmId;
           if (current.role === 'supervisor') {
-            list = list.filter(u => 
-              String(u.supervisor_id) === String(currentUserId) || 
+            list = list.filter(u =>
+              String(u.supervisor_id) === String(currentUserId) ||
               String(u.id) === String(currentUserId) ||
               (currentAgmId && String(u.id) === String(currentAgmId))
             );
@@ -1529,9 +1852,20 @@ export const ApiService = {
   },
 
   // --- AUTO-SCHEDULER ---
+  getUpcomingInspections: async (params = {}) => {
+    return await request(`/auto-scheduler/upcoming${qs(params)}`);
+  },
+
+  generateAutoSchedule: async (data) => {
+    return await request('/auto-scheduler/generate', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
   getScheduledTasks: async (params = {}) => {
     try {
-      return await request(`/tasks${qs(params)}`);
+      return await request(`/auto-scheduler/tasks${qs(params)}`);
     } catch (e) {
       // Temporary fallback mock if backend is not ready
       console.warn("Scheduler API not available, falling back to local storage mock");
@@ -1539,6 +1873,37 @@ export const ApiService = {
       return { data: saved };
     }
   },
+
+  getScheduledTaskById: async (id) => {
+    return await request(`/auto-scheduler/tasks/${id}`);
+  },
+
+  assignScheduledTask: async (id, data) => {
+    return await request(`/auto-scheduler/tasks/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
+  getOverdueTasks: async (params = {}) => {
+    return await request(`/auto-scheduler/overdue${qs(params)}`);
+  },
+
+  getCompletedTasks: async (params = {}) => {
+    return await request(`/auto-scheduler/completed${qs(params)}`);
+  },
+  // --- OPERATOR MAPPINGS ---
+  getOperatorMappings: async (params = {}) => {
+    return await request(`/operator-mappings${qs(params)}`);
+  },
+
+  createOperatorMapping: async (data) => {
+    return await request('/operator-mappings', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
 
   triggerSchedulerRun: async () => {
     try {

@@ -17,7 +17,7 @@ const fmt = (d) => {
 const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 90 ? '#28a745' : n >= 80 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
   v === 'OK' ? '#28a745'
@@ -28,11 +28,11 @@ const condColor = (v) =>
 const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
-  { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#045A97', key: 'total' },
-  { type: 'active', label: 'Active', icon: '✅', color: '#045A97', key: 'active' },
-  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#045A97', key: 'needs_service' },
-  { type: 'expired', label: 'Expired', icon: '⌛', color: '#045A97', key: 'expired' },
-  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#045A97', key: 'due_inspection' },
+  { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#3b82f6', key: 'total' },
+  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
+  { type: 'expired', label: 'Expired', icon: '⌛', color: '#8b5cf6', key: 'expired' },
+  { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
 ];
 
 const PAGE_SIZE = 10;
@@ -250,7 +250,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Fire Extinguisher Fleet Monitor</div>
           </div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Fleet - (Expired + Needs Service + Due Inspection)) / Total Fleet) * 100. Click to toggle inspection history panel."
             onClick={() => setShowInspections(!showInspections)}
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18' }}>
@@ -273,7 +273,6 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
           </div>
         </div>
 
-        {/* KPI cards */}
         <div className="fe-kpi-grid">
           {KPI_CARDS.map(card => (
             <div
@@ -281,8 +280,6 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
               className="fe-kpi-card"
               style={{ '--kpi-color': card.color }}
               onClick={() => openList(card)}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 10px 28px ${card.color}30`; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
             >
               <span className="fe-kpi-emoji">{card.icon}</span>
               <span className="fe-kpi-value">

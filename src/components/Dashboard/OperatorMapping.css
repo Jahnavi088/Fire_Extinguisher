@@ -1,0 +1,158 @@
+/* OperatorMapping.css */
+
+.om-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  animation: fe-fade 0.35s ease-out;
+}
+
+.om-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.om-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.om-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+}
+
+.om-body {
+  padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.om-table-wrap {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.om-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.om-th {
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.om-tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 0.12s;
+}
+
+.om-tr:last-child {
+  border-bottom: none;
+}
+
+.om-tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.om-td {
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.om-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.om-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.om-action-btn.primary {
+  background: #2563eb;
+  border-color: #3b82f6;
+}
+
+.om-action-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.om-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+}
+
+.om-select option {
+  color: #000;
+}
+
+.om-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.om-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.om-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.om-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  font-weight: 600;
+}

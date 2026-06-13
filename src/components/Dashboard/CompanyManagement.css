@@ -19,6 +19,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   overflow: hidden;
+  overflow-x: auto;
 }
 
 .cm-table {
@@ -107,7 +108,9 @@
 }
 
 .cm-company-name {
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: bold;
+  color: #000000;
 }
 
 .cm-empty-row {
@@ -125,7 +128,7 @@
 
 .cm-company-sub {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .cm-email-text {
@@ -404,4 +407,11 @@
   font-weight: 500;
   min-width: 110px;
   text-align: center;
+}
+
+/* Force dark text and white background for location setup selectors */
+select,
+select option {
+  color: #000000 !important;
+  background-color: #ffffff !important;
 }

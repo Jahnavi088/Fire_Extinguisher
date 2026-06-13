@@ -193,7 +193,7 @@ const FireBrigadeStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack}>Back</BackBtn>
           <div className="fe-header-info"><div className="fe-header-title">Fire Brigade Fleet Monitor</div></div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Units - (Expired + Needs Service + Due Inspection)) / Total Units) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
@@ -309,7 +309,7 @@ const FireBrigadeStats = ({ module, onBack, onRaiseWorkOrder }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack}>Back</BackBtn>
         <span className="fe-header-icon">🚒</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>

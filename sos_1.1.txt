@@ -1,0 +1,168 @@
+1. Dashboard Summary API
+Used for KPI cards.
+GET -  /api/v1/auto-scheduler/dashboard
+Response - {
+  "success": true,
+  "data": {
+    "due_today": 12,
+    "upcoming_next_7_days": 48,
+    "overdue": 8,
+    "completed": 35
+  }
+}
+
+Upcoming Inspections:
+GET /api/v1/auto-scheduler/upcoming
+GET /api/v1/auto-scheduler/upcoming?building_id=1&floor_id=2&zone_id=1&equipment_type=Fire&limit=20
+Response:
+{
+  "success": true,
+  "total": 48,
+  "page": 1,
+  "limit": 20,
+  "data": [
+    {
+      "equipment_id": 101,
+      "equipment_code": "FE001",
+      "equipment_name": "Fire Extinguisher",
+      "building_name": "Building A",
+      "floor_name": "Floor 1",
+      "zone_name": "Zone 2",
+      "frequency": "Monthly",
+      "next_due_date": "2026-06-15",
+      "days_remaining": 2,
+      "priority": "HIGH"
+    }
+  ]
+}
+
+3. Generate Schedule
+Endpoint
+POST /api/v1/auto-scheduler/generate
+Request
+{
+  "window_days": 7
+}
+Response
+{
+  "success": true,
+  "message": "Inspection tasks generated successfully",
+  "data": {
+    "due_equipment": 48,
+    "tasks_created": 45,
+    "already_generated": 3
+  }
+}
+4. Scheduled Tasks
+Used in:
+Scheduled Tab
+Endpoint
+GET /api/v1/auto-scheduler/tasks
+Query Params
+GET /api/v1/auto-scheduler/tasks?
+status=PENDING
+&page=1
+&limit=20
+Response
+{
+  "success": true,
+  "total": 45,
+  "data": [
+    {
+      "task_id": 5001,
+      "equipment_code": "FE001",
+      "equipment_name": "Fire Extinguisher",
+      "assigned_to": "Jahnavi",
+      "due_date": "2026-06-15",
+      "priority": "HIGH",
+      "status": "PENDING"
+    },
+    {
+      "task_id": 5002,
+      "equipment_code": "EL001",
+      "equipment_name": "Emergency Light",
+      "assigned_to": null,
+      "due_date": "2026-06-16",
+      "priority": "MEDIUM",
+      "status": "UNASSIGNED"
+    }
+  ]
+}
+5. Task Details
+Endpoint
+GET /api/v1/auto-scheduler/tasks/{task_id}
+Response
+{
+  "success": true,
+  "data": {
+    "task_id": 5001,
+    "equipment_id": 101,
+    "equipment_code": "FE001",
+    "equipment_name": "Fire Extinguisher",
+
+    "location": {
+      "building": "Building A",
+      "floor": "Floor 1",
+      "zone": "Zone 2"
+    },
+
+    "frequency": "Monthly",
+
+    "last_inspection_date": "2026-05-15",
+    "due_date": "2026-06-15",
+
+    "assigned_to": {
+      "user_id": 25,
+      "name": "Jahnavi"
+    },
+
+    "status": "PENDING"
+  }
+}
+7. Overdue Tasks
+Endpoint
+GET /api/v1/auto-scheduler/overdue
+Response
+{
+  "success": true,
+  "total": 8,
+  "data": [
+    {
+      "task_id": 5010,
+      "equipment_code": "DG001",
+      "equipment_name": "DG Generator",
+      "due_date": "2026-06-01",
+      "overdue_days": 8,
+      "status": "OVERDUE"
+    }
+  ]
+}
+8. Completed Tasks
+Endpoint
+GET /api/v1/auto-scheduler/completed
+Response
+{
+  "success": true,
+  "total": 35,
+  "data": [
+    {
+      "task_id": 4900,
+      "equipment_code": "FE001",
+      "equipment_name": "Fire Extinguisher",
+      "completed_by": "Jahnavi",
+      "completed_at": "2026-06-10T10:30:00Z",
+      "status": "COMPLETED"
+    }
+  ]
+}
+Backend should maintain only:
+UNASSIGNED
+PENDING
+IN_PROGRESS
+COMPLETED
+OVERDUE
+
+
+
+
+

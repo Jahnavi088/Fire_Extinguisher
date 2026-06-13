@@ -25,6 +25,7 @@ import UserManagement from './UserManagement';
 import RightPanel from './RightPanel';
 import FireExtinguisherChecklist from './FireExtinguisherChecklist';
 import CompanyManagement from './CompanyManagement';
+import LocationsTable from './LocationsTable';
 import SpillKitStats from './SpillKitStats';
 import PPEStationStats from './PPEStationStats';
 import SafetySignageStats from './SafetySignageStats';
@@ -50,36 +51,42 @@ import ShiftManagement from './ShiftManagement';
 import AutoScheduler from './AutoScheduler';
 import CODetectorStats from './CODetectorStats';
 import FireDoorStats from './FireDoorStats';
+import SuperAdminOverview from './SuperAdminOverview';
+import AdminOverview from './AdminOverview';
+import AgmOverview from './AgmOverview';
+import SupervisorOverview from './SupervisorOverview';
+import InspectorOverview from './InspectorOverview';
+import OperatorMapping from './OperatorMapping';
 
 
 
 const STATIC_MODULES = [
-  { module_id: 30, name: 'Fire Extinguishers', code: 'fire_extinguisher', health_score: 100, category: 'fire', image: '/images/fire_extinguisher1.png' },
-  { module_id: 33, name: 'Hose Reels', code: 'hose_reel', health_score: 92, category: 'fire', image: '/images/hosereels1.png' },
-  { module_id: 31, name: 'Sprinklers', code: 'sprinkler', health_score: 93, category: 'fire', image: '/images/sprinkler1.png' },
-  { module_id: 34, name: 'Fire Hydrants', code: 'hydrant', health_score: 92, category: 'fire', image: '/images/hydrant1.png' },
-  { module_id: 35, name: 'Alarm Panels', code: 'fpca', health_score: 92, category: 'fire', image: '/images/firealarm_panel1.png' },
-  { module_id: 36, name: 'Smoke Detectors', code: 'smoke_detector', health_score: 92, category: 'fire', image: '/images/smoke_detector1.png' },
-  { module_id: 37, name: 'Heat Detectors', code: 'heat_detector', health_score: 92, category: 'fire', image: '/images/heatdetector1.png' },
-  { module_id: 55, name: 'Fire Trolleys', code: 'fire_trolley', health_score: 100, category: 'fire', image: '/images/fire_trolley1.png' },
-  { module_id: 39, name: 'Emergency Exits', code: 'emergency_exit', health_score: 92, category: 'fire', image: '/images/emergency_exitdoor1.png' },
-  { module_id: 38, name: 'Emergency Lighting', code: 'emergency_light', health_score: 92, category: 'fire', image: '/images/emergencylight1.png' },
-  { module_id: 44, name: 'PA Systems', code: 'pa_system', health_score: 100, category: 'fire', image: '/images/pa_system1.png' },
-  { module_id: 56, name: 'Wind Socks', code: 'wind_sock', health_score: 100, category: 'chemical', image: '/images/wind_sock1.png' },
-  { module_id: 57, name: 'SCBA', code: 'scba', health_score: 100, category: 'chemical', image: '/images/scba_unit1.png' },
-  { module_id: 58, name: 'Ambulances', code: 'ambulance', health_score: 100, category: 'chemical', image: '/images/ambulance1.png' },
-  { module_id: 45, name: 'First Aid Kits', code: 'first_aid_kit', health_score: 93, category: 'chemical', image: '/images/Firstaid1.png' },
-  { module_id: 46, name: 'Eye Wash Stations', code: 'eyewash_station', health_score: 92, category: 'chemical', image: '/images/eye_wash1.png' },
-  { module_id: 48, name: 'Spill Kits', code: 'spill_kit', health_score: 92, category: 'chemical', image: '/images/spill_kit1.png' },
-  { module_id: 47, name: 'Emergency Showers', code: 'safety_shower', health_score: 100, category: 'chemical', image: '/images/chemicalshower1.png' },
-  { module_id: 49, name: 'PPE Stations', code: 'ppe_station', health_score: 94, category: 'chemical', image: '/images/ppe_station1.png' },
-  { module_id: 42, name: 'CO2 Systems', code: 'suppression_system', health_score: 94, category: 'fire', image: '/images/suppression_system.png' },
-  { module_id: 62, name: 'Safety Signage', code: 'safety_signage', health_score: 100, category: 'permit', image: '/images/signage1.png' },
-  { module_id: 61, name: 'Emergency Comms', code: 'emergency_comm', health_score: 100, category: 'permit', image: '/images/Emergency_call1.png' },
-  { module_id: 41, name: 'Fire Blankets', code: 'fire_blanket', health_score: 93, category: 'fire', image: '/images/fireblanket1.png' },
-  { module_id: 59, name: 'Muster Points', code: 'muster_point', health_score: 100, category: 'permit', image: '/images/muster_point1.png' },
-  { module_id: 40, name: 'CO Detectors', code: 'co_detector', health_score: 100, category: 'fire', image: '/images/smoke_detector1.png' },
-  { module_id: 43, name: 'Fire Doors', code: 'fire_door', health_score: 100, category: 'fire', image: '/images/fire_door1.png' },
+  { module_id: 30, name: 'Fire Extinguishers', code: 'fire_extinguisher', category: 'fire', image: '/images/fire_extinguisher1.png' },
+  { module_id: 33, name: 'Hose Reels', code: 'hose_reel', category: 'fire', image: '/images/hosereels1.png' },
+  { module_id: 31, name: 'Sprinklers', code: 'sprinkler', category: 'fire', image: '/images/sprinkler1.png' },
+  { module_id: 34, name: 'Fire Hydrants', code: 'hydrant', category: 'fire', image: '/images/hydrant1.png' },
+  { module_id: 35, name: 'Alarm Panels', code: 'fpca', category: 'fire', image: '/images/firealarm_panel1.png' },
+  { module_id: 36, name: 'Smoke Detectors', code: 'smoke_detector', category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 37, name: 'Heat Detectors', code: 'heat_detector', category: 'fire', image: '/images/heatdetector1.png' },
+  { module_id: 55, name: 'Fire Trolleys', code: 'fire_trolley', category: 'fire', image: '/images/fire_trolley1.png' },
+  { module_id: 39, name: 'Emergency Exits', code: 'emergency_exit', category: 'fire', image: '/images/emergency_exitdoor1.png' },
+  { module_id: 38, name: 'Emergency Lighting', code: 'emergency_light', category: 'fire', image: '/images/emergencylight1.png' },
+  { module_id: 44, name: 'PA Systems', code: 'pa_system', category: 'fire', image: '/images/pa_system1.png' },
+  { module_id: 56, name: 'Wind Socks', code: 'wind_sock', category: 'chemical', image: '/images/wind_sock1.png' },
+  { module_id: 57, name: 'SCBA', code: 'scba', category: 'chemical', image: '/images/scba_unit1.png' },
+  { module_id: 58, name: 'Ambulances', code: 'ambulance', category: 'chemical', image: '/images/ambulance1.png' },
+  { module_id: 45, name: 'First Aid Kits', code: 'first_aid_kit', category: 'chemical', image: '/images/Firstaid1.png' },
+  { module_id: 46, name: 'Eye Wash Stations', code: 'eyewash_station', category: 'chemical', image: '/images/eye_wash1.png' },
+  { module_id: 48, name: 'Spill Kits', code: 'spill_kit', category: 'chemical', image: '/images/spill_kit1.png' },
+  { module_id: 47, name: 'Emergency Showers', code: 'safety_shower', category: 'chemical', image: '/images/chemicalshower1.png' },
+  { module_id: 49, name: 'PPE Stations', code: 'ppe_station', category: 'chemical', image: '/images/ppe_station1.png' },
+  { module_id: 42, name: 'CO2 Systems', code: 'suppression_system', category: 'fire', image: '/images/suppression_system.png' },
+  { module_id: 62, name: 'Safety Signage', code: 'safety_signage', category: 'permit', image: '/images/signage1.png' },
+  { module_id: 61, name: 'Emergency Comms', code: 'emergency_comm', category: 'permit', image: '/images/Emergency_call1.png' },
+  { module_id: 41, name: 'Fire Blankets', code: 'fire_blanket', category: 'fire', image: '/images/fireblanket1.png' },
+  { module_id: 59, name: 'Muster Points', code: 'muster_point', category: 'permit', image: '/images/muster_point1.png' },
+  { module_id: 40, name: 'CO Detectors', code: 'co_detector', category: 'fire', image: '/images/smoke_detector1.png' },
+  { module_id: 43, name: 'Fire Doors', code: 'fire_door', category: 'fire', image: '/images/fire_door1.png' },
 ];
 
 const CHECKLIST_GENERIC_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>;
@@ -227,7 +234,7 @@ const PAGE_TO_MODULE_MAP = {
 const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const getCompanyLogo = () => {
     const logo = user?.logo_url || user?.company_logo || user?.company?.logo || user?.logo || user?.company?.logo_url;
-    if (!logo) return '/apitoria-logo.png';
+    if (!logo) return '/images/eltrive.png';
     if (logo.startsWith('http')) return logo;
     if (logo.startsWith('/uploads/logos/')) return `http://ehs.garrev.com${logo}`;
     if (logo.startsWith('uploads/logos/')) return `http://ehs.garrev.com/${logo}`;
@@ -251,17 +258,10 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [notifError, setNotifError] = useState(false);
   const notifRef = React.useRef(null);
   const [checkedItems, setCheckedItems] = useState({});
+  const [statsBackPage, setStatsBackPage] = useState('grid');
   const [bgColor, setBgColor] = useState('rgb(144,194,244)');
   const [currentTime, setCurrentTime] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [supervisorStats, setSupervisorStats] = useState(null);
-  const [agmStats, setAgmStats] = useState(null);
-
-  useEffect(() => {
-    if (user) {
-      setCompanyName(user.company_name || user.company?.name || '');
-    }
-  }, [user]);
   const [handoverNotes, setHandoverNotes] = useState('');
   const [drillTime, setDrillTime] = useState('');
   const [shiftData, setShiftData] = useState({ icon: '🌅', name: 'Day Shift', time: '06:00 - 14:00', staff: 12 });
@@ -276,10 +276,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [searchFilter, setSearchFilter] = useState('All');
   const [eqSearchQuery, setEqSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState('all');
   const [eaInitialSearchQuery, setEaInitialSearchQuery] = useState('');
   const [eaInitialSelectedUserId, setEaInitialSelectedUserId] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [modules, setModules] = useState(STATIC_MODULES);
+  const [moduleSummariesMap, setModuleSummariesMap] = useState({});
   // Nav access: array of module codes the user is allowed to see (null = unrestricted)
   const [navAccessList, setNavAccessList] = useState(navAccess ?? null);
   const [equipmentAccessList, setEquipmentAccessList] = useState(equipmentAccess ?? null);
@@ -300,6 +303,43 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
   const [topbarVisible, setTopbarVisible] = useState(true);
   const [adminCompanies, setAdminCompanies] = useState([]);
+  const [supervisorStats, setSupervisorStats] = useState(null);
+  const [agmStats, setAgmStats] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      let name = user.company_name || user.company?.name || user.company?.company_name;
+      if (!name && typeof user.company === 'string') name = user.company;
+      if (typeof name !== 'string') name = null;
+
+      const cid = String(user.company_id || user.companyId || user.company?.id || user.company?.company_id || '');
+
+      if (!name && cid) {
+        if (adminCompanies.length > 0) {
+          const comp = adminCompanies.find(c => String(c.id) === cid || String(c.company_id) === cid);
+          if (comp) name = comp.company_name || comp.name;
+        }
+
+        if (name) {
+          setCompanyName(name);
+        } else {
+          import('../../services/apiService').then(({ ApiService }) => {
+            ApiService.getAdminCompanyById(cid)
+              .then(res => {
+                const fetchedName = res?.company_name || res?.name || res?.data?.company_name || res?.data?.name;
+                setCompanyName(fetchedName || 'Dashboard');
+              })
+              .catch(err => {
+                console.warn("Could not fetch company name", err);
+                setCompanyName('Dashboard');
+              });
+          });
+        }
+      } else {
+        setCompanyName(name || 'Dashboard');
+      }
+    }
+  }, [user, adminCompanies]);
   const lastScrollY = React.useRef(0);
 
 
@@ -307,9 +347,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     setNotifLoading(true);
     setNotifError(false);
     try {
-      const d = await ApiService.getNotifications({ limit: 20 });
+      const d = await ApiService.getNotifications({ limit: 50 });
       const list = Array.isArray(d) ? d : (d?.notifications || d?.items || d?.data || []);
-      setNotifications(list);
+      const unreadList = list.filter(n => !n.read && !n.is_read);
+      setNotifications(unreadList);
+      setAlertCount(unreadList.length);
     } catch (err) {
       console.error("Failed to load notifications:", err);
       setNotifError(true);
@@ -329,7 +371,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const handleMarkRead = async (id) => {
     try {
       await ApiService.markNotificationRead([id]);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, is_read: true } : n));
+      setNotifications(prev => prev.filter(n => n.id !== id));
       setAlertCount(prev => Math.max(0, prev - 1));
     } catch { /* ignore */ }
   };
@@ -337,7 +379,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const handleMarkAllRead = async () => {
     try {
       await ApiService.markAllNotificationsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
+      setNotifications([]);
       setAlertCount(0);
     } catch { /* ignore */ }
   };
@@ -359,8 +401,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     { label: 'Permits', icon: '📋' },
   ];
 
-  const getStatus = (mod) => {
-    const score = mod.health_score ?? 0;
+  const getStatus = (mod, summaries = {}) => {
+    const summary = summaries[mod.module_id] || {};
+    const score = summary.compliance ?? mod.health_score ?? 0;
     if (score < 80) return 'critical'; // red (below 80 is critical)
     if (score >= 90) return 'healthy'; // green
     return 'warning'; // amber (80 to 90)
@@ -368,19 +411,19 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   // Sync navAccessList whenever the prop changes (e.g. after admin updates access)
   useEffect(() => {
-    const mods = Array.isArray(navAccess) && navAccess.length > 0 ? navAccess : null;
+    const mods = Array.isArray(navAccess) ? navAccess : null;
     setNavAccessList(mods);
   }, [navAccess]);
 
   useEffect(() => {
-    const eqMods = Array.isArray(equipmentAccess) && equipmentAccess.length > 0 ? equipmentAccess : null;
+    const eqMods = Array.isArray(equipmentAccess) ? equipmentAccess : null;
     setEquipmentAccessList(eqMods);
   }, [equipmentAccess]);
 
   useEffect(() => {
     if (!user) return;
     const isAllowed = (page) => {
-      if (page === 'grid' || page === 'overview') return true;
+      if (page === 'grid' || page === 'overview' || page === 'equipment-grid') return true;
       let code = page;
       if (PAGE_TO_MODULE_MAP[page]) {
         code = PAGE_TO_MODULE_MAP[page];
@@ -392,12 +435,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       if (page === 'audit-logs') code = 'audit_logs';
       if (page === 'device-monitoring') code = 'device_monitoring';
       if (page === 'setup-company') code = 'setup_company';
+      if (page === 'setup-operator-mapping') code = 'setup_operator_mapping';
       if (page === 'setup-domains') code = 'setup_domains';
       if (page === 'equipment-onboarding') code = 'add_equipment';
       if (page === 'users-manage') code = 'user_manage';
       if (page === 'users-equipment-access') code = 'equipment_access';
       if (page === 'setup-modules') return false; // Completely disabled
-      
+
       return isNavAllowed(code);
     };
 
@@ -411,34 +455,46 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     const role = (user.role || '').toLowerCase();
     const isGlobal = role === 'superadmin' || role === 'admin' || role === 'safety_manager';
 
-    if (!isGlobal && (!equipmentAccess || equipmentAccess.length === 0)) {
+    if (!isGlobal) {
       ApiService.getEquipment({ limit: 1000 })
         .then(res => {
           const eqList = Array.isArray(res) ? res : (res?.items || res?.data || []);
-          if (eqList.length > 0) {
-            const moduleIds = new Set();
-            const moduleCodes = new Set();
-            eqList.forEach(eq => {
-              if (eq.module_id) moduleIds.add(Number(eq.module_id));
-              if (eq.module_code) moduleCodes.add(eq.module_code);
-              else if (eq.equipment_type) moduleCodes.add(eq.equipment_type);
-            });
+          const moduleIds = new Set();
+          const moduleCodes = new Set();
 
-            const inheritedMods = STATIC_MODULES.filter(m =>
-              moduleIds.has(m.module_id) ||
-              moduleCodes.has(m.code)
-            );
+          let extractedCompanyName = null;
 
-            if (inheritedMods.length > 0) {
-              setEquipmentAccessList(inheritedMods);
+          eqList.forEach(eq => {
+            if (eq.module_id) moduleIds.add(Number(eq.module_id));
+            if (eq.module_code) moduleCodes.add(eq.module_code);
+            else if (eq.equipment_type) moduleCodes.add(eq.equipment_type);
+
+            if (!extractedCompanyName && (eq.company_name || eq.company?.name || eq.company?.company_name)) {
+              extractedCompanyName = eq.company_name || eq.company?.name || eq.company?.company_name;
             }
+          });
+
+          if (extractedCompanyName) {
+            setCompanyName(prev => (!prev || prev === 'Dashboard') ? extractedCompanyName : prev);
+          }
+
+          const onboardedMods = STATIC_MODULES.filter(m =>
+            moduleIds.has(m.module_id) || moduleCodes.has(m.code)
+          );
+
+          if (Array.isArray(equipmentAccess)) {
+            const permittedCodes = new Set(equipmentAccess.map(m => m.code));
+            const visibleModules = onboardedMods.filter(m => permittedCodes.has(m.code));
+            setEquipmentAccessList(visibleModules);
+          } else {
+            setEquipmentAccessList(onboardedMods.length > 0 ? onboardedMods : []);
           }
         })
         .catch(err => {
           console.error("Failed to load equipment list for inheritance:", err);
         });
     }
-  }, [user, equipmentAccess]);
+  }, [user, equipmentAccess, refreshKey]);
   useEffect(() => {
     if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
     ApiService.getModuleChecklists(selectedEq.module_id || selectedEq.id)
@@ -471,9 +527,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   }, [selectedChecklistType]);
 
   useEffect(() => {
-    ApiService.getNotificationsUnreadCount()
-      .then((d) => setAlertCount(d.unread_count || 0))
-      .catch(() => setAlertCount(0));
+    fetchNotifications();
 
     // Fetch pending approvals count
     const today = new Date();
@@ -484,8 +538,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
     Promise.allSettled([
       ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }),
-      ApiService.getPendingUpdates().catch(() => [])
-    ]).then(([inspectionsRes, updatesRes]) => {
+      ApiService.getPendingUpdates().catch(() => []),
+      ApiService.getAdminUsers().catch(() => [])
+    ]).then(([inspectionsRes, updatesRes, usersRes]) => {
       const queuedInspections = ApiService.getQueuedInspections();
       let pendingItems = [...queuedInspections];
       const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
@@ -510,6 +565,64 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           return stApprov === 'PENDING' || stStatus === 'PENDING' || stApprov !== 'APPROVED';
         }).map(u => ({ ...u, _itemType: 'update' })));
       }
+
+      const rawUsers = usersRes.status === 'fulfilled' ? usersRes.value : [];
+      const uListUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.users || rawUsers?.data || []);
+      const role = (user?.role || '').toLowerCase();
+      const currentUserId = String(user?.id || user?.user_id || '');
+      const userCompanyId = user?.company_id || user?.companyId;
+
+      if (role === 'supervisor') {
+        const controlled = uListUsers.filter(u => String(u.supervisor_id || u.supervisorId) === currentUserId);
+        const controlledIds = new Set(controlled.map(u => String(u.id)));
+        let teamFiltered = pendingItems.filter(item => {
+          const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+          return itemUserId === currentUserId || controlledIds.has(itemUserId);
+        });
+        if (teamFiltered.length === 0 && userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          teamFiltered = pendingItems.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+        pendingItems = teamFiltered;
+      } else if (role === 'agm') {
+        const controlled = uListUsers.filter(u => String(u.agm_id || u.agmId) === currentUserId);
+        const controlledIds = new Set(controlled.map(u => String(u.id)));
+        let teamFiltered = pendingItems.filter(item => {
+          const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+          return itemUserId === currentUserId || controlledIds.has(itemUserId);
+        });
+        if (teamFiltered.length === 0 && userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          teamFiltered = pendingItems.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+        pendingItems = teamFiltered;
+      } else if (role === 'admin' || role === 'superadmin') {
+        if (userCompanyId) {
+          const companyUsers = uListUsers.filter(u => String(u.company_id || u.companyId) === String(userCompanyId));
+          const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
+          pendingItems = pendingItems.filter(item => {
+            const itemUserId = String(item.submitted_by_id || item.inspector_id || item.user_id || '');
+            return companyUserIds.has(itemUserId);
+          });
+        }
+      }
+
+      const backendUser = uListUsers.find(u => String(u.id) === currentUserId || String(u.user_id) === currentUserId);
+      if (backendUser) {
+        const bName = backendUser.company_name || backendUser.company?.name || backendUser.company?.company_name;
+        if (bName) {
+          setCompanyName(prev => (!prev || prev === 'Dashboard') ? bName : prev);
+        }
+      }
+
       setPendingRawItems(pendingItems);
     }).catch(() => setPendingRawItems([]));
 
@@ -545,11 +658,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
 
           const reportsRes = await ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }).catch(() => []);
-          
+
           const usersList = Array.isArray(usersRes) ? usersRes : (usersRes?.users || usersRes?.data || []);
           const inspectors = usersList.filter(u => u.role === 'inspector' || u.role === 'user');
           const reportsList = Array.isArray(reportsRes) ? reportsRes : (reportsRes?.items || reportsRes?.reports || reportsRes?.inspections || reportsRes?.data || []);
-          
+
           const todayStr = new Date().toISOString().split('T')[0];
           const activities = inspectors.map(inspector => {
             const inspectorReportsToday = reportsList.filter(r => {
@@ -557,14 +670,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               const repDateStr = new Date(r.created_at || r.inspected_at).toISOString().split('T')[0];
               return String(repUserId) === String(inspector.id) && repDateStr === todayStr;
             });
-            
+
             const inspectorAllReports = reportsList.filter(r => {
               const repUserId = r.submitted_by_id || r.inspector_id || r.user_id;
               return String(repUserId) === String(inspector.id);
             });
             inspectorAllReports.sort((a, b) => new Date(b.created_at || b.inspected_at) - new Date(a.created_at || a.inspected_at));
             const lastReport = inspectorAllReports[0];
-            
+
             return {
               id: inspector.id,
               name: inspector.name || inspector.username,
@@ -598,25 +711,39 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         const results = await Promise.allSettled(
           STATIC_MODULES.map(m => ApiService.getModuleSummary(m.module_id).then(res => {
             let score = res.readiness_score ?? res.health_score ?? res.score;
+            const total = res.total ?? res.total_units ?? res.total_assets ?? res.total_equipment ?? 0;
+            const expired = res.expired ?? res.expired_assets ?? res.expired_equipment ?? res.expired_count ?? 0;
+            const due = res.due_inspection ?? res.due ?? res.pending_inspections ?? 0;
 
             // If the backend didn't calculate it, we do it here using the standard safety formula:
             if (score === undefined || score === null) {
-              const total = res.total ?? res.total_units ?? 0;
-              const expired = res.expired ?? 0;
               const needsService = res.needs_service ?? 0;
-              const dueInspection = res.due_inspection ?? 0;
-
-              const issues = expired + needsService + dueInspection;
+              const issues = expired + needsService + due;
               score = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
             }
 
-            return { id: m.module_id, score, health_colour: res.health_colour };
+            return { id: m.module_id, score, health_colour: res.health_colour, total, due, expired };
           }))
         );
 
+        const summariesMap = {};
+        results.forEach(r => {
+          if (r.status !== 'fulfilled') return;
+          const { id, score, total, due, expired } = r.value;
+          summariesMap[id] = { compliance: score, total, due, expired };
+        });
+        setModuleSummariesMap(summariesMap);
+
         setModules(current => current.map(m => {
           const match = results.find(r => r.status === 'fulfilled' && r.value.id === m.module_id);
-          return match ? { ...m, health_score: match.value.score, health_colour: match.value.health_colour } : m;
+          return match ? {
+            ...m,
+            health_score: match.value.score,
+            health_colour: match.value.health_colour,
+            total: match.value.total,
+            due: match.value.due,
+            expired: match.value.expired
+          } : m;
         }));
       } catch (err) {
         console.error('Failed to fetch module summaries:', err);
@@ -625,6 +752,8 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       }
     };
     fetchSummaries();
+    const summariesInterval = setInterval(fetchSummaries, 15000);
+    // summariesInterval is cleaned up at the end of this effect's return
 
     // Check supervisor inactivity and notify AGM
     const checkSupervisorInactivity = async () => {
@@ -761,7 +890,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
     // Run after a short delay
     setTimeout(checkSupervisorInactivity, 5000);
-  }, []);
+
+    return () => clearInterval(summariesInterval);
+  }, [refreshKey]);
 
   useEffect(() => {
     const tick = () => {
@@ -866,17 +997,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   }, [modules, equipmentAccessList, navAccessList, eqSearchQuery, user]);
 
   const pendingApprovalsCount = useMemo(() => {
-    if (user?.role === 'supervisor' && supervisorStats !== null && supervisorStats.pending_approvals > 0) {
-      return supervisorStats.pending_approvals;
-    }
-    if (user?.role === 'agm' && agmStats !== null && agmStats.pending_approvals_across_team > 0) {
-      return agmStats.pending_approvals_across_team;
-    }
     if (!pendingRawItems) return 0;
     const allowedIds = new Set(filteredModules.map(m => String(m.module_id)));
     const finalItems = pendingRawItems.filter(r => !r.module_id || allowedIds.has(String(r.module_id)));
     return finalItems.length;
-  }, [pendingRawItems, filteredModules, user, supervisorStats, agmStats]);
+  }, [pendingRawItems, filteredModules]);
 
   const preparednessScore = useMemo(() => {
     if (user?.role === 'supervisor' && supervisorStats !== null && supervisorStats.compliance_rate > 0) {
@@ -885,22 +1010,26 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     if (user?.role === 'agm' && agmStats !== null && agmStats.compliance_rate > 0) {
       return agmStats.compliance_rate;
     }
-    const total = filteredModules.reduce((sum, m) => sum + (m.health_score || 0), 0);
+    const total = filteredModules.reduce((sum, m) => {
+      const summary = moduleSummariesMap[m.module_id] || {};
+      const score = summary.compliance ?? m.health_score ?? 0;
+      return sum + score;
+    }, 0);
     return filteredModules.length > 0 ? Math.round(total / filteredModules.length) : 0;
-  }, [filteredModules, user, supervisorStats, agmStats]);
+  }, [filteredModules, moduleSummariesMap, user, supervisorStats, agmStats]);
 
   const statusCounts = useMemo(() => {
     return filteredModules.reduce(
       (acc, m) => {
-        const status = getStatus(m);
-        if (status === 'healthy') acc.healthy++;
-        else if (status === 'warning') acc.warning++;
-        else if (status === 'critical') acc.critical++;
+        const status = getStatus(m, moduleSummariesMap);
+        if (status === 'healthy') acc.healthy += 1;
+        else if (status === 'warning') acc.warning += 1;
+        else if (status === 'critical') acc.critical += 1;
         return acc;
       },
       { healthy: 0, warning: 0, critical: 0 }
     );
-  }, [filteredModules]);
+  }, [filteredModules, moduleSummariesMap]);
 
   const totalItems = useMemo(() => {
     return activeChecklistItems.length;
@@ -918,6 +1047,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const handleOpenModule = (mod) => {
     setSelectedEq(mod);
+    setStatsBackPage(activePage);
     if (mod.code === 'fire_extinguisher') setActivePage('fire-stats');
     else if (mod.code === 'sprinkler') setActivePage('sprinkler-stats');
     else if (mod.code === 'hose_reel') setActivePage('hose-stats');
@@ -983,6 +1113,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
   const isNavAllowed = (code) => {
     if (!code) return false;
+    if (code === 'location_explorer') return true;
     const role = (user?.role || '').toLowerCase();
     if (code === 'pending_updates') {
       if (role === 'supervisor' || role === 'agm' || role === 'admin' || role === 'superadmin') return true;
@@ -993,8 +1124,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     const isGlobal = isAdminOrSuper || role === 'safety_manager';
 
     // 1. Role-based hard boundaries (Security Overrides)
-    if (code === 'user_manage' || code === 'add_equipment' || code === 'setup_company' || code === 'setup_domains') {
+    if (code === 'locations_table' || code === 'user_manage' || code === 'add_equipment' || code === 'setup_domains') {
       if (!isAdminOrSuper) return false;
+    }
+    if (code === 'setup_company') {
+      if (role !== 'superadmin') return false;
     }
     if (code === 'equipment_access') {
       if (!isAdminOrSuper && role !== 'agm' && role !== 'supervisor') return false;
@@ -1056,6 +1190,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           active: activePage === 'grid',
           onClick: () => setActivePage('grid')
         },
+
       ],
     },
     {
@@ -1076,6 +1211,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     },
   ];
 
+  const displayModules = (equipmentAccessList?.length > 0 ? equipmentAccessList : modules).map(mod => ({
+    ...mod,
+    image: mod.image || STATIC_MODULES.find(m => String(m.module_id) === String(mod.module_id || mod.id))?.image
+  }));
+
   return (
     <div className={`dash ${navCollapsed ? 'sidebar-collapsed' : ''} ${!topbarVisible ? 'topbar-hidden' : ''}`} style={{ '--bg': bgColor }}>
       {appLoading && (
@@ -1089,45 +1229,35 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
           <div className="refresher-text">Loading Safety Dashboard…</div>
         </div>
       )}
-      {/* ── TOPBAR (HEADER AT TOP) ────────────────────────────────────────── */}
-      <header className="topbar">
-        <div className="topbar-left">
-          <div className="topbar-brand">
+      <header className="topbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div className="topbar-left" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+          {user?.role === 'superadmin' ? (
             <div className="topbar-logo-pill">
               <img src={getCompanyLogo()} alt="Company Logo" className="topbar-logo" />
             </div>
-            <div className="topbar-copy">
-              <div className="tb-title">
-                <span className="tb-brand-icon">🚨</span>
-                Emergency Safety Dashboard
-              </div>
-              <div className="tb-subtitle">
-                Real-time fire &amp; safety monitoring
-                <span className="health-info-link" title="Health Calculation: ((Total Assets - (Expired + Needs Service + Due Inspection)) / Total Assets) * 100" style={{ marginLeft: '8px', opacity: 0.7, cursor: 'help', fontSize: '9px', textDecoration: 'underline' }}>
-                  Health Logic ⓘ
-                </span>
-              </div>
+          ) : (
+            <div className="topbar-company-name" style={{ padding: '0 20px', fontWeight: '900', fontSize: '1.1rem', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', height: '44px' }}>
+              {companyName || 'Dashboard'}
+            </div>
+          )}
+        </div>
+
+        <div className="topbar-center" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+          <div className="topbar-copy" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="tb-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span className="tb-brand-icon">🚨</span>
+              Emergency Safety Dashboard
+            </div>
+            <div className="tb-subtitle">
+              Real-time fire &amp; safety monitoring
             </div>
           </div>
         </div>
 
-
-        <div className="tb-actions">
+        <div className="tb-actions" style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
           {activePage === 'grid' && modules.length > 10 && (
             <div className="topbar-search">
-              <div className="search-group">
-                <div className="search-box">
-                  <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round">
-                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                  </svg>
-                  <input
-                    className="search-input"
-                    placeholder="Search equipment..."
-                    value={eqSearchQuery}
-                    onChange={(e) => setEqSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
+
             </div>
           )}
 
@@ -1258,12 +1388,6 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       <span className="nav-label-small">Add Company</span>
                     </div>
                   )}
-                  {user?.role === 'superadmin' && (
-                    <div className={`nav-submenu-item ${activePage === 'setup-domains' ? 'active' : ''}`} onClick={() => setActivePage('setup-domains')}>
-                      <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></span>
-                      <span className="nav-label-small">Email Domains</span>
-                    </div>
-                  )}
                   {isNavAllowed('add_equipment') && (
                     <div className={`nav-submenu-item ${activePage === 'equipment-onboarding' ? 'active' : ''}`} onClick={() => setActivePage('equipment-onboarding')}>
                       <span className="nav-icon-small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><rect x="3" y="3" width="18" height="18" rx="3" /></svg></span>
@@ -1338,157 +1462,376 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
         <main className="main">
           {/* MIDDLE COLUMN: PAGES */}
           <div className="content-area">
-            <section className={`page ${activePage === 'grid' ? 'active' : ''}`}>
-              <div className="grid-scroll" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
-                {/* Onboarding setup banner — superadmin only, shown while companies are still being set up */}
-                {user?.role === 'superadmin' && adminCompanies.length === 0 && !appLoading && (
-                  <div className="onboarding-banner" onClick={() => setActivePage('setup-onboarding')}>
-                    <div className="ob-banner-icon">🚀</div>
-                    <div className="ob-banner-body">
-                      <div className="ob-banner-title">Complete Your Setup</div>
-                      <div className="ob-banner-desc">Configure your company, users and equipment access to get started.</div>
-                    </div>
-                    <button className="ob-banner-btn">Start Onboarding →</button>
-                  </div>
-                )}
-
-                {/* Summary White Card */}
-                <div className={`overview-summary-card ${(user?.role === 'user' || user?.role === 'inspector') ? 'inspector-mode' : ''}`}>
-                  <div className="osc-section" style={{ flex: 1, alignItems: (user?.role === 'user' || user?.role === 'inspector') ? 'center' : 'flex-start' }}>
-                    <span className="osc-label">Equipment Status:</span>
-                    <div className="osc-cards-wrapper">
-                      <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
-                        <span className="osc-symbol">✅</span>
-                        <span className="osc-text">Healthy</span>
-                        <span className="osc-count">{statusCounts.healthy}</span>
-                      </button>
-                      <button className={`osc-small-card warning ${statusFilter === 'warning' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}>
-                        <span className="osc-symbol">⚠️</span>
-                        <span className="osc-text">Warning</span>
-                        <span className="osc-count">{statusCounts.warning}</span>
-                      </button>
-                      <button className={`osc-small-card critical ${statusFilter === 'critical' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}>
-                        <span className="osc-symbol">🚨</span>
-                        <span className="osc-text">Critical</span>
-                        <span className="osc-count">{statusCounts.critical}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="osc-divider"></div>
-
-                  <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
-                    <span className="osc-label">Readiness Score:</span>
-                    <div className="osc-sys-health" style={{ minWidth: '150px', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
-                      <svg width="190" height="110" viewBox="0 0 112 64" fill="none" role="img">
-                        <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
-                        <path d="M10 58 A46 46 0 0 1 102 58"
-                          stroke={preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'}
-                          strokeWidth="10" strokeLinecap="round" fill="none"
-                          strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
-                        <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '26px' }}>{preparednessScore}%</text>
-                      </svg>
-                      <div style={{
-                        fontSize: '15px',
-                        fontWeight: '800',
-                        marginTop: '2px',
-                        color: preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'
-                      }}>
-                        {preparednessScore >= 90 ? 'System Healthy' : preparednessScore >= 80 ? 'System Warning' : 'System Critical'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {!(user?.role === 'user' || user?.role === 'inspector') && (
-                    <>
-                      <div className="osc-divider"></div>
-                      <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
-                        <span className="osc-label">Pending Approvals:</span>
-                        <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '24px', fontWeight: '900', color: '#f39c12', marginTop: '8px' }}>
-                          <span className="osc-symbol" style={{ fontSize: '28px' }}>📋</span>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
-                            <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
-                            <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
-                          </div>
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ width: '18px', height: '18px', color: '#adb5bd', marginLeft: '4px', cursor: 'pointer', transition: 'color 0.2s' }}
-                            onClick={() => setActivePage('pending-updates')}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#adb5bd'}
-                            title="View Pending Approvals"
-                          >
-                            <path d="M9 18l6-6-6-6" />
+            <section className={`page ${activePage === 'grid' || activePage === 'equipment-grid' ? 'active' : ''}`}>
+              <div
+                className={`grid-scroll${user?.role === 'superadmin' && activePage !== 'equipment-grid' ? ' grid-scroll--overview' : ''}`}
+                onScroll={handleScroll}
+                style={{ overflowY: 'auto' }}
+              >
+                {/* ── SUPERADMIN OVERVIEW DASHBOARD ── */}
+                {user?.role === 'superadmin' && activePage !== 'equipment-grid' ? (
+                  <SuperAdminOverview
+                    user={user}
+                    allModules={filteredModules}
+                    moduleSummaries={moduleSummariesMap}
+                    onNavigate={(code, filter, moduleFilter) => {
+                      const codeToPage = {
+                        'grid': 'grid',
+                        'equipment-grid': 'equipment-grid',
+                        'setup-company': 'setup-company',
+                        'users-manage': 'users-manage',
+                        'pending-updates': 'pending-updates',
+                        'reports': 'reports',
+                        'fire_extinguisher': 'fire-stats',
+                        'sprinkler': 'sprinkler-stats',
+                        'hose_reel': 'hose-stats',
+                        'smoke_detector': 'smoke-detector-stats',
+                        'emergency_light': 'emergency-lighting-stats',
+                        'hydrant': 'hydrant-stats',
+                        'fpca': 'fire-alarm-panel-stats',
+                        'locations-table': 'locations-table',
+                      };
+                      const page = codeToPage[code] || 'grid';
+                      if (filter) {
+                        setStatusFilter(filter);
+                      } else {
+                        setStatusFilter('all');
+                      }
+                      if (moduleFilter) {
+                        setSelectedModuleFilter(moduleFilter);
+                      } else {
+                        setSelectedModuleFilter('all');
+                      }
+                      setActivePage(page);
+                    }}
+                  />
+                ) : user?.role === 'admin' && activePage !== 'equipment-grid' ? (
+                  <AdminOverview
+                    user={user}
+                    allModules={filteredModules}
+                    moduleSummaries={moduleSummariesMap}
+                    onNavigate={(code, filter, moduleFilter) => {
+                      const codeToPage = {
+                        'grid': 'grid',
+                        'equipment-grid': 'equipment-grid',
+                        'setup-company': 'setup-company',
+                        'users-manage': 'users-manage',
+                        'pending-updates': 'pending-updates',
+                        'reports': 'reports',
+                        'fire_extinguisher': 'fire-stats',
+                        'sprinkler': 'sprinkler-stats',
+                        'hose_reel': 'hose-stats',
+                        'smoke_detector': 'smoke-detector-stats',
+                        'emergency_light': 'emergency-lighting-stats',
+                        'hydrant': 'hydrant-stats',
+                        'fpca': 'fire-alarm-panel-stats',
+                        'locations-table': 'locations-table',
+                      };
+                      const page = codeToPage[code] || 'grid';
+                      if (filter) {
+                        setStatusFilter(filter);
+                      } else {
+                        setStatusFilter('all');
+                      }
+                      if (moduleFilter) {
+                        setSelectedModuleFilter(moduleFilter);
+                      } else {
+                        setSelectedModuleFilter('all');
+                      }
+                      setActivePage(page);
+                    }}
+                  />
+                ) : user?.role === 'agm' && activePage !== 'equipment-grid' ? (
+                  <AgmOverview
+                    user={user}
+                    allModules={filteredModules}
+                    moduleSummaries={moduleSummariesMap}
+                    onNavigate={(code, filter, moduleFilter) => {
+                      const codeToPage = {
+                        'grid': 'grid',
+                        'equipment-grid': 'equipment-grid',
+                        'setup-company': 'setup-company',
+                        'users-manage': 'users-manage',
+                        'pending-updates': 'pending-updates',
+                        'reports': 'reports',
+                        'fire_extinguisher': 'fire-stats',
+                        'sprinkler': 'sprinkler-stats',
+                        'hose_reel': 'hose-stats',
+                        'smoke_detector': 'smoke-detector-stats',
+                        'emergency_light': 'emergency-lighting-stats',
+                        'hydrant': 'hydrant-stats',
+                        'fpca': 'fire-alarm-panel-stats',
+                      };
+                      const page = codeToPage[code] || 'grid';
+                      if (filter) {
+                        setStatusFilter(filter);
+                      } else {
+                        setStatusFilter('all');
+                      }
+                      if (moduleFilter) {
+                        setSelectedModuleFilter(moduleFilter);
+                      } else {
+                        setSelectedModuleFilter('all');
+                      }
+                      setActivePage(page);
+                    }}
+                  />
+                ) : user?.role === 'supervisor' && activePage !== 'equipment-grid' ? (
+                  <SupervisorOverview
+                    user={user}
+                    allModules={filteredModules}
+                    moduleSummaries={moduleSummariesMap}
+                    onNavigate={(code, filter, moduleFilter) => {
+                      const codeToPage = {
+                        'grid': 'grid',
+                        'equipment-grid': 'equipment-grid',
+                        'setup-company': 'setup-company',
+                        'users-manage': 'users-manage',
+                        'pending-updates': 'pending-updates',
+                        'reports': 'reports',
+                        'fire_extinguisher': 'fire-stats',
+                        'sprinkler': 'sprinkler-stats',
+                        'hose_reel': 'hose-stats',
+                        'smoke_detector': 'smoke-detector-stats',
+                        'emergency_light': 'emergency-lighting-stats',
+                        'hydrant': 'hydrant-stats',
+                        'fpca': 'fire-alarm-panel-stats',
+                      };
+                      const page = codeToPage[code] || 'grid';
+                      if (filter) {
+                        setStatusFilter(filter);
+                      } else {
+                        setStatusFilter('all');
+                      }
+                      if (moduleFilter) {
+                        setSelectedModuleFilter(moduleFilter);
+                      } else {
+                        setSelectedModuleFilter('all');
+                      }
+                      setActivePage(page);
+                    }}
+                  />
+                ) : (user?.role === 'inspector' || user?.role === 'user') && activePage !== 'equipment-grid' ? (
+                  <InspectorOverview
+                    user={user}
+                    allModules={filteredModules}
+                    moduleSummaries={moduleSummariesMap}
+                    onNavigate={(code, filter, moduleFilter) => {
+                      const codeToPage = {
+                        'grid': 'grid',
+                        'equipment-grid': 'equipment-grid',
+                        'setup-company': 'setup-company',
+                        'users-manage': 'users-manage',
+                        'pending-updates': 'pending-updates',
+                        'reports': 'reports',
+                        'fire_extinguisher': 'fire-stats',
+                        'sprinkler': 'sprinkler-stats',
+                        'hose_reel': 'hose-stats',
+                        'smoke_detector': 'smoke-detector-stats',
+                        'emergency_light': 'emergency-lighting-stats',
+                        'hydrant': 'hydrant-stats',
+                        'fpca': 'fire-alarm-panel-stats',
+                      };
+                      const page = codeToPage[code] || 'grid';
+                      if (filter) {
+                        setStatusFilter(filter);
+                      } else {
+                        setStatusFilter('all');
+                      }
+                      if (moduleFilter) {
+                        setSelectedModuleFilter(moduleFilter);
+                      } else {
+                        setSelectedModuleFilter('all');
+                      }
+                      setActivePage(page);
+                    }}
+                  />
+                ) : (
+                  <>
+                    {activePage === 'equipment-grid' && (
+                      <div style={{ width: '100%', maxWidth: '1000px', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 4px 8px', boxSizing: 'border-box' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedModuleFilter('all');
+                            setStatusFilter('all');
+                            setActivePage('grid');
+                          }}
+                          title="Back to Overview"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.25)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '26px',
+                            height: '26px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#111827'
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                            <path d="M19 12H5M12 5l-7 7 7 7" />
                           </svg>
+                        </button>
+                        <h1 className="sao-page-title" style={{ fontSize: '18px', fontWeight: '700', color: '#111827', margin: 0 }}>Safety Equipments</h1>
+                      </div>
+                    )}
+
+                    {/* Onboarding setup banner — admin only, shown while companies are still being set up */}
+                    {activePage !== 'equipment-grid' && adminCompanies.length === 0 && !appLoading && (
+                      <div className="onboarding-banner" onClick={() => setActivePage('setup-onboarding')}>
+                        <div className="ob-banner-icon">🚀</div>
+                        <div className="ob-banner-body">
+                          <div className="ob-banner-title">Complete Your Setup</div>
+                          <div className="ob-banner-desc">Configure your company, users and equipment access to get started.</div>
+                        </div>
+                        <button className="ob-banner-btn">Start Onboarding →</button>
+                      </div>
+                    )}
+
+                    {/* Summary White Card */}
+                    <div className={`overview-summary-card ${(user?.role === 'user' || user?.role === 'inspector') ? 'inspector-mode' : ''}`}>
+                      <div className="osc-section" style={{ flex: 1, alignItems: (user?.role === 'user' || user?.role === 'inspector') ? 'center' : 'flex-start' }}>
+                        <span className="osc-label">Equipment Status:</span>
+                        <div className="osc-cards-wrapper">
+                          <button className={`osc-small-card healthy ${statusFilter === 'healthy' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}>
+                            <span className="osc-symbol">✅</span>
+                            <span className="osc-text">Healthy</span>
+                            <span className="osc-count">{statusCounts.healthy}</span>
+                          </button>
+                          <button className={`osc-small-card warning ${statusFilter === 'warning' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}>
+                            <span className="osc-symbol">⚠️</span>
+                            <span className="osc-text">Warning</span>
+                            <span className="osc-count">{statusCounts.warning}</span>
+                          </button>
+                          <button className={`osc-small-card critical ${statusFilter === 'critical' ? 'active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}>
+                            <span className="osc-symbol">🚨</span>
+                            <span className="osc-text">Critical</span>
+                            <span className="osc-count">{statusCounts.critical}</span>
+                          </button>
                         </div>
                       </div>
-                    </>
-                  )}
-                </div>
 
-                {/* Team Daily Activity Tracker — Supervisor Only */}
-                {user?.role === 'supervisor' && teamActivities.length > 0 && (
-                  <div className="supervisor-tracker-card">
-                    <div className="stc-header">
-                      <h3>👥 Team Daily Activity Tracker</h3>
-                      <span className="stc-date">Today: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                    </div>
-                    <div className="stc-body">
-                      {teamActivities.map(act => (
-                        <div key={act.id} className={`stc-item ${act.status.toLowerCase()}`}>
-                          <div className="stc-user-info">
-                            <div className="stc-avatar">{(act.name).charAt(0).toUpperCase()}</div>
-                            <div>
-                              <div className="stc-name">{act.name}</div>
-                              <div className="stc-role">{act.role.toUpperCase()}</div>
+                      <div className="osc-divider"></div>
+
+                      <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                        <span className="osc-label">Readiness Score:</span>
+                        <div className="osc-sys-health" style={{ minWidth: '150px', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
+                          <svg width="190" height="110" viewBox="0 0 112 64" fill="none" role="img">
+                            <path d="M10 58 A46 46 0 0 1 102 58" stroke="rgba(0,0,0,0.1)" strokeWidth="10" strokeLinecap="round" fill="none" />
+                            <path d="M10 58 A46 46 0 0 1 102 58"
+                              stroke={preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'}
+                              strokeWidth="10" strokeLinecap="round" fill="none"
+                              strokeDasharray="144.5" strokeDashoffset={144.5 * (1 - preparednessScore / 100)} />
+                            <text x="56" y="55" textAnchor="middle" style={{ fill: '#111827', fontWeight: '900', fontSize: '26px' }}>{preparednessScore}%</text>
+                          </svg>
+                          <div style={{
+                            fontSize: '15px',
+                            fontWeight: '800',
+                            marginTop: '2px',
+                            color: preparednessScore >= 90 ? '#2ecc71' : preparednessScore >= 80 ? '#f39c12' : '#e74c3c'
+                          }}>
+                            {preparednessScore >= 90 ? 'System Healthy' : preparednessScore >= 80 ? 'System Warning' : 'System Critical'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {!(user?.role === 'user' || user?.role === 'inspector') && (
+                        <>
+                          <div className="osc-divider"></div>
+                          <div className="osc-section" style={{ flex: 1, alignItems: 'center' }}>
+                            <span className="osc-label">Pending Approvals:</span>
+                            <div className="osc-info-text" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '24px', fontWeight: '900', color: '#f39c12', marginTop: '8px' }}>
+                              <span className="osc-symbol" style={{ fontSize: '28px' }}>📋</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0px' }}>
+                                <span style={{ lineHeight: '1' }}>{pendingApprovalsCount}</span>
+                                <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: '800', textTransform: 'uppercase', marginTop: '2px', letterSpacing: '0.5px' }}>Approvals</span>
+                              </div>
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ width: '14px', height: '14px', color: '#adb5bd', marginLeft: '2px', cursor: 'pointer', transition: 'color 0.2s' }}
+                                onClick={() => setActivePage('pending-updates')}
+                                onMouseEnter={(e) => e.currentTarget.style.color = '#495057'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = '#adb5bd'}
+                                title="View Pending Approvals"
+                              >
+                                <path d="M9 18l6-6-6-6" />
+                              </svg>
                             </div>
                           </div>
-                          
-                          <div className="stc-stat">
-                            <span className="stc-stat-label">Tasks Done Today</span>
-                            <span className="stc-stat-val">{act.inspectionsCount}</span>
-                          </div>
+                        </>
+                      )}
+                    </div>
 
-                          <div className="stc-stat">
-                            <span className="stc-stat-label">Last Activity</span>
-                            <span className="stc-stat-val">{act.lastActive}</span>
-                          </div>
-
-                          <div className="stc-stat">
-                            <span className="stc-stat-label">Last Inspected</span>
-                            <span className="stc-stat-val">{act.lastModule}</span>
-                          </div>
-
-                          <div className={`stc-badge ${act.status.toLowerCase()}`}>
-                            {act.status === 'Active' ? '✓ COMPLETED' : '⏳ PENDING'}
-                          </div>
+                    {/* Team Daily Activity Tracker — Supervisor Only */}
+                    {activePage !== 'equipment-grid' && user?.role === 'supervisor' && teamActivities.length > 0 && (
+                      <div className="supervisor-tracker-card">
+                        <div className="stc-header">
+                          <h3>👥 Team Daily Activity Tracker</h3>
+                          <span className="stc-date">Today: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        <div className="stc-body">
+                          {teamActivities.map(act => (
+                            <div key={act.id} className={`stc-item ${act.status.toLowerCase()}`}>
+                              <div className="stc-user-info">
+                                <div className="stc-avatar">{(act.name).charAt(0).toUpperCase()}</div>
+                                <div>
+                                  <div className="stc-name">{act.name}</div>
+                                  <div className="stc-role">{act.role.toUpperCase()}</div>
+                                </div>
+                              </div>
 
-                <div className="eq-grid">
-                  {filteredModules.filter(m => statusFilter === 'all' || getStatus(m) === statusFilter).map((mod) => (
-                    <div key={mod.module_id} className={`eq-card ${getStatus(mod)}`} onClick={() => handleOpenModule(mod)}>
-                      <div className="eq-icon">
-                        {mod.image
-                          ? <img src={mod.image} alt={mod.name} className={`eq-card-img eq-img-${mod.code}`}
-                            onError={e => { e.target.style.display = 'none'; e.target.parentElement.textContent = MODULE_EMOJI[mod.code] || '📦'; }} />
-                          : (MODULE_EMOJI[mod.code] || '📦')}
+                              <div className="stc-stat">
+                                <span className="stc-stat-label">Tasks Done Today</span>
+                                <span className="stc-stat-val">{act.inspectionsCount}</span>
+                              </div>
+
+                              <div className="stc-stat">
+                                <span className="stc-stat-label">Last Activity</span>
+                                <span className="stc-stat-val">{act.lastActive}</span>
+                              </div>
+
+                              <div className="stc-stat">
+                                <span className="stc-stat-label">Last Inspected</span>
+                                <span className="stc-stat-val">{act.lastModule}</span>
+                              </div>
+
+                              <div className={`stc-badge ${act.status.toLowerCase()}`}>
+                                {act.status === 'Active' ? '✓ COMPLETED' : '⏳ PENDING'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="eq-info-wrap">
-                        <div className="eq-name">{mod.name}</div>
-                        <div className="eq-pct">{mod.health_score}%</div>
-                      </div>
+                    )}
+
+                    <div className="eq-grid">
+                      {filteredModules
+                        .filter(m => selectedModuleFilter === 'all' || m.code === selectedModuleFilter)
+                        .filter(m => statusFilter === 'all' || getStatus(m) === statusFilter)
+                        .map((mod) => (
+                          <div key={mod.module_id} className={`eq-card ${getStatus(mod)}`} onClick={() => handleOpenModule(mod)}>
+                            <div className="eq-icon">
+                              {mod.image
+                                ? <img src={mod.image} alt={mod.name} className={`eq-card-img eq-img-${mod.code}`}
+                                  onError={e => { e.target.style.display = 'none'; e.target.parentElement.textContent = MODULE_EMOJI[mod.code] || '📦'; }} />
+                                : (MODULE_EMOJI[mod.code] || '📦')}
+                            </div>
+                            <div className="eq-info-wrap">
+                              <div className="eq-name">{mod.name}</div>
+                              <div className="eq-pct">{mod.health_score}%</div>
+                            </div>
+                          </div>
+                        ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             </section>
 
@@ -1550,103 +1893,103 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
 
 
             <section className={`page ${activePage === 'fire-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-stats' && <FireExtinguisherStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'sprinkler-stats' ? 'active' : ''}`}>
-              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'sprinkler-stats' && <SprinklerStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hose-stats' ? 'active' : ''}`}>
-              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'hose-stats' && <HoseReelStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'drum-stats' ? 'active' : ''}`}>
-              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'drum-stats' && <DrumHoseStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'hydrant-stats' ? 'active' : ''}`}>
-              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'hydrant-stats' && <HydrantStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-trolley-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-trolley-stats' && <FireTrolleyStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'suppression-system-stats' ? 'active' : ''}`}>
-              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'suppression-system-stats' && <SuppressionSystemStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-blanket-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-blanket-stats' && <FireBlanketStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-alarm-panel-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-alarm-panel-stats' && <FireAlarmPanelStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'smoke-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'smoke-detector-stats' && <SmokeDetectorStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'heat-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'heat-detector-stats' && <HeatDetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'heat-detector-stats' && <HeatDetectorStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-exit-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'emergency-exit-stats' && <EmergencyExitStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'co-detector-stats' ? 'active' : ''}`}>
-              {activePage === 'co-detector-stats' && <CODetectorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'co-detector-stats' && <CODetectorStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-door-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-door-stats' && <FireDoorStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-door-stats' && <FireDoorStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-lighting-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'emergency-lighting-stats' && <EmergencyLightingStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'pa-siren-stats' ? 'active' : ''}`}>
-              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'pa-siren-stats' && <PASirenStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'wind-sock-stats' ? 'active' : ''}`}>
-              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'wind-sock-stats' && <WindSockStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'scba-stats' ? 'active' : ''}`}>
-              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'scba-stats' && <SCBAStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'ambulance-stats' ? 'active' : ''}`}>
-              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'ambulance-stats' && <AmbulanceStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'first-aid-stats' ? 'active' : ''}`}>
-              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'first-aid-stats' && <FirstAidBoxStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'emergency-shower-stats' && <EmergencyShowerStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'eyewash-station-stats' ? 'active' : ''}`}>
-              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'eyewash-station-stats' && <EyewashStationStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'chemical-shower-stats' ? 'active' : ''}`}>
-              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'chemical-shower-stats' && <ChemicalShowerStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'spill-kit-stats' ? 'active' : ''}`}>
-              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'spill-kit-stats' && <SpillKitStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'ppe-station-stats' ? 'active' : ''}`}>
-              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'ppe-station-stats' && <PPEStationStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'safety-signage-stats' ? 'active' : ''}`}>
-              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'safety-signage-stats' && <SafetySignageStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'emergency-comm-stats' ? 'active' : ''}`}>
-              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'emergency-comm-stats' && <EmergencyCommStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'muster-point-stats' ? 'active' : ''}`}>
-              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'muster-point-stats' && <MusterPointStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-brigade-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-brigade-stats' && <FireBrigadeStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'volunteer-stats' && <VolunteerStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'shift-volunteer-stats' ? 'active' : ''}`}>
-              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'shift-volunteer-stats' && <ShiftVolunteerStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'trained-shift-stats' ? 'active' : ''}`}>
-              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'trained-shift-stats' && <TrainedShiftStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
             <section className={`page ${activePage === 'fire-noc-stats' ? 'active' : ''}`}>
-              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage('grid')} onScroll={handleScroll}  />}
+              {activePage === 'fire-noc-stats' && <FireNocStats module={selectedEq} onBack={() => setActivePage(statsBackPage)} onScroll={handleScroll} />}
             </section>
 
             {/* ── REPORTS ── */}
@@ -1714,7 +2057,10 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
               {activePage === 'equipment-onboarding' && (
                 <EquipmentOnboarding
                   onBack={() => setActivePage('grid')}
-                  onSuccess={() => setActivePage('grid')}
+                  onSuccess={() => {
+                    setActivePage('grid');
+                    setRefreshKey(prev => prev + 1);
+                  }}
                 />
               )}
             </section>
@@ -1722,14 +2068,28 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── SETUP: COMPANY MANAGEMENT ── */}
             <section className={`page ${activePage === 'setup-company' ? 'active' : ''}`}>
               {activePage === 'setup-company' && (
-                <CompanyManagement onBack={() => setActivePage('grid')} />
+                <CompanyManagement onBack={() => setActivePage('grid')} onNavigate={setActivePage} />
+              )}
+            </section>
+
+            {/* ── LOCATIONS TABLE ── */}
+            <section className={`page ${activePage === 'locations-table' ? 'active' : ''}`}>
+              {activePage === 'locations-table' && (
+                <LocationsTable user={user} onBack={() => setActivePage('grid')} />
+              )}
+            </section>
+
+            {/* ── SETUP: OPERATOR MAPPING ── */}
+            <section className={`page ${activePage === 'setup-operator-mapping' ? 'active' : ''}`}>
+              {activePage === 'setup-operator-mapping' && (
+                <OperatorMapping onBack={() => setActivePage('grid')} />
               )}
             </section>
 
             {/* ── SETUP: EMAIL DOMAINS ── */}
             <section className={`page ${activePage === 'setup-domains' ? 'active' : ''}`}>
               {activePage === 'setup-domains' && (
-                <EmailDomains onBack={() => setActivePage('grid')} />
+                <EmailDomains onBack={() => setActivePage('setup-company')} />
               )}
             </section>
 
@@ -1769,6 +2129,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                 />
               )}
             </section>
+
 
           </div>
         </main>

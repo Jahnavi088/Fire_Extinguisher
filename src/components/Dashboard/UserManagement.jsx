@@ -181,6 +181,13 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
   }, [displayModules]);
 
   const [search, setSearch] = useState('');
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -285,13 +292,20 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
     setShowForm(true);
   };
 
-  const handleDelete = async (u) => {
-    if (!window.confirm(`Delete user "${u.name || u.username}"? This cannot be undone.`)) return;
+  const confirmDeleteUser = (u) => {
+    setDeleteConfirm(u);
+  };
+
+  const executeDeleteUser = async () => {
+    if (!deleteConfirm) return;
     try {
-      await ApiService.deleteAdminUser(u.id);
+      await ApiService.deleteAdminUser(deleteConfirm.id);
       setRefreshKey(k => k + 1);
+      showToast('User deleted successfully.');
     } catch (err) {
-      alert(err.message || 'Failed to delete user.');
+      showToast(err.message || 'Failed to delete user.', 'error');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -467,8 +481,8 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
             );
           } else if (!isChecked && wasChecked && moduleId !== undefined) {
             // Remove access: find corresponding assignment record ID
-            const assignment = userAssignments.find(a => 
-              String(a.module_id || a.id) === String(moduleId) || 
+            const assignment = userAssignments.find(a =>
+              String(a.module_id || a.id) === String(moduleId) ||
               (a.code === m.code || a.module_code === m.code)
             );
             if (assignment && assignment.id) {
@@ -507,7 +521,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
       const userId = viewUser.id || viewUser.user_id || viewUser.username;
       const enabledNavCodes = displayModules.filter(m => moduleChecks[m.code]).map(m => m.code);
       localStorage.setItem(`nav_access_${userId}`, JSON.stringify(enabledNavCodes));
-      alert('Failed to save access on server. Changes saved locally in this browser.');
+      showToast('Failed to save access on server. Changes saved locally in this browser.', 'error');
     } finally {
       setModSaving(false);
       setViewUser(null);
@@ -545,6 +559,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
             leave_reason: form.leave_reason || null
           });
         }
+        showToast('User updated successfully.');
       } else {
         const selectedSupervisor = supervisors.find(s => String(s.id) === String(form.supervisor_id));
         const supervisorAgmId = selectedSupervisor?.agm_id || selectedSupervisor?.agmId || null;
@@ -561,6 +576,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
           supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
           agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
         });
+        showToast('User created successfully.');
       }
       setShowForm(false);
       setRefreshKey(k => k + 1);
@@ -573,18 +589,55 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
 
   return (
     <div className="setup-page">
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px',
+          background: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff', padding: '12px 20px', borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontWeight: '500', animation: 'fe-fade 0.3s ease-out'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          {toast.message}
+        </div>
+      )}
+      {deleteConfirm && (
+        <div className="um-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="um-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="um-modal-head">
+              <div className="um-modal-title">
+                <span style={{ fontSize: 20, marginRight: '8px' }}>⚠️</span> Confirm Deletion
+              </div>
+              <button className="um-modal-close" onClick={() => setDeleteConfirm(null)}>×</button>
+            </div>
+            <div className="um-modal-body">
+              <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', lineHeight: '1.5' }}>
+                Are you sure you want to delete the user <strong>"{deleteConfirm.name || deleteConfirm.username}"</strong>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="um-modal-foot">
+              <button className="um-btn-cancel" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="um-btn-save" style={{ background: '#ef4444', color: '#fff' }} onClick={executeDeleteUser}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="setup-header">
         <button className="setup-back-btn" onClick={onBack} title="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
         <div className="setup-header-info" style={{ flex: 1 }}>
-
           <div>
             <div className="setup-title">User Management</div>
-
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+              Manage roles, hierarchies, and module access permissions
+            </p>
           </div>
         </div>
         <div className="um-search-wrap">
@@ -593,7 +646,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
           </svg>
           <input
             className="um-search"
-            placeholder="Search by name, username, email..."
+            placeholder="Search "
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -710,7 +763,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
                               <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                             </svg>
                           </button>
-                          <button className="um-action-btn delete" onClick={() => handleDelete(u)} title="Delete user">
+                          <button className="um-action-btn delete" onClick={() => confirmDeleteUser(u)} title="Delete user">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                               <path d="M10 11v6" /><path d="M14 11v6" />

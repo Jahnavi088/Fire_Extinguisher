@@ -18,7 +18,7 @@ const resolveLogoUrl = (input) => {
   return `${API_BASE}/uploads/logos/${logo}`;
 };
 
-const CompanyManagement = ({ onBack }) => {
+const CompanyManagement = ({ onBack, onNavigate }) => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,19 +29,41 @@ const CompanyManagement = ({ onBack }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
 
-  const [addForm, setAddForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
-  const [editForm, setEditForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
+  const [addForm, setAddForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', emailDomains: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
+  const [editForm, setEditForm] = useState({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', emailDomains: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState({ name: '', companyId: '', email: '', phone: '' });
   const [editingItemId, setEditingItemId] = useState(null);
   const [editingItemValue, setEditingItemValue] = useState('');
   const [selectedLocationCompany, setSelectedLocationCompany] = useState(null);
-  const [locationForm, setLocationForm] = useState({ buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Local parent selection states for hierarchal location creation
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+  const [locationForm, setLocationForm] = useState({
+    branches: [],
+    buildings: [],
+    floors: [],
+    zones: [],
+    departments: [],
+    new_branch: '',
+    new_building: '',
+    new_floor: '',
+    new_zone: '',
+    new_department: ''
+  });
+
+  const [selectedParentBr, setSelectedParentBr] = useState('');
   const [selectedParentBld, setSelectedParentBld] = useState('');
+  const [selectedParentFl, setSelectedParentFl] = useState('');
   const [selectedParentZn, setSelectedParentZn] = useState('');
-  const [creatorMode, setCreatorMode] = useState('building'); // 'building', 'zone', 'area'
+  const [creatorMode, setCreatorMode] = useState('branch'); // 'branch', 'building', 'floor', 'zone', 'department'
+  const [expandedBranches, setExpandedBranches] = useState([]);
 
   const addFileRef = useRef();
   const editFileRef = useRef();
@@ -50,60 +72,61 @@ const CompanyManagement = ({ onBack }) => {
     fetchCompanies();
   }, []);
 
-  useEffect(() => {
+  const refreshHierarchy = async () => {
     if (!selectedLocationCompany) return;
-    const fetchRemoteData = async () => {
-      const blds = locationForm.buildings || [];
-      if (blds.length === 0) return;
+    const companyId = selectedLocationCompany.id || selectedLocationCompany.company_id;
+    try {
+      // 1. Fetch branches for the company
+      const branchesRes = await ApiService.getBranches({ company_id: companyId });
+      const branchesList = (Array.isArray(branchesRes) ? branchesRes : (branchesRes?.branches || branchesRes?.data || []))
+        .filter(b => !companyId || String(b.company_id) === String(companyId));
+      
+      let allBuildings = [];
+      let allFloors = [];
+      let allZones = [];
+      let allDepartments = [];
+      
+      // 2. Extract Buildings directly from Branches
+      branchesList.forEach(branch => {
+        const bList = Array.isArray(branch.buildings) ? branch.buildings : [];
+        allBuildings = allBuildings.concat(bList.map(b => ({ id: b.id, name: b.building_name || b.name, branch_id: branch.id, floors: b.floors })));
+      });
 
-      // Update building names with fresh GET data
-      let updatedBlds = [...blds];
-      let bldsChanged = false;
-      for (let i = 0; i < updatedBlds.length; i++) {
-        try {
-          const res = await ApiService.getBranchById(updatedBlds[i].id);
-          if (res && res.name && res.name !== updatedBlds[i].name) {
-            updatedBlds[i] = { ...updatedBlds[i], name: res.name };
-            bldsChanged = true;
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch branch details for ${updatedBlds[i].id}:`, e);
-        }
-      }
+      // 3. Extract Floors
+      allBuildings.forEach(bld => {
+        const fList = Array.isArray(bld.floors) ? bld.floors : [];
+        allFloors = allFloors.concat(fList.map(f => ({ id: f.id, name: f.floor_name || f.name, building_id: bld.id, zones: f.zones })));
+      });
 
-      let allZones = [...(locationForm.zones || [])];
-      let loadedAny = false;
-      for (const bld of updatedBlds) {
-        try {
-          const res = await ApiService.getBranchZones(bld.id);
-          const branchZones = Array.isArray(res) ? res : (res?.data || res?.zones || []);
-          if (branchZones.length > 0) {
-            branchZones.forEach(z => {
-              const exists = allZones.some(az => az.id === z.id || az.name.toLowerCase() === z.name.toLowerCase());
-              if (!exists) {
-                loadedAny = true;
-                allZones.push({
-                  id: z.id || `ZN-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                  name: z.name,
-                  building_id: bld.id
-                });
-              }
-            });
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch zones for branch ${bld.id}:`, e);
-        }
-      }
+      // 4. Extract Zones
+      allFloors.forEach(fl => {
+        const zList = Array.isArray(fl.zones) ? fl.zones : [];
+        allZones = allZones.concat(zList.map(z => ({ id: z.id, name: z.zone_name || z.name, floor_id: fl.id, departments: z.departments })));
+      });
 
-      if (bldsChanged || loadedAny) {
-        setLocationForm(f => ({
-          ...f,
-          ...(bldsChanged ? { buildings: updatedBlds } : {}),
-          ...(loadedAny ? { zones: allZones } : {})
-        }));
-      }
-    };
-    fetchRemoteData();
+      // 5. Extract Departments
+      allZones.forEach(zn => {
+        const dList = Array.isArray(zn.departments) ? zn.departments : [];
+        allDepartments = allDepartments.concat(dList.map(d => ({ id: d.id, name: d.department_name || d.name, zone_id: zn.id })));
+      });
+      
+      setLocationForm(f => ({
+        ...f,
+        branches: branchesList.map(b => ({ id: b.id, name: b.branch_name || b.name || `Branch #${b.id}` })),
+        buildings: allBuildings,
+        floors: allFloors,
+        zones: allZones,
+        departments: allDepartments
+      }));
+    } catch (err) {
+      console.error("Failed to load hierarchy details:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedLocationCompany) {
+      refreshHierarchy();
+    }
   }, [selectedLocationCompany]);
 
   const fetchCompanies = async () => {
@@ -151,14 +174,14 @@ const CompanyManagement = ({ onBack }) => {
 
   const openAdd = () => {
     setFormErrors({ name: '', companyId: '', email: '', phone: '' });
-    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
+    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', emailDomains: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
     setShowAddModal(true);
   };
 
   const closeAdd = () => {
     setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setShowAddModal(false);
-    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
+    setAddForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', emailDomains: '', building_name: '', zone_name: '', area_name: '', department_name: '', number_of_floors: '5' });
   };
 
   const saveAdd = async () => {
@@ -227,6 +250,7 @@ const CompanyManagement = ({ onBack }) => {
         name: requestedName,
         comapany_ref: requestedRef,
         email: addForm.email.trim(),
+        email_domains: addForm.emailDomains.trim(),
         address: addForm.address.trim(),
         phone: addForm.phone.trim()
       });
@@ -268,6 +292,7 @@ const CompanyManagement = ({ onBack }) => {
       }
 
       await fetchCompanies();
+      showToast('Company created successfully.');
       closeAdd();
     } catch (err) {
       const msg = err.message || '';
@@ -313,6 +338,7 @@ const CompanyManagement = ({ onBack }) => {
       email: company.email || '',
       address: company.address || '',
       phone: company.phone || '',
+      emailDomains: company.email_domains || '',
       buildings: bldList,
       zones: znList,
       areas: arList,
@@ -330,7 +356,7 @@ const CompanyManagement = ({ onBack }) => {
     setFormErrors({ name: '', companyId: '', email: '', phone: '' });
     setShowEditModal(false);
     setEditTarget(null);
-    setEditForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
+    setEditForm({ name: '', companyId: '', logo: null, logoPreview: null, email: '', address: '', phone: '', emailDomains: '', buildings: [], zones: [], areas: [], departments: [], number_of_floors: '5', new_building: '', new_zone: '', new_area: '', new_department: '' });
   };
 
   const saveEdit = async () => {
@@ -400,6 +426,7 @@ const CompanyManagement = ({ onBack }) => {
     try {
       const payload = {
         email: editForm.email.trim(),
+        email_domains: editForm.emailDomains.trim(),
         address: editForm.address.trim(),
         phone: editForm.phone.trim()
       };
@@ -443,6 +470,7 @@ const CompanyManagement = ({ onBack }) => {
       }
 
       await fetchCompanies();
+      showToast('Company updated successfully.');
       closeEdit();
     } catch (err) {
       const msg = err.message || '';
@@ -459,80 +487,65 @@ const CompanyManagement = ({ onBack }) => {
 
   const openLocationSetup = (company) => {
     setSelectedLocationCompany(company);
-    let bldList = [];
-    let znList = [];
-    let arList = [];
-    let dpList = [];
-    let flList = [];
-    let flCount = '5';
-    try {
-      const localLocs = JSON.parse(localStorage.getItem('local_onboarding_locations') || '{}');
-      const match = localLocs[company.comapany_ref || company.company_ref || ''];
-      if (match) {
-        bldList = match.buildings || [];
-        znList = match.zones || [];
-        arList = match.areas || [];
-        dpList = match.departments || [];
-        flList = match.floors || [];
-        if (match.floors) {
-          flCount = String(match.floors.length - 1);
-        }
-      }
-    } catch (e) { }
-
-    if (flList.length === 0) {
-      flList.push({ id: 'FLR-GF', name: 'Ground Floor' });
-      const numFloors = parseInt(flCount) || 5;
-      for (let f = 1; f < numFloors; f++) {
-        const suffix = f === 1 ? 'st' : f === 2 ? 'nd' : f === 3 ? 'rd' : 'th';
-        flList.push({ id: `FLR-${f}`, name: `${f}${suffix} Floor` });
-      }
-      flList.push({ id: 'FLR-01', name: 'Basement' });
-    }
-
+    setSelectedParentBr('');
+    setSelectedParentBld('');
+    setSelectedParentFl('');
+    setSelectedParentZn('');
+    setCreatorMode('branch');
     setLocationForm({
-      buildings: bldList,
-      zones: znList,
-      areas: arList,
-      departments: dpList,
-      floors: flList,
-      number_of_floors: flCount,
+      branches: [],
+      buildings: [],
+      floors: [],
+      zones: [],
+      departments: [],
+      new_branch: '',
       new_building: '',
+      new_floor: '',
       new_zone: '',
-      new_area: '',
-      new_department: '',
-      new_floor: ''
+      new_department: ''
     });
   };
 
   const saveLocationSetup = () => {
-    if (!selectedLocationCompany) return;
-    const ref = selectedLocationCompany.comapany_ref || selectedLocationCompany.company_ref || '';
+    setSelectedLocationCompany(null);
+  };
+
+  const confirmDeleteCompany = (company) => {
+    setDeleteConfirm({ type: 'company', company });
+  };
+
+  const executeDeleteCompany = async (company) => {
     try {
-      const localLocs = JSON.parse(localStorage.getItem('local_onboarding_locations') || '{}');
-      localLocs[ref] = {
-        buildings: locationForm.buildings,
-        zones: locationForm.zones,
-        areas: locationForm.areas,
-        departments: locationForm.departments || [],
-        floors: locationForm.floors || []
-      };
-      localStorage.setItem('local_onboarding_locations', JSON.stringify(localLocs));
-      alert('Location and Department configurations saved successfully!');
-      setSelectedLocationCompany(null);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to save configurations.');
+      await ApiService.deleteAdminCompany(company.id);
+      await fetchCompanies();
+      showToast('Company deleted successfully.');
+    } catch (err) {
+      alert(err.message || 'Failed to delete company.');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this company?')) return;
+  const confirmDeleteItem = (type, id, name) => {
+    setDeleteConfirm({ type: 'item', itemType: type, id, name });
+  };
+
+  const executeDeleteItem = async (item) => {
+    setActionError(null);
+    setActionSuccess(null);
     try {
-      await ApiService.deleteAdminCompany(id);
-      await fetchCompanies();
+      if (item.itemType === 'branch') await ApiService.deleteBranch(item.id);
+      else if (item.itemType === 'building') await ApiService.deleteBuilding(item.id);
+      else if (item.itemType === 'floor') await ApiService.deleteFloor(item.id);
+      else if (item.itemType === 'zone') await ApiService.deleteZone(item.id);
+      else if (item.itemType === 'department') await ApiService.deleteDepartmentHierarchy(item.id);
+
+      await refreshHierarchy();
+      setActionSuccess(`${item.itemType.charAt(0).toUpperCase() + item.itemType.slice(1)} deleted successfully.`);
     } catch (err) {
-      alert(err.message || 'Failed to delete company.');
+      setActionError(err.message || 'Deletion failed.');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -540,7 +553,8 @@ const CompanyManagement = ({ onBack }) => {
     const smlInput = {
       padding: '6px 10px', fontSize: '12px', background: '#fff',
       border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px',
-      height: '32px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit'
+      height: '32px', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
+      width: '100%'
     };
     const addBtn = (bg) => ({
       padding: '0 14px', background: bg, color: '#fff', border: 'none',
@@ -562,7 +576,7 @@ const CompanyManagement = ({ onBack }) => {
     };
     const listBox = {
       background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px',
-      maxHeight: '200px', overflowY: 'auto', fontSize: '12px'
+      maxHeight: '400px', overflowY: 'auto', fontSize: '12px', padding: '8px 12px'
     };
     const rowBase = (indentLeft, bg) => ({
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -577,62 +591,177 @@ const CompanyManagement = ({ onBack }) => {
     const smallSave = { background: '#10b981', border: 'none', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', height: '24px', fontWeight: '600' };
     const smallCancel = { background: '#64748b', border: 'none', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', height: '24px' };
 
+    const handleCreateItem = async () => {
+      setActionError(null);
+      setActionSuccess(null);
+      try {
+        const companyId = selectedLocationCompany.id || selectedLocationCompany.company_id;
+        if (creatorMode === 'branch') {
+          const name = locationForm.new_branch.trim();
+          if (!name) { setActionError('Please enter a branch name.'); return; }
+          await ApiService.createBranch({ branch_name: name, company_id: Number(companyId) });
+          setLocationForm(f => ({ ...f, new_branch: '' }));
+          setActionSuccess('Branch created successfully.');
+        } else if (creatorMode === 'building') {
+          const name = locationForm.new_building.trim();
+          if (!name) { setActionError('Please enter a building name.'); return; }
+          if (!selectedParentBr) { setActionError('Please select a branch first.'); return; }
+          await ApiService.createBuilding({ building_name: name, branch_id: Number(selectedParentBr) });
+          setLocationForm(f => ({ ...f, new_building: '' }));
+          setActionSuccess('Building created successfully.');
+        } else if (creatorMode === 'floor') {
+          const name = locationForm.new_floor.trim();
+          if (!name) { setActionError('Please enter a floor name.'); return; }
+          if (!selectedParentBld) { setActionError('Please select a building first.'); return; }
+          await ApiService.createFloor({ floor_name: name, building_id: Number(selectedParentBld) });
+          setLocationForm(f => ({ ...f, new_floor: '' }));
+          setActionSuccess('Floor created successfully.');
+        } else if (creatorMode === 'zone') {
+          const name = locationForm.new_zone.trim();
+          if (!name) { setActionError('Please enter a zone name.'); return; }
+          if (!selectedParentFl) { setActionError('Please select a floor first.'); return; }
+          await ApiService.createZone({ zone_name: name, floor_id: Number(selectedParentFl) });
+          setLocationForm(f => ({ ...f, new_zone: '' }));
+          setActionSuccess('Zone created successfully.');
+        } else if (creatorMode === 'department') {
+          const name = locationForm.new_department.trim();
+          if (!name) { setActionError('Please enter a department name.'); return; }
+          if (!selectedParentZn) { setActionError('Please select a zone first.'); return; }
+          await ApiService.createDepartmentHierarchy({ department_name: name, zone_id: Number(selectedParentZn) });
+          setLocationForm(f => ({ ...f, new_department: '' }));
+          setActionSuccess('Department created successfully.');
+        }
+        await refreshHierarchy();
+      } catch (err) {
+        setActionError(err.message || 'Action failed.');
+      }
+    };
+
+    const handleUpdateItem = async (type, id, newValue) => {
+      setActionError(null);
+      setActionSuccess(null);
+      try {
+        if (type === 'branch') {
+          await ApiService.updateBranch(id, { branch_name: newValue });
+        } else if (type === 'building') {
+          await ApiService.updateBuilding(id, { building_name: newValue });
+        } else if (type === 'floor') {
+          await ApiService.updateFloor(id, { floor_name: newValue });
+        } else if (type === 'zone') {
+          await ApiService.updateZone(id, { zone_name: newValue });
+        } else if (type === 'department') {
+          await ApiService.updateDepartmentHierarchy(id, { department_name: newValue });
+        }
+        setEditingItemId(null);
+        await refreshHierarchy();
+        setActionSuccess(`${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully.`);
+      } catch (err) {
+        setActionError(err.message || 'Failed to update item.');
+      }
+    };
+
+
+
     return (
       <div className="ea-page" style={{ padding: '16px 20px', overflowY: 'auto', boxSizing: 'border-box' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <button className="setup-back-btn" onClick={() => setSelectedLocationCompany(null)} title="Back">
+          <button className="setup-back-btn" onClick={() => { setSelectedLocationCompany(null); setActionError(null); }} title="Back">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
           </button>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', letterSpacing: '-0.2px' }}>
-              Location & Department Setup Workspace
+              EHS Location &amp; Department Setup Workspace
             </div>
             <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
               Configuring: <strong style={{ color: '#3b82f6' }}>{selectedLocationCompany.name}</strong>
-              {' '}({selectedLocationCompany.comapany_ref || selectedLocationCompany.company_ref || selectedLocationCompany.company_id || selectedLocationCompany.companyId})
             </div>
           </div>
-          <button
-            onClick={saveLocationSetup}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: '600', fontSize: '12px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(16,185,129,0.2)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            Save Configuration
-          </button>
         </div>
 
-        {/* Content panel */}
-        <div style={{ background: '#fff', padding: '18px 22px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-
-          {/* SECTION 1: Branches / Zones / Areas */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={secLabel}>
-              <span>Branches, Zones &amp; Areas</span>
-              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+        {/* Error response display */}
+        {actionError && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '8px',
+            color: '#fca5a5',
+            padding: '10px 14px',
+            fontSize: '12.5px',
+            marginBottom: '14px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px' }}>⚠️</span>
+              <span><strong>Error:</strong> {actionError}</span>
             </div>
+            <button
+              onClick={() => setActionError(null)}
+              style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
-            {/* Mode tabs */}
-            <div style={{ display: 'flex', gap: '3px', background: '#f1f5f9', padding: '3px', borderRadius: '7px', width: 'fit-content' }}>
+        {/* Success response display */}
+        {actionSuccess && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            color: '#059669',
+            padding: '10px 14px',
+            fontSize: '12.5px',
+            marginBottom: '14px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px' }}>✅</span>
+              <span><strong>Success:</strong> {actionSuccess}</span>
+            </div>
+            <button
+              onClick={() => setActionSuccess(null)}
+              style={{ background: 'transparent', border: 'none', color: '#059669', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
+        {/* Content panel */}
+        <div style={{ background: '#fff', padding: '18px 22px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px' }}>
+          
+          {/* LEFT COLUMN: Tabbed Configuration Form */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderRight: '1px solid #f1f5f9', paddingRight: '16px' }}>
+            <div style={secLabel}>Hierarchy Level Setup</div>
+            
+            {/* Creator Mode Tabs */}
+            <div style={{ display: 'flex', gap: '3px', background: '#f1f5f9', padding: '3px', borderRadius: '7px' }}>
               {[
-                { mode: 'building', label: '1. Branch / Building' },
-                { mode: 'zone', label: '2. Zone / Wing' },
-                { mode: 'area', label: '3. Area / Spot' }
+                { mode: 'branch', label: 'Branch' },
+                { mode: 'building', label: 'Building' },
+                { mode: 'floor', label: 'Floor' },
+                { mode: 'zone', label: 'Zone' },
+                { mode: 'department', label: 'Department' }
               ].map(opt => (
                 <button
                   key={opt.mode}
                   type="button"
                   onClick={() => setCreatorMode(opt.mode)}
                   style={{
+                    flex: 1,
                     background: creatorMode === opt.mode ? '#fff' : 'transparent',
                     color: creatorMode === opt.mode ? '#0f172a' : '#64748b',
-                    border: 'none', borderRadius: '5px', padding: '4px 12px',
+                    border: 'none', borderRadius: '5px', padding: '6px 0',
                     fontSize: '11px', fontWeight: creatorMode === opt.mode ? '700' : '500',
                     cursor: 'pointer', transition: 'all 0.15s',
                     boxShadow: creatorMode === opt.mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
@@ -643,198 +772,313 @@ const CompanyManagement = ({ onBack }) => {
               ))}
             </div>
 
-            {/* Creator row — Building */}
-            {creatorMode === 'building' && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  style={{ ...smlInput, flex: 1 }}
-                  placeholder="Branch / Building name  (e.g. Block B, Main Building)"
-                  value={locationForm.new_building}
-                  onChange={e => setLocationForm(f => ({ ...f, new_building: e.target.value }))}
-                />
-                <button type="button" style={addBtn('#3b82f6')} onClick={() => {
-                  const name = locationForm.new_building.trim();
-                  if (!name) { alert('Please enter a building or branch name.'); return; }
-                  if (locationForm.buildings.some(b => b.name.toLowerCase() === name.toLowerCase())) { alert('Building/Branch already exists.'); return; }
-                  setLocationForm(f => ({ ...f, buildings: [...f.buildings, { id: `BLD-${Date.now()}`, name }], new_building: '' }));
-                }}>
+            {/* Form Fields depending on Creator Mode */}
+            {creatorMode === 'branch' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Branch / Plant Name</label>
+                  <input
+                    style={smlInput}
+                    placeholder="e.g. Main Plant, Branch Office"
+                    value={locationForm.new_branch}
+                    onChange={e => setLocationForm(f => ({ ...f, new_branch: e.target.value }))}
+                  />
+                </div>
+                <button type="button" style={{ ...addBtn('#e11d48'), alignSelf: 'flex-start', marginTop: '6px' }} onClick={handleCreateItem}>
                   + Add Branch
                 </button>
               </div>
             )}
+            {creatorMode === 'building' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Select Branch / Plant</label>
+                  <select style={{ ...smlInput, color: '#0f172a', background: '#ffffff' }} value={selectedParentBr} onChange={e => setSelectedParentBr(e.target.value)}>
+                    <option value="" style={{ color: '#0f172a', background: '#ffffff' }}>— Select Branch —</option>
+                    {locationForm.branches.map(b => (
+                      <option key={b.id} value={b.id} style={{ color: '#0f172a', background: '#ffffff' }}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Building Name</label>
+                  <input
+                    style={smlInput}
+                    placeholder="e.g. Production Building, R&D Hub"
+                    value={locationForm.new_building}
+                    onChange={e => setLocationForm(f => ({ ...f, new_building: e.target.value }))}
+                  />
+                </div>
+                <button type="button" style={{ ...addBtn('#2563eb'), alignSelf: 'flex-start', marginTop: '6px' }} onClick={handleCreateItem}>
+                  + Add Building
+                </button>
+              </div>
+            )}
 
-            {/* Creator row — Zone */}
+            {creatorMode === 'floor' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Select Building</label>
+                  <select style={{ ...smlInput, color: '#0f172a', background: '#ffffff' }} value={selectedParentBld} onChange={e => setSelectedParentBld(e.target.value)}>
+                    <option value="" style={{ color: '#0f172a', background: '#ffffff' }}>— Select Building —</option>
+                    {locationForm.buildings.map(b => (
+                      <option key={b.id} value={b.id} style={{ color: '#0f172a', background: '#ffffff' }}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Floor Name</label>
+                  <input
+                    style={smlInput}
+                    placeholder="e.g. Ground Floor, 1st Floor"
+                    value={locationForm.new_floor}
+                    onChange={e => setLocationForm(f => ({ ...f, new_floor: e.target.value }))}
+                  />
+                </div>
+                <button type="button" style={{ ...addBtn('#10b981'), alignSelf: 'flex-start', marginTop: '6px' }} onClick={handleCreateItem}>
+                  + Add Floor
+                </button>
+              </div>
+            )}
+
             {creatorMode === 'zone' && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select style={{ ...smlInput, minWidth: '170px' }} value={selectedParentBld} onChange={e => setSelectedParentBld(e.target.value)}>
-                  <option value="">— Select Branch —</option>
-                  {locationForm.buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-                <input
-                  style={{ ...smlInput, flex: 1 }}
-                  placeholder="Zone / Wing name  (e.g. OT Wing, North Block)"
-                  value={locationForm.new_zone}
-                  onChange={e => setLocationForm(f => ({ ...f, new_zone: e.target.value }))}
-                />
-                <button type="button" style={addBtn('#10b981')} onClick={() => {
-                  if (!selectedParentBld) { alert('Please select a branch first.'); return; }
-                  const name = locationForm.new_zone.trim();
-                  if (!name) { alert('Please enter a zone name.'); return; }
-                  if (locationForm.zones.some(z => z.name.toLowerCase() === name.toLowerCase() && z.building_id === selectedParentBld)) { alert('Zone already exists under this branch.'); return; }
-                  const id = `ZN-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                  try { ApiService.createBranchZone(selectedParentBld, { name }).catch(() => { }); } catch (e) { }
-                  setLocationForm(f => ({ ...f, zones: [...f.zones, { id, name, building_id: selectedParentBld }], new_zone: '' }));
-                }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Select Floor</label>
+                  <select style={{ ...smlInput, color: '#0f172a', background: '#ffffff' }} value={selectedParentFl} onChange={e => setSelectedParentFl(e.target.value)}>
+                    <option value="" style={{ color: '#0f172a', background: '#ffffff' }}>— Select Floor —</option>
+                    {locationForm.floors.map(f => {
+                      const bld = locationForm.buildings.find(b => b.id === f.building_id);
+                      return (
+                        <option key={f.id} value={f.id} style={{ color: '#0f172a', background: '#ffffff' }}>
+                          {bld ? `${bld.name} > ` : ''}{f.name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Zone Name</label>
+                  <input
+                    style={smlInput}
+                    placeholder="e.g. Zone A, Clean Room 1"
+                    value={locationForm.new_zone}
+                    onChange={e => setLocationForm(f => ({ ...f, new_zone: e.target.value }))}
+                  />
+                </div>
+                <button type="button" style={{ ...addBtn('#f59e0b'), alignSelf: 'flex-start', marginTop: '6px' }} onClick={handleCreateItem}>
                   + Add Zone
                 </button>
               </div>
             )}
 
-            {/* Creator row — Area */}
-            {creatorMode === 'area' && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select style={{ ...smlInput, minWidth: '150px' }} value={selectedParentBld} onChange={e => { setSelectedParentBld(e.target.value); setSelectedParentZn(''); }}>
-                  <option value="">— Select Branch —</option>
-                  {locationForm.buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-                <select style={{ ...smlInput, minWidth: '150px', opacity: selectedParentBld ? 1 : 0.5 }} value={selectedParentZn} onChange={e => setSelectedParentZn(e.target.value)} disabled={!selectedParentBld}>
-                  <option value="">— Select Zone —</option>
-                  {locationForm.zones.filter(z => z.building_id === selectedParentBld).map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-                </select>
-                <input
-                  style={{ ...smlInput, flex: 1, opacity: selectedParentZn ? 1 : 0.5 }}
-                  placeholder="Area / Spot name  (e.g. OT Room 3)"
-                  value={locationForm.new_area}
-                  onChange={e => setLocationForm(f => ({ ...f, new_area: e.target.value }))}
-                  disabled={!selectedParentZn}
-                />
-                <button type="button" style={{ ...addBtn('#f59e0b'), opacity: selectedParentZn ? 1 : 0.5 }} disabled={!selectedParentZn} onClick={() => {
-                  if (!selectedParentZn) return;
-                  const name = locationForm.new_area.trim();
-                  if (!name) { alert('Please enter an area name.'); return; }
-                  if (locationForm.areas.some(a => a.name.toLowerCase() === name.toLowerCase() && a.zone_id === selectedParentZn)) { alert('Area already exists under this zone.'); return; }
-                  setLocationForm(f => ({ ...f, areas: [...f.areas, { id: `AREA-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, name, zone_id: selectedParentZn }], new_area: '' }));
-                }}>
-                  + Add Area
+            {creatorMode === 'department' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Select Zone</label>
+                  <select style={{ ...smlInput, color: '#0f172a', background: '#ffffff' }} value={selectedParentZn} onChange={e => setSelectedParentZn(e.target.value)}>
+                    <option value="" style={{ color: '#0f172a', background: '#ffffff' }}>— Select Zone —</option>
+                    {locationForm.zones.map(z => {
+                      const fl = locationForm.floors.find(f => f.id === z.floor_id);
+                      const bld = fl ? locationForm.buildings.find(b => b.id === fl.building_id) : null;
+                      return (
+                        <option key={z.id} value={z.id} style={{ color: '#0f172a', background: '#ffffff' }}>
+                          {bld ? `${bld.name} > ` : ''}{fl ? `${fl.name} > ` : ''}{z.name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Department Name</label>
+                  <input
+                    style={smlInput}
+                    placeholder="e.g. Granulation, Quality Control"
+                    value={locationForm.new_department}
+                    onChange={e => setLocationForm(f => ({ ...f, new_department: e.target.value }))}
+                  />
+                </div>
+                <button type="button" style={{ ...addBtn('#7c3aed'), alignSelf: 'flex-start', marginTop: '6px' }} onClick={handleCreateItem}>
+                  + Add Department
                 </button>
               </div>
             )}
+          </div>
 
-            {/* Created hierarchy — dropdown list */}
-            {locationForm.buildings.length > 0 && (
+          {/* RIGHT COLUMN: Interactive Hierarchical Tree Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={secLabel}>Location Hierarchy Preview</div>
+            
+            {locationForm.branches.length === 0 ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '8px', fontSize: '12px' }}>
+                No branches setup for this company. Create a Branch/Plant using the "Branch" tab first.
+              </div>
+            ) : (
               <div style={listBox}>
-                {locationForm.buildings.map(bld => {
-                  const bldZones = locationForm.zones.filter(z => z.building_id === bld.id);
+                {locationForm.branches.map(br => {
+                  const brBuildings = locationForm.buildings.filter(b => b.branch_id === br.id);
                   return (
-                    <div key={bld.id}>
-                      <div style={rowBase(10, '#f8fafc')}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', color: '#0f172a', fontSize: '12px' }}>
-                          <span>🏢</span>
-                          {editingItemId === bld.id
-                            ? <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('160px')} autoFocus />
-                            : bld.name}
+                    <div key={br.id} style={{ marginBottom: '10px' }}>
+                      <div style={{ ...rowBase(0, 'transparent'), fontWeight: '700', fontSize: '13px', color: '#1e3a8a', borderBottom: 'none', minHeight: '28px', paddingTop: '2px', paddingBottom: '2px' }}>
+                        <span 
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                          onClick={() => {
+                            if (editingItemId !== br.id) {
+                              setExpandedBranches(prev => 
+                                prev.includes(br.id) ? prev.filter(id => id !== br.id) : [...prev, br.id]
+                              );
+                            }
+                          }}
+                        >
+                          <span style={{ fontSize: '10px' }}>{expandedBranches.includes(br.id) ? '▼' : '▶'}</span>
+                          <span>📍</span>
+                          {editingItemId === br.id ? (
+                            <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('150px')} autoFocus onClick={e => e.stopPropagation()} />
+                          ) : br.name}
                         </span>
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          {editingItemId === bld.id ? (
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {editingItemId === br.id ? (
                             <>
-                              <button style={smallSave} onClick={() => {
-                                try { ApiService.updateBranch(bld.id, { name: editingItemValue }).catch(() => { }); } catch (e) { }
-                                setLocationForm(f => ({ ...f, buildings: f.buildings.map(b => b.id === bld.id ? { ...b, name: editingItemValue } : b) }));
-                                setEditingItemId(null);
-                              }}>Save</button>
+                              <button style={smallSave} onClick={() => handleUpdateItem('branch', br.id, editingItemValue)}>Save</button>
                               <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
                             </>
                           ) : (
                             <>
-                              <button style={iconEditBtn} title="Edit" onClick={() => { setEditingItemId(bld.id); setEditingItemValue(bld.name); }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                              </button>
-                              <button style={iconDelBtn} title="Delete" onClick={() => {
-                                setLocationForm(f => ({
-                                  ...f,
-                                  buildings: f.buildings.filter(b => b.id !== bld.id),
-                                  zones: f.zones.filter(z => z.building_id !== bld.id),
-                                  areas: f.areas.filter(a => { const tz = f.zones.find(z => z.id === a.zone_id); return tz ? tz.building_id !== bld.id : true; })
-                                }));
-                              }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                              </button>
+                              <button style={iconEditBtn} onClick={() => { setEditingItemId(br.id); setEditingItemValue(br.name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button>
+                              <button style={iconDelBtn} onClick={() => confirmDeleteItem('branch', br.id, br.name)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
                             </>
                           )}
                         </div>
                       </div>
-                      {bldZones.map(zn => {
-                        const znAreas = locationForm.areas.filter(a => a.zone_id === zn.id);
-                        return (
-                          <div key={zn.id}>
-                            <div style={rowBase(26, '#fff')}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#334155' }}>
-                                <span style={{ color: '#3b82f6', fontSize: '10px' }}>▸</span>
-                                {editingItemId === zn.id
-                                  ? <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('140px')} autoFocus />
-                                  : zn.name}
-                              </span>
-                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                {editingItemId === zn.id ? (
-                                  <>
-                                    <button style={smallSave} onClick={() => {
-                                      setLocationForm(f => ({ ...f, zones: f.zones.map(z => z.id === zn.id ? { ...z, name: editingItemValue } : z) }));
-                                      setEditingItemId(null);
-                                    }}>Save</button>
-                                    <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button style={iconEditBtn} title="Edit" onClick={() => { setEditingItemId(zn.id); setEditingItemValue(zn.name); }}>
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                                    </button>
-                                    <button style={iconDelBtn} title="Delete" onClick={() => {
-                                      if (window.confirm(`Delete zone "${zn.name}"?`)) {
-                                        try { ApiService.deleteBranchZone(bld.id, zn.id).catch(() => { }); } catch (e) { }
-                                        setLocationForm(f => ({ ...f, zones: f.zones.filter(z => z.id !== zn.id), areas: f.areas.filter(a => a.zone_id !== zn.id) }));
-                                      }
-                                    }}>
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            {znAreas.map(ar => (
-                              <div key={ar.id} style={rowBase(44, '#fff')}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748b' }}>
-                                  <span style={{ color: '#10b981', fontSize: '9px' }}>●</span>
-                                  {editingItemId === ar.id
-                                    ? <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('120px')} autoFocus />
-                                    : ar.name}
+
+                      {/* Buildings */}
+                      {expandedBranches.includes(br.id) && (
+                      <div style={{ paddingLeft: '16px', borderLeft: '1px dashed #cbd5e1', marginLeft: '6px' }}>
+                        {brBuildings.map(bld => {
+                          const bldFloors = locationForm.floors.filter(f => f.building_id === bld.id);
+                          return (
+                            <div key={bld.id}>
+                              <div style={rowBase(6, 'transparent')}>
+                                <span style={{ fontWeight: '600', color: '#334155', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span>🏢</span>
+                                  {editingItemId === bld.id ? (
+                                    <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('150px')} autoFocus />
+                                  ) : bld.name}
                                 </span>
-                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                  {editingItemId === ar.id ? (
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  {editingItemId === bld.id ? (
                                     <>
-                                      <button style={smallSave} onClick={() => {
-                                        setLocationForm(f => ({ ...f, areas: f.areas.map(a => a.id === ar.id ? { ...a, name: editingItemValue } : a) }));
-                                        setEditingItemId(null);
-                                      }}>Save</button>
+                                      <button style={smallSave} onClick={() => handleUpdateItem('building', bld.id, editingItemValue)}>Save</button>
                                       <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
                                     </>
                                   ) : (
                                     <>
-                                      <button style={iconEditBtn} title="Edit" onClick={() => { setEditingItemId(ar.id); setEditingItemValue(ar.name); }}>
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                                      </button>
-                                      <button style={iconDelBtn} title="Delete" onClick={() => {
-                                        setLocationForm(f => ({ ...f, areas: f.areas.filter(a => a.id !== ar.id) }));
-                                      }}>
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                                      </button>
+                                      <button style={iconEditBtn} onClick={() => { setEditingItemId(bld.id); setEditingItemValue(bld.name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button>
+                                      <button style={iconDelBtn} onClick={() => confirmDeleteItem('building', bld.id, bld.name)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
                                     </>
                                   )}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })}
+
+                              {/* Floors */}
+                              <div style={{ paddingLeft: '16px', borderLeft: '1px dashed #cbd5e1', marginLeft: '6px' }}>
+                                {bldFloors.map(flr => {
+                                  const flrZones = locationForm.zones.filter(z => z.floor_id === flr.id);
+                                  return (
+                                    <div key={flr.id}>
+                                      <div style={rowBase(6, 'transparent')}>
+                                        <span style={{ color: '#475569', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span>🪜</span>
+                                          {editingItemId === flr.id ? (
+                                            <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('140px')} autoFocus />
+                                          ) : flr.name}
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                          {editingItemId === flr.id ? (
+                                            <>
+                                              <button style={smallSave} onClick={() => handleUpdateItem('floor', flr.id, editingItemValue)}>Save</button>
+                                              <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <button style={iconEditBtn} onClick={() => { setEditingItemId(flr.id); setEditingItemValue(flr.name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button>
+                                              <button style={iconDelBtn} onClick={() => confirmDeleteItem('floor', flr.id, flr.name)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Zones */}
+                                      <div style={{ paddingLeft: '16px', borderLeft: '1px dashed #cbd5e1', marginLeft: '6px' }}>
+                                        {flrZones.map(zn => {
+                                          const znDepts = locationForm.departments.filter(d => d.zone_id === zn.id);
+                                          return (
+                                            <div key={zn.id}>
+                                              <div style={rowBase(6, 'transparent')}>
+                                                <span style={{ color: '#475569', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>🔘</span>
+                                                  {editingItemId === zn.id ? (
+                                                    <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('130px')} autoFocus />
+                                                  ) : zn.name}
+                                                </span>
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                  {editingItemId === zn.id ? (
+                                                    <>
+                                                      <button style={smallSave} onClick={() => handleUpdateItem('zone', zn.id, editingItemValue)}>Save</button>
+                                                      <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <button style={iconEditBtn} onClick={() => { setEditingItemId(zn.id); setEditingItemValue(zn.name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button>
+                                                      <button style={iconDelBtn} onClick={() => confirmDeleteItem('zone', zn.id, zn.name)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+
+                                              {/* Departments */}
+                                              <div style={{ paddingLeft: '16px', borderLeft: '1px dashed #cbd5e1', marginLeft: '6px' }}>
+                                                {znDepts.map(dept => (
+                                                  <div key={dept.id} style={rowBase(6, 'transparent')}>
+                                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                      <span>◈</span>
+                                                      {editingItemId === dept.id ? (
+                                                        <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('120px')} autoFocus />
+                                                      ) : dept.name}
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                      {editingItemId === dept.id ? (
+                                                        <>
+                                                          <button style={smallSave} onClick={() => handleUpdateItem('department', dept.id, editingItemValue)}>Save</button>
+                                                          <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                          <button style={iconEditBtn} onClick={() => { setEditingItemId(dept.id); setEditingItemValue(dept.name); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button>
+                                                          <button style={iconDelBtn} onClick={() => confirmDeleteItem('department', dept.id, dept.name)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="10" height="10"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
+                                                        </>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                            </div>
+                          );
+                        })}
+                      </div>
+                      )}
+
                     </div>
                   );
                 })}
@@ -842,190 +1086,52 @@ const CompanyManagement = ({ onBack }) => {
             )}
           </div>
 
-          <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-          {/* SECTION 2: Floor Configuration */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={secLabel}>
-              <span>Floor Configuration</span>
-              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <label style={{ fontSize: '10px', color: '#64748b', fontWeight: '600' }}>Quick-set Total Floors</label>
-                <input
-                  type="number"
-                  style={{ ...smlInput, width: '130px' }}
-                  placeholder="e.g. 5"
-                  value={locationForm.number_of_floors}
-                  onChange={e => {
-                    const val = e.target.value;
-                    const numFloors = parseInt(val) || 0;
-                    const generatedFloors = [];
-                    if (numFloors > 0) {
-                      generatedFloors.push({ id: 'FLR-GF', name: 'Ground Floor' });
-                      for (let f = 1; f < numFloors; f++) {
-                        const suffix = f === 1 ? 'st' : f === 2 ? 'nd' : f === 3 ? 'rd' : 'th';
-                        generatedFloors.push({ id: `FLR-${f}`, name: `${f}${suffix} Floor` });
-                      }
-                      generatedFloors.push({ id: 'FLR-01', name: 'Basement' });
-                    }
-                    setLocationForm(f => ({ ...f, number_of_floors: val, floors: generatedFloors }));
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
-                <label style={{ fontSize: '10px', color: '#64748b', fontWeight: '600' }}>Custom Floor Name</label>
-                <input
-                  style={{ ...smlInput, width: '100%' }}
-                  placeholder="e.g. Mezzanine Floor, Rooftop"
-                  value={locationForm.new_floor || ''}
-                  onChange={e => setLocationForm(f => ({ ...f, new_floor: e.target.value }))}
-                />
-              </div>
-              <button type="button" style={addBtn('#3b82f6')} onClick={() => {
-                const name = (locationForm.new_floor || '').trim();
-                if (!name) { alert('Please enter a floor name.'); return; }
-                const floors = locationForm.floors || [];
-                if (floors.some(f => f.name.toLowerCase() === name.toLowerCase())) { alert('Floor already exists.'); return; }
-                const firstBldId = locationForm.buildings[0]?.id;
-                if (firstBldId) { try { ApiService.createBranchFloor(firstBldId, { name }).catch(() => { }); } catch (e) { } }
-                setLocationForm(f => ({ ...f, floors: [...(f.floors || []), { id: `FLR-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, name }], new_floor: '' }));
-              }}>
-                + Add Floor
-              </button>
-            </div>
-
-            {locationForm.floors && locationForm.floors.length > 0 && (
-              <div style={listBox}>
-                {[...locationForm.floors]
-                  .sort((a, b) => {
-                    const an = a.name.toLowerCase(), bn = b.name.toLowerCase();
-                    if (an.includes('basement')) return -1; if (bn.includes('basement')) return 1;
-                    if (an.includes('ground')) return -0.5; if (bn.includes('ground')) return 0.5;
-                    return (parseInt(an) || 0) - (parseInt(bn) || 0);
-                  })
-                  .map(flr => {
-                    const isBasement = flr.name.toLowerCase().includes('basement');
-                    const isGround = flr.name.toLowerCase().includes('ground');
-                    return (
-                      <div key={flr.id} style={rowBase(10, isBasement ? '#f1f5f9' : isGround ? '#eff6ff' : '#fff')}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', color: isGround ? '#1e40af' : '#334155' }}>
-                          <span>{isBasement ? '🕳️' : '🏢'}</span>
-                          {editingItemId === flr.id
-                            ? <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('150px')} autoFocus />
-                            : flr.name}
-                        </span>
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          {editingItemId === flr.id ? (
-                            <>
-                              <button style={smallSave} onClick={() => {
-                                setLocationForm(f => ({ ...f, floors: f.floors.map(fl => fl.id === flr.id ? { ...fl, name: editingItemValue } : fl) }));
-                                setEditingItemId(null);
-                              }}>Save</button>
-                              <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
-                            </>
-                          ) : (
-                            <>
-                              <button style={iconEditBtn} title="Edit" onClick={() => { setEditingItemId(flr.id); setEditingItemValue(flr.name); }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                              </button>
-                              <button style={iconDelBtn} title="Delete" onClick={() => {
-                                if (window.confirm(`Delete floor "${flr.name}"?`)) {
-                                  const firstBldId = locationForm.buildings[0]?.id;
-                                  if (firstBldId) { try { ApiService.deleteBranchFloor(firstBldId, flr.id).catch(() => { }); } catch (e) { } }
-                                  setLocationForm(f => ({ ...f, floors: f.floors.filter(fl => fl.id !== flr.id) }));
-                                }
-                              }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-
-          <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-          {/* SECTION 3: Departments */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={secLabel}>
-              <span>Departments</span>
-              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                style={{ ...smlInput, flex: 1 }}
-                placeholder="Department name  (e.g. Granulation Department, Cardiology)"
-                value={locationForm.new_department || ''}
-                onChange={e => setLocationForm(f => ({ ...f, new_department: e.target.value }))}
-              />
-              <button type="button" style={addBtn('#10b981')} onClick={() => {
-                const name = (locationForm.new_department || '').trim();
-                if (!name) { alert('Please enter a department name.'); return; }
-                const depts = locationForm.departments || [];
-                if (depts.some(d => d.name.toLowerCase() === name.toLowerCase())) { alert('Department already exists.'); return; }
-                try { ApiService.createDepartment({ name }).catch(() => { }); } catch (e) { }
-                setLocationForm(f => ({ ...f, departments: [...(f.departments || []), { id: `DEP-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, name }], new_department: '' }));
-              }}>
-                + Add Department
-              </button>
-            </div>
-
-            {locationForm.departments && locationForm.departments.length > 0 && (
-              <div style={listBox}>
-                {locationForm.departments.map(dept => (
-                  <div key={dept.id} style={rowBase(10, '#fff')}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', color: '#0f172a' }}>
-                      <span style={{ color: '#10b981', fontSize: '11px' }}>◈</span>
-                      {editingItemId === dept.id
-                        ? <input value={editingItemValue} onChange={e => setEditingItemValue(e.target.value)} style={inlineEdit('180px')} autoFocus />
-                        : dept.name}
-                    </span>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      {editingItemId === dept.id ? (
-                        <>
-                          <button style={smallSave} onClick={() => {
-                            setLocationForm(f => ({ ...f, departments: f.departments.map(d => d.id === dept.id ? { ...d, name: editingItemValue } : d) }));
-                            setEditingItemId(null);
-                          }}>Save</button>
-                          <button style={smallCancel} onClick={() => setEditingItemId(null)}>Cancel</button>
-                        </>
-                      ) : (
-                        <>
-                          <button style={iconEditBtn} title="Edit" onClick={() => { setEditingItemId(dept.id); setEditingItemValue(dept.name); }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                          </button>
-                          <button style={iconDelBtn} title="Delete" onClick={() => {
-                            if (window.confirm(`Delete department "${dept.name}"?`)) {
-                              try { ApiService.deleteDepartment(dept.id).catch(() => { }); } catch (e) { }
-                              setLocationForm(f => ({ ...f, departments: f.departments.filter(d => d.id !== dept.id) }));
-                            }
-                          }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-        </div>
       </div>
-    );
-  }
+
+      {deleteConfirm && (
+        <div className="cm-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="cm-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="cm-modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
+              <span className="cm-modal-icon" style={{ fontSize: '20px' }}>⚠️</span>
+              <span className="cm-modal-title" style={{ color: '#991b1b' }}>Confirm Deletion</span>
+            </div>
+            <div className="cm-modal-body">
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', color: '#1f2937' }}>
+                {deleteConfirm.type === 'company' 
+                  ? `Are you sure you want to delete the company "${deleteConfirm.company.name}"? This action cannot be undone.`
+                  : `Are you sure you want to delete the ${deleteConfirm.itemType} "${deleteConfirm.name}"? This action cannot be undone.`
+                }
+              </p>
+            </div>
+            <div className="cm-modal-actions">
+              <button className="cm-cancel-btn" style={{ color: '#374151', border: '1px solid #d1d5db', background: '#fff' }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="cm-save-btn" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => {
+                if (deleteConfirm.type === 'company') executeDeleteCompany(deleteConfirm.company);
+                else executeDeleteItem(deleteConfirm);
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
   return (
     <div className="ea-page">
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px',
+          background: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff', padding: '12px 20px', borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontWeight: '500', animation: 'fe-fade 0.3s ease-out'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          {toast.message}
+        </div>
+      )}
       <div className="setup-header">
         <button className="setup-back-btn" onClick={onBack} title="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -1039,12 +1145,20 @@ const CompanyManagement = ({ onBack }) => {
 
           </div>
         </div>
-        <button className="ea-add-nav-btn" onClick={openAdd}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add Company
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="ea-add-nav-btn" onClick={() => onNavigate && onNavigate('setup-domains')} style={{ background: '#0284c7', color: '#fff', border: 'none' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg>
+            View Domain
+          </button>
+          <button className="ea-add-nav-btn" onClick={openAdd} style={{ background: '#0284c7', color: '#fff', border: 'none' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Company
+          </button>
+        </div>
       </div>
 
       <div className="ea-body">
@@ -1094,7 +1208,7 @@ const CompanyManagement = ({ onBack }) => {
                                 )}
                               </div>
                               <div className="cm-info-cell">
-                                <div className="ea-user-name">{company.name}</div>
+                                <div className="cm-company-name">{company.name}</div>
                                 <div className="cm-company-sub">
                                   {(company.comapany_ref || company.company_ref || company.company_id || company.companyId) && (
                                     <span className="cm-id-badge">{company.comapany_ref || company.company_ref || company.company_id || company.companyId}</span>
@@ -1124,7 +1238,7 @@ const CompanyManagement = ({ onBack }) => {
                                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                               </button>
-                              <button className="ea-action-btn delete" title="Delete" onClick={() => handleDelete(company.id)}>
+                              <button className="ea-action-btn delete" title="Delete" onClick={() => confirmDeleteCompany(company)}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
                                   <polyline points="3 6 5 6 21 6" />
                                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -1212,6 +1326,17 @@ const CompanyManagement = ({ onBack }) => {
                   onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
                 />
                 {formErrors.email && <span className="cm-error-text" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>{formErrors.email}</span>}
+              </div>
+
+              <div className="cm-field">
+                <label className="cm-label">Email Domains</label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. garrev.com, example.com"
+                  value={addForm.emailDomains}
+                  onChange={(e) => setAddForm((f) => ({ ...f, emailDomains: e.target.value }))}
+                />
               </div>
 
               <div className="cm-field">
@@ -1316,6 +1441,17 @@ const CompanyManagement = ({ onBack }) => {
               </div>
 
               <div className="cm-field">
+                <label className="cm-label">Email Domains</label>
+                <input
+                  className="cm-input"
+                  type="text"
+                  placeholder="e.g. garrev.com, example.com"
+                  value={editForm.emailDomains}
+                  onChange={(e) => setEditForm((f) => ({ ...f, emailDomains: e.target.value }))}
+                />
+              </div>
+
+              <div className="cm-field">
                 <label className="cm-label">Company Address</label>
                 <textarea
                   className="cm-input cm-textarea"
@@ -1369,6 +1505,31 @@ const CompanyManagement = ({ onBack }) => {
               <button className="cm-save-btn" onClick={saveEdit} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteConfirm && (
+        <div className="cm-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="cm-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="cm-modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
+              <span className="cm-modal-icon" style={{ fontSize: '20px' }}>⚠️</span>
+              <span className="cm-modal-title" style={{ color: '#991b1b' }}>Confirm Deletion</span>
+            </div>
+            <div className="cm-modal-body">
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', color: '#1f2937' }}>
+                {deleteConfirm.type === 'company' 
+                  ? `Are you sure you want to delete the company "${deleteConfirm.company.name}"? This action cannot be undone.`
+                  : `Are you sure you want to delete the ${deleteConfirm.itemType} "${deleteConfirm.name}"? This action cannot be undone.`
+                }
+              </p>
+            </div>
+            <div className="cm-modal-actions">
+              <button className="cm-cancel-btn" style={{ color: '#374151', border: '1px solid #d1d5db', background: '#fff' }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="cm-save-btn" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => {
+                if (deleteConfirm.type === 'company') executeDeleteCompany(deleteConfirm.company);
+                else executeDeleteItem(deleteConfirm);
+              }}>Delete</button>
             </div>
           </div>
         </div>

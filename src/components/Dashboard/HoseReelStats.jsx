@@ -16,7 +16,7 @@ const fmt = (d) => {
 const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 90 ? '#28a745' : n >= 80 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
   v === 'OK' ? '#28a745'
@@ -288,7 +288,7 @@ const HoseReelStats = ({ module, onBack, onRaiseWorkOrder }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Hose Reel Fleet Monitor</div>
           </div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Units - (Expired + Needs Service + Due Inspection)) / Total Units) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
@@ -568,7 +568,7 @@ const HoseReelStats = ({ module, onBack, onRaiseWorkOrder }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack}>Back</BackBtn>
         <span className="fe-header-icon">🧵</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>

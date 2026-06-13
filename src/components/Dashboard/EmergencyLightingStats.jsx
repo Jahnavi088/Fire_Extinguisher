@@ -137,7 +137,7 @@ const EmergencyLightingStats = ({ module, onBack, onRaiseWorkOrder }) => {
           id: `light_${i}`,
           sos_code: `EL-0${i + 1}`,
           equipment_type: i % 3 === 0 ? 'Exit Sign Light' : 'Emergency Bulkhead',
-          location_name: `Floor ${Math.floor(i/3) + 1} - Passage ${i % 3 + 1}`,
+          location_name: `Floor ${Math.floor(i / 3) + 1} - Passage ${i % 3 + 1}`,
           building_name: 'Warehouse A',
           readiness_score: 100,
           next_inspection_due: new Date(Date.now() + 86400000 * 90).toISOString()
@@ -175,7 +175,7 @@ const EmergencyLightingStats = ({ module, onBack, onRaiseWorkOrder }) => {
         <div className="fe-header">
           <BackBtn onClick={onBack}>Back</BackBtn>
           <div className="fe-header-info"><div className="fe-header-title">Emergency Lighting Monitor</div></div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Units - (Expired + Needs Service + Due Inspection)) / Total Units) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
@@ -282,7 +282,7 @@ const EmergencyLightingStats = ({ module, onBack, onRaiseWorkOrder }) => {
   return (
     <div className="fe-page">
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack}>Back</BackBtn>
         <span className="fe-header-icon">💡</span>
         <div className="fe-header-info">
           <div className="fe-header-title">{u.sos_code || '…'}</div>

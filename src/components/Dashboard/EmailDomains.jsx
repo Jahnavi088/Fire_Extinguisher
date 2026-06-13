@@ -17,6 +17,13 @@ const EmailDomains = ({ onBack }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     fetchData();
@@ -87,8 +94,8 @@ const EmailDomains = ({ onBack }) => {
       return;
     }
 
-    const exists = domains.some(d => 
-      d.domain.toLowerCase() === domainName.toLowerCase() && 
+    const exists = domains.some(d =>
+      d.domain.toLowerCase() === domainName.toLowerCase() &&
       (!editTarget || d.id !== editTarget.id)
     );
     if (exists) {
@@ -101,8 +108,10 @@ const EmailDomains = ({ onBack }) => {
     try {
       if (editTarget) {
         await ApiService.updateAdminEmailDomain(editTarget.id, domainName, selectedCompanyId);
+        showToast('Domain updated successfully.');
       } else {
         await ApiService.createAdminEmailDomain(domainName, selectedCompanyId);
+        showToast('Domain created successfully.');
       }
       setShowForm(false);
       await fetchData();
@@ -113,18 +122,38 @@ const EmailDomains = ({ onBack }) => {
     }
   };
 
-  const handleDelete = async (dom) => {
-    if (!window.confirm(`Delete domain "${dom.domain}"? This cannot be undone.`)) return;
+  const confirmDelete = (dom) => {
+    setDeleteConfirm(dom);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
     try {
-      await ApiService.deleteAdminEmailDomain(dom.id);
+      await ApiService.deleteAdminEmailDomain(deleteConfirm.id);
       await fetchData();
+      showToast('Domain deleted successfully.');
     } catch (err) {
-      alert(err.message || 'Failed to delete domain.');
+      showToast(err.message || 'Failed to delete domain.', 'error');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
   return (
     <div className="setup-page">
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px',
+          background: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff', padding: '12px 20px', borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontWeight: '500', animation: 'fe-fade 0.3s ease-out'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          {toast.message}
+        </div>
+      )}
       {/* Header */}
       <div className="setup-header">
         <button className="setup-back-btn" onClick={onBack} title="Back">
@@ -183,7 +212,7 @@ const EmailDomains = ({ onBack }) => {
                     <tr key={dom.id || idx}>
                       <td className="um-td-num">{(page - 1) * PAGE_SIZE + idx + 1}</td>
                       <td>
-                        <span className="um-name" style={{ fontWeight: '500' }}>{dom.domain}</span>
+                        <span className="um-name" style={{ fontWeight: '500', color: '#000000' }}>{dom.domain}</span>
                       </td>
                       <td>
                         <span style={{ fontSize: '13px', color: '#000', fontWeight: '500' }}>
@@ -198,7 +227,7 @@ const EmailDomains = ({ onBack }) => {
                               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
                           </button>
-                          <button className="um-action-btn delete" onClick={() => handleDelete(dom)} title="Delete domain">
+                          <button className="um-action-btn delete" onClick={() => confirmDelete(dom)} title="Delete domain">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                               <path d="M10 11v6" /><path d="M14 11v6" />
@@ -266,6 +295,31 @@ const EmailDomains = ({ onBack }) => {
               <button className="um-btn-cancel" onClick={() => setShowForm(false)}>Cancel</button>
               <button className="um-btn-save" onClick={handleSave} disabled={saving}>
                 {saving ? <><div className="um-btn-spinner" /> Saving...</> : (editTarget ? 'Save Changes' : 'Add Domain')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="um-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="um-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="um-modal-head">
+              <div className="um-modal-title">
+                <span style={{ fontSize: 20, marginRight: '8px' }}>⚠️</span> Confirm Deletion
+              </div>
+              <button className="um-modal-close" onClick={() => setDeleteConfirm(null)}>×</button>
+            </div>
+            <div className="um-modal-body">
+              <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', lineHeight: '1.5' }}>
+                Are you sure you want to delete the domain <strong>"{deleteConfirm.domain}"</strong>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="um-modal-foot">
+              <button className="um-btn-cancel" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="um-btn-save" style={{ background: '#ef4444', color: '#fff' }} onClick={handleDeleteConfirm}>
+                Delete
               </button>
             </div>
           </div>

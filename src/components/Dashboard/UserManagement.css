@@ -65,7 +65,7 @@
 /* ── Stats row ────────────────────────────────────────────────────── */
 .um-stats-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
   padding: 16px 24px 0;
   flex-shrink: 0;
@@ -108,7 +108,7 @@
   flex: 1;
   max-width: 220px;
   position: relative;
-  margin: 0 20px;
+  margin: 0 8px;
 }
 
 .um-search-icon {
@@ -180,6 +180,7 @@
   padding: 14px 24px 24px;
   display: flex;
   flex-direction: column;
+  overflow-x: auto;
 }
 
 /* ── Table ────────────────────────────────────────────────────────── */

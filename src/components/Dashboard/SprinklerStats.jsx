@@ -257,7 +257,7 @@ const SprinklerStats = ({ module, onBack }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Sprinkler System Monitor</div>
           </div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Systems - (Expired + Needs Service + Due Inspection)) / Total Systems) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>
@@ -536,7 +536,7 @@ const SprinklerStats = ({ module, onBack }) => {
     <div className="fe-page">
       {/* Header */}
       <div className="fe-header">
-        <BackBtn onClick={goBack}>Back to list</BackBtn>
+        <BackBtn onClick={goBack}>Back</BackBtn>
         <span className="fe-header-icon">🚿</span>
         <div className="fe-header-info">
           <div className="fe-header-title" style={{ fontFamily: 'var(--font-mono)' }}>

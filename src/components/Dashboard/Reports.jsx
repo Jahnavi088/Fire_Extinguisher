@@ -207,14 +207,14 @@ const Icons = {
 };
 
 const CATEGORY_ICONS = {
-  'Identification':    '🔖',
-  'Accessibility':     '🚪',
-  'Physical Condition':'🔍',
-  'Documentation':     '📄',
-  'Compliance':        '✅',
-  'Service':           '🔧',
-  'Sign-off':          '✍️',
-  'General':           '📋'
+  'Identification': '🔖',
+  'Accessibility': '🚪',
+  'Physical Condition': '🔍',
+  'Documentation': '📄',
+  'Compliance': '✅',
+  'Service': '🔧',
+  'Sign-off': '✍️',
+  'General': '📋'
 };
 
 const REPORT_TYPES = [
@@ -339,6 +339,7 @@ const Reports = ({ onBack, allowedModules }) => {
   const [data, setData] = useState([]);
   const [filter, setFilter] = useState({ dateRange: '30', module: 'all' });
   const [page, setPage] = useState(1);
+  const [exportConfirm, setExportConfirm] = useState(null);
 
   // States for detailed inspection checklist viewing
   const [selectedInspection, setSelectedInspection] = useState(null);
@@ -376,10 +377,10 @@ const Reports = ({ onBack, allowedModules }) => {
         mapped = checklistItems.map(item => {
           const ans = answersList.find(a => {
             const aId = a.checklist_item_id !== undefined ? a.checklist_item_id :
-                        a.checklist_id !== undefined ? a.checklist_id :
-                        a.item_id !== undefined ? a.item_id :
-                        a.question_id !== undefined ? a.question_id :
-                        a.id !== undefined ? a.id : null;
+              a.checklist_id !== undefined ? a.checklist_id :
+                a.item_id !== undefined ? a.item_id :
+                  a.question_id !== undefined ? a.question_id :
+                    a.id !== undefined ? a.id : null;
             return aId !== null && String(aId) === String(item.id);
           });
           const rawAns = ans ? (ans.answer !== undefined ? ans.answer : ans.value !== undefined ? ans.value : ans.status !== undefined ? ans.status : ans.result !== undefined ? ans.result : ans.response) : undefined;
@@ -426,7 +427,39 @@ const Reports = ({ onBack, allowedModules }) => {
     const dateStr = fmt(row.inspected_at || row.created_at) || '';
     const timeStr = fmtTime(row.inspected_at || row.created_at) || '';
     const scoreVal = parseFloat(row.score) || 0;
-    
+
+    const getModuleAbbr = (code) => {
+      if (!code) return 'GP';
+      const c = String(code).toLowerCase();
+      if (c.includes('extinguisher')) return 'FE';
+      if (c.includes('sprinkler')) return 'SP';
+      if (c.includes('hose_reel') || c.includes('hose')) return 'HR';
+      if (c.includes('drum')) return 'DH';
+      if (c.includes('hydrant')) return 'HY';
+      if (c.includes('trolley')) return 'FT';
+      if (c.includes('suppression')) return 'SS';
+      if (c.includes('blanket')) return 'FB';
+      if (c.includes('panel') || c.includes('fpca') || c.includes('alarm')) return 'FA';
+      if (c.includes('smoke')) return 'SD';
+      return 'EQ';
+    };
+
+    const moduleAbbr = getModuleAbbr(row.module_code || row.module_name || row.equipment_type || '');
+    const inspectionId = row.inspection_no || row.inspection_code || `ES${moduleAbbr}2526${String(row.id || '').padStart(4, '0')}`;
+    const eqType = row.module_name || row.equipment_type || 'Safety Equipment';
+    const eqCode = row.sos_code || row.equipment_code || '—';
+
+    const currentUser = ApiService.getUser();
+    const companyName = row.company_name || currentUser?.company_name || currentUser?.company?.name || 'Cipla Limited';
+
+    const buildingName = row.building_name || row.building || 'Manufacturing Plant';
+    const floorName = row.floor_name || row.floor || 'Ground Floor';
+    const zoneName = row.zone_name || row.zone || 'Production Zone A';
+    const deptName = row.department_name || row.department || 'Production';
+
+    const inspectorName = row.inspector_name || row.staff_name || row.user_name || '—';
+    const resultStatus = row.result || row.status || 'PASS';
+
     // Group checklist items by category
     const categoriesMap = {};
     checklist.forEach(item => {
@@ -451,9 +484,9 @@ const Reports = ({ onBack, allowedModules }) => {
             </thead>
             <tbody>
               ${items.map(item => {
-                const ansClass = item.answer === 'Yes' ? 'ans-yes' : item.answer === 'No' ? 'ans-no' : 'ans-na';
-                const critBadge = item.is_critical ? '<span class="crit-badge">CRITICAL</span>' : '<span class="non-crit">—</span>';
-                return `
+        const ansClass = item.answer === 'Yes' ? 'ans-yes' : item.answer === 'No' ? 'ans-no' : 'ans-na';
+        const critBadge = item.is_critical ? '<span class="crit-badge">CRITICAL</span>' : '<span class="non-crit">—</span>';
+        return `
                   <tr>
                     <td class="question-cell">${esc(item.question)}</td>
                     <td style="text-align: center;">${critBadge}</td>
@@ -461,7 +494,7 @@ const Reports = ({ onBack, allowedModules }) => {
                     <td class="remarks-cell">${esc(item.remarks || '—')}</td>
                   </tr>
                 `;
-              }).join('')}
+      }).join('')}
             </tbody>
           </table>
         </div>
@@ -469,22 +502,22 @@ const Reports = ({ onBack, allowedModules }) => {
     });
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>SOS Inspection Report - ${esc(row.sos_code || row.equipment_code)}</title>
+<title>SOS Inspection Report - ${esc(eqCode)}</title>
 <style>
   body { font-family: 'Inter', Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 32px; background: #fff; line-height: 1.4; }
   .header-table { width: 100%; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
   .header-logo { font-size: 20px; font-weight: 800; color: #0284c7; letter-spacing: -0.5px; }
   .header-title { font-size: 16px; font-weight: 700; color: #0f172a; text-align: right; }
   
-  .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
-  .info-item { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 2px; }
-  .info-lbl { font-weight: 600; color: #64748b; }
-  .info-val { font-weight: 700; color: #0f172a; font-family: monospace; }
-  
-  .score-badge { display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: #fff; padding: 8px 16px; border-radius: 6px; }
-  .score-high { background: #16a34a; }
-  .score-medium { background: #d97706; }
-  .score-low { background: #dc2626; }
+  .prof-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .prof-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-sizing: border-box; }
+  .prof-card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px; }
+  .prof-item { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; }
+  .prof-lbl { font-weight: 600; color: #64748b; }
+  .prof-val { font-weight: 700; color: #0f172a; text-align: right; }
+  .prof-val.badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9.5px; text-transform: uppercase; }
+  .prof-val.badge.pass { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+  .prof-val.badge.fail { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
   
   .category-section { margin-bottom: 20px; break-inside: avoid; }
   .category-section h3 { font-size: 12px; font-weight: 700; color: #0f172a; margin: 0 0 8px 0; border-left: 3px solid #0284c7; padding-left: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -510,37 +543,79 @@ const Reports = ({ onBack, allowedModules }) => {
   
   @media print {
     body { margin: 12px; font-size: 10px; }
-    .info-grid { background: none; border: 1px solid #cbd5e1; }
-    .crit-badge, .ans-chip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .prof-card { background: none; border: 1px solid #cbd5e1; }
+    .crit-badge, .ans-chip, .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style></head><body>
 <table class="header-table">
   <tr>
-    <td class="header-logo" style="border:none; padding:0;">SOS EMERGENCY SYSTEM</td>
+    <td class="header-logo" style="border:none; padding:0;">${esc(companyName.toUpperCase())}</td>
     <td class="header-title" style="border:none; padding:0;">INSPECTION CHECKLIST REPORT</td>
   </tr>
 </table>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-  <div style="flex:1;">
-    <div class="info-grid">
-      <div>
-        <div class="info-item"><span class="info-lbl">Unit ID:</span><span class="info-val">${esc(row.sos_code || row.equipment_code)}</span></div>
-        <div class="info-item"><span class="info-lbl">Module:</span><span class="info-val">${esc(row.module_name || 'Safety')}</span></div>
-        <div class="info-item"><span class="info-lbl">Inspector:</span><span class="info-val">${esc(row.inspector_name || row.staff_name || row.user_name || '—')}</span></div>
-      </div>
-      <div>
-        <div class="info-item"><span class="info-lbl">Date:</span><span class="info-val">${esc(dateStr)}</span></div>
-        <div class="info-item"><span class="info-lbl">Time:</span><span class="info-val">${esc(timeStr)}</span></div>
-        <div class="info-item"><span class="info-lbl">Result:</span><span class="info-val" style="color: ${row.result === 'PASS' || row.status === 'PASS' ? '#16a34a' : '#dc2626'}">${esc(row.result || row.status || 'CHECKED')}</span></div>
-      </div>
+<div class="prof-info-grid">
+  <!-- Column 1: Equipment Details -->
+  <div class="prof-card">
+    <div class="prof-card-title">Equipment Details</div>
+    <div class="prof-item">
+      <span class="prof-lbl">Inspection ID:</span>
+      <span class="prof-val" style="font-family: monospace;">${esc(inspectionId)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Equipment Type:</span>
+      <span class="prof-val">${esc(eqType)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Equipment Code:</span>
+      <span class="prof-val" style="font-family: monospace;">${esc(eqCode)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Company:</span>
+      <span class="prof-val">${esc(companyName)}</span>
     </div>
   </div>
-  <div style="margin-left:24px; text-align:center;">
-    <div class="score-badge ${scoreVal >= 80 ? 'score-high' : scoreVal >= 50 ? 'score-medium' : 'score-low'}">
-      ${scoreVal}%
+
+  <!-- Column 2: Location Details -->
+  <div class="prof-card">
+    <div class="prof-card-title">Location Details</div>
+    <div class="prof-item">
+      <span class="prof-lbl">Building:</span>
+      <span class="prof-val">${esc(buildingName)}</span>
     </div>
-    <div style="font-size:9px; font-weight:700; color:#64748b; margin-top:6px; text-transform:uppercase;">Overall Score</div>
+    <div class="prof-item">
+      <span class="prof-lbl">Floor:</span>
+      <span class="prof-val">${esc(floorName)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Zone:</span>
+      <span class="prof-val">${esc(zoneName)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Department:</span>
+      <span class="prof-val">${esc(deptName)}</span>
+    </div>
+  </div>
+
+  <!-- Column 3: Inspection Outcome -->
+  <div class="prof-card">
+    <div class="prof-card-title">Inspection Summary</div>
+    <div class="prof-item">
+      <span class="prof-lbl">Inspection Date:</span>
+      <span class="prof-val">${esc(dateStr)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Inspector:</span>
+      <span class="prof-val">${esc(inspectorName)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Status:</span>
+      <span class="prof-val badge ${resultStatus.toUpperCase() === 'PASS' || resultStatus.toUpperCase() === 'COMPLIANT' || resultStatus.toUpperCase() === 'APPROVED' ? 'pass' : 'fail'}">${esc(resultStatus)}</span>
+    </div>
+    <div class="prof-item">
+      <span class="prof-lbl">Compliance Score:</span>
+      <span class="prof-val" style="color: ${scoreVal >= 80 ? '#16a34a' : scoreVal >= 50 ? '#d97706' : '#dc2626'}; font-weight: 800;">${scoreVal}%</span>
+    </div>
   </div>
 </div>
 
@@ -556,7 +631,7 @@ ${checklistHtml}
 <div class="footer-sig">
   <div>
     <span style="font-weight:700; color:#475569;">Inspector Signature</span><br/>
-    <span style="font-size:9px; color:#64748b;">Name: ${esc(row.inspector_name || row.staff_name || row.user_name || '—')}</span>
+    <span style="font-size:9px; color:#64748b;">Name: ${esc(inspectorName)}</span>
     <div class="sig-box">Certified via SOS App</div>
   </div>
   <div>
@@ -611,21 +686,21 @@ ${checklistHtml}
       }
 
       let finalData = Array.isArray(res) ? res : (res?.items || res?.reports || res?.inspections || res?.data || []);
-      
+
       // Do not show pending inspections in Service Reports
       if (activeTab === 'inspections') {
-         const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
-         finalData = finalData.filter(i => {
-            const stStatus = (i.status || '').toUpperCase();
-            const stApprov = (i.approval_status || '').toUpperCase();
-            
-            // Explicitly exclude rejected reports
-            if (stApprov === 'REJECTED' || stStatus === 'REJECTED') return false;
-            
-            // Allow approved reports with type-safe ID casting
-            const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(i.id));
-            return isApproved;
-         });
+        const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
+        finalData = finalData.filter(i => {
+          const stStatus = (i.status || '').toUpperCase();
+          const stApprov = (i.approval_status || '').toUpperCase();
+
+          // Explicitly exclude rejected reports
+          if (stApprov === 'REJECTED' || stStatus === 'REJECTED') return false;
+
+          // Allow approved reports with type-safe ID casting
+          const isApproved = stApprov === 'APPROVED' || stStatus === 'APPROVED' || approvedLocally.map(String).includes(String(i.id));
+          return isApproved;
+        });
       }
 
       // Filter out records for modules the user doesn't have access to
@@ -647,11 +722,11 @@ ${checklistHtml}
         try {
           const rawUsers = await ApiService.getAdminUsers();
           const userList = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.users || rawUsers?.data || []);
-          
+
           if (role === 'supervisor') {
             const controlled = userList.filter(u => String(u.supervisor_id || u.supervisorId) === String(currentUser.id || currentUser.user_id));
             const controlledUserIds = new Set(controlled.map(u => String(u.id)));
-            
+
             finalData = finalData.filter(r => {
               const repUserId = String(r.submitted_by_id || r.inspector_id || r.user_id || '');
               const currentUserId = String(currentUser?.id || currentUser?.user_id);
@@ -662,7 +737,7 @@ ${checklistHtml}
             if (adminCompanyId) {
               const companyUsers = userList.filter(u => String(u.company_id || u.companyId) === String(adminCompanyId));
               const companyUserIds = new Set(companyUsers.map(u => String(u.id)));
-              
+
               finalData = finalData.filter(r => {
                 const repUserId = String(r.submitted_by_id || r.inspector_id || r.user_id || '');
                 return companyUserIds.has(repUserId);
@@ -673,7 +748,7 @@ ${checklistHtml}
           console.error("Failed to load users for supervisor/admin filtering", e);
         }
       }
-      
+
       setData(finalData);
     } catch (err) {
       console.error('Error fetching reports:', err);
@@ -685,11 +760,10 @@ ${checklistHtml}
 
   const getExportRows = () => {
     if (activeTab === 'inspections') {
-      const headers = ['S.No', 'Date', 'Time', 'Inspector', 'Unit ID', 'Module', 'Score (%)', 'Result', 'Remarks'];
+      const headers = ['S.No', 'Date & Time', 'Inspector', 'Unit ID', 'Module', 'Score (%)', 'Result', 'Remarks'];
       const rows = data.map((r, i) => [
         i + 1,
-        fmt(r.inspected_at || r.created_at) || '',
-        fmtTime(r.inspected_at || r.created_at) || '',
+        `${fmt(r.inspected_at || r.created_at) || ''} ${fmtTime(r.inspected_at || r.created_at) || ''}`,
         r.inspector_name || r.staff_name || r.user_name || '',
         r.sos_code || r.equipment_code || '',
         r.module_name || 'Safety',
@@ -742,30 +816,203 @@ ${checklistHtml}
     if (!exported) return;
     const { headers, rows } = exported;
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Build KPI Summary Cards HTML
+    let statsHtml = '';
+    const totalRecords = data.length;
+    if (activeTab === 'inspections') {
+      const passed = data.filter(r => {
+        const v = (r.result || r.status || '').toLowerCase().replace(/[^a-z]/g, '');
+        return ['ok', 'pass', 'passed'].includes(v);
+      }).length;
+      const rate = totalRecords > 0 ? Math.round((passed / totalRecords) * 100) : 0;
+      const failed = totalRecords - passed;
+
+      const healthRating = rate >= 90 ? 'Excellent' : rate >= 80 ? 'Good' : rate >= 60 ? 'Fair' : 'Critical';
+      const healthColor = rate >= 90 ? '#16a34a' : rate >= 80 ? '#22c55e' : rate >= 60 ? '#d97706' : '#dc2626';
+
+      statsHtml = `
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Records</div>
+            <div class="stat-value">${totalRecords}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Pass Rate</div>
+            <div class="stat-value" style="color: #16a34a;">${rate}%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Issues Found</div>
+            <div class="stat-value" style="color: #dc2626;">${failed}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Inspection Health</div>
+            <div class="stat-value" style="color: ${healthColor};">${healthRating}</div>
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'status') {
+      const healthy = data.filter(r => parseFloat(r.readiness_score || 0) >= 80).length;
+      const atRisk = data.filter(r => parseFloat(r.readiness_score || 0) < 60).length;
+      const avg = totalRecords > 0 ? Math.round(data.reduce((s, r) => s + parseFloat(r.readiness_score || 0), 0) / totalRecords) : 0;
+
+      statsHtml = `
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Units</div>
+            <div class="stat-value">${totalRecords}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Healthy (≥80%)</div>
+            <div class="stat-value" style="color: #16a34a;">${healthy}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">At Risk (<60%)</div>
+            <div class="stat-value" style="color: #dc2626;">${atRisk}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg. Readiness</div>
+            <div class="stat-value" style="color: #d97706;">${avg}%</div>
+          </div>
+        </div>
+      `;
+    }
+
     const theadHtml = `<tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr>`;
-    const tbodyHtml = rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+    const tbodyHtml = rows.map(r => {
+      return `<tr>${r.map((c, cellIdx) => {
+        const headerName = headers[cellIdx];
+        let cellContent = esc(c);
+
+        // Add visual badges for Score and Result in PDF Table
+        if (headerName.includes('Score') || headerName.includes('Readiness')) {
+          const val = parseFloat(c) || 0;
+          const cls = val >= 80 ? 'score-high' : val >= 50 ? 'score-medium' : 'score-low';
+          cellContent = `<span class="score-badge ${cls}">${val}%</span>`;
+        } else if (headerName === 'Result' || headerName === 'Operational State' || headerName === 'Status') {
+          const str = String(c).toLowerCase().replace(/[^a-z]/g, '');
+          const cls = ['ok', 'pass', 'operational', 'active'].includes(str) ? 'status-ok' :
+            ['fail', 'failed', 'critical', 'expired'].includes(str) ? 'status-fail' : 'status-warn';
+          cellContent = `<span class="status-badge ${cls}">${esc(c)}</span>`;
+        }
+
+        return `<td>${cellContent}</td>`;
+      }).join('')}</tr>`;
+    }).join('');
+
     const reportLabel = REPORT_TYPES.find(t => t.id === activeTab)?.name || 'Report';
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const currentUser = ApiService.getUser();
+    const companyName = currentUser?.company_name || currentUser?.company?.name || 'Cipla Limited';
+
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(reportLabel)}</title>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 24px; }
-  h1 { font-size: 16px; margin-bottom: 4px; }
-  .meta { color: #64748b; margin-bottom: 16px; font-size: 10px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #1e293b; color: #fff; padding: 7px 10px; text-align: left; font-size: 10px; }
-  td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
+  @page {
+    size: auto;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+  body { font-family: 'Inter', Arial, sans-serif; font-size: 10px; color: #1e293b; margin: 0; background: #fff; line-height: 1.4; padding: 10px; }
+  
+  .header-block {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid #0f172a;
+    padding: 0 10px 10px 10px;
+    margin-bottom: 20px;
+  }
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .company-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0284c7;
+    text-transform: uppercase;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+  .report-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: right;
+  }
+  .meta-item {
+    font-size: 9px;
+    color: #64748b;
+  }
+  .meta-label {
+    font-weight: 600;
+  }
+  .meta-val {
+    font-weight: 700;
+    color: #0f172a;
+  }
+  
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; padding: 0 10px; }
+  .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center; }
+  .stat-label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 16px; font-weight: 800; color: #0f172a; }
+  
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-left: 10px; margin-right: 10px; }
+  th { background: #0f172a; color: #fff; padding: 7px 10px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
   tr:nth-child(even) td { background: #f8fafc; }
-  @media print { body { margin: 12px; } }
+  
+  .score-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 9px; }
+  .score-high { background: #dcfce7; color: #16a34a; }
+  .score-medium { background: #fef3c7; color: #d97706; }
+  .score-low { background: #fee2e2; color: #dc2626; }
+  
+  .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .status-ok { background: #dcfce7; color: #16a34a; }
+  .status-fail { background: #fee2e2; color: #dc2626; }
+  .status-warn { background: #fef3c7; color: #d97706; }
+  
+  @media print {
+    body { padding: 0; font-size: 9px; }
+    .stat-card { border: 1px solid #cbd5e1; background: none; }
+    th { background: #0f172a !important; color: #fff !important; }
+    .score-badge, .status-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style></head><body>
-<h1>Fire Safety — ${esc(reportLabel)}</h1>
-<div class="meta">Generated on ${esc(dateStr)} &nbsp;|&nbsp; ${data.length} records</div>
-<table><thead>${theadHtml}</thead><tbody>${tbodyHtml}</tbody></table>
+<div class="header-block">
+  <div class="header-left">
+    <div class="company-name">${esc(companyName)}</div>
+    <div class="report-title">${esc(reportLabel.toUpperCase())}</div>
+  </div>
+  <div class="header-right">
+    <div class="meta-item"><span class="meta-label">Generated On:</span> <span class="meta-val">${esc(dateStr)} ${esc(timeStr)}</span></div>
+    <div class="meta-item"><span class="meta-label">Scope:</span> <span class="meta-val">${totalRecords} Records</span></div>
+  </div>
+</div>
+
+${statsHtml}
+
+<div style="padding: 0 10px;">
+  <table><thead>${theadHtml}</thead><tbody>${tbodyHtml}</tbody></table>
+</div>
 </body></html>`;
+
     const win = window.open('', '_blank');
     win.document.write(html);
     win.document.close();
     win.focus();
-    win.print();
+    setTimeout(() => {
+      win.print();
+    }, 250);
   };
 
   const totalPages = Math.max(1, Math.ceil(data.length / ROWS_PER_PAGE));
@@ -814,17 +1061,17 @@ ${checklistHtml}
     if (!allowedModules) {
       return [
         ...base,
-        { id: '30',  label: 'Fire Extinguishers' },
-        { id: '31',  label: 'Sprinklers' },
-        { id: '39',  label: 'Emergency Exits' },
-        { id: '38',  label: 'Emergency Lighting' },
-        { id: '29',  label: 'Fire NOC' },
-        { id: '23',  label: 'Trained Personnel' },
-        { id: '34',  label: 'Fire Hydrants' },
-        { id: '33',  label: 'Fire Hose Reels' },
-        { id: '35',  label: 'Fire Alarms' },
-        { id: '36',  label: 'Smoke Detectors' },
-        { id: '59',  label: 'Muster Points' },
+        { id: '30', label: 'Fire Extinguishers' },
+        { id: '31', label: 'Sprinklers' },
+        { id: '39', label: 'Emergency Exits' },
+        { id: '38', label: 'Emergency Lighting' },
+        { id: '29', label: 'Fire NOC' },
+        { id: '23', label: 'Trained Personnel' },
+        { id: '34', label: 'Fire Hydrants' },
+        { id: '33', label: 'Fire Hose Reels' },
+        { id: '35', label: 'Fire Alarms' },
+        { id: '36', label: 'Smoke Detectors' },
+        { id: '59', label: 'Muster Points' },
       ];
     }
     const mapped = allowedModules.map(m => ({
@@ -841,21 +1088,48 @@ ${checklistHtml}
 
   return (
     <div className="rpt-page">
+      {exportConfirm && (
+        <div className="rpt-modal-overlay" onClick={() => setExportConfirm(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="rpt-modal-card" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '8px', width: '90%', maxWidth: '400px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            <div className="rpt-modal-body" style={{ padding: '24px 16px 16px' }}>
+              <p style={{ margin: 0, color: '#334155', fontSize: '14px', lineHeight: '1.5' }}>
+                Are you sure you want to export this report as a {exportConfirm.type.toUpperCase()}?
+              </p>
+            </div>
+            <div className="rpt-modal-footer" style={{ padding: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button onClick={() => setExportConfirm(null)} style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: '500' }}>Cancel</button>
+              <button onClick={() => {
+                if (exportConfirm.type === 'csv') handleExportCSV();
+                else if (exportConfirm.type === 'pdf') handleExportPDF();
+                else if (exportConfirm.type === 'checklist pdf') handleDownloadChecklistPDF(exportConfirm.payload.row, exportConfirm.payload.checklist);
+                setExportConfirm(null);
+              }} style={{ padding: '8px 16px', borderRadius: '4px', border: 'none', background: '#0284c7', color: '#fff', cursor: 'pointer', fontWeight: '500' }}>
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Header ── */}
       <div className="rpt-header">
         <button
           className="rpt-back-btn"
           onClick={selectedInspection ? () => setSelectedInspection(null) : onBack}
-          title={selectedInspection ? "Back to Inspection History" : "Back to Dashboard"}
+          title={selectedInspection ? "Back to Reports" : "Back to Dashboard"}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
 
         <div className="rpt-header-info">
-          <div className="rpt-title-text">
-            {selectedInspection ? "Inspection Checklist Log" : "Reports"}
+          <div>
+            <div className="rpt-title-text">
+              {selectedInspection ? "Inspection Checklist Log" : "Reports"}
+            </div>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+              {selectedInspection ? "Detailed view of inspection results" : "Comprehensive view of all safety checks and audit logs"}
+            </p>
           </div>
         </div>
 
@@ -863,7 +1137,7 @@ ${checklistHtml}
           {selectedInspection ? (
             <button
               className="rpt-export-btn pdf"
-              onClick={() => handleDownloadChecklistPDF(selectedInspection, inspectionChecklist)}
+              onClick={() => setExportConfirm({ type: 'checklist pdf', payload: { row: selectedInspection, checklist: inspectionChecklist } })}
               disabled={modalLoading || inspectionChecklist.length === 0}
             >
               <Icons.FilePdf />
@@ -871,11 +1145,17 @@ ${checklistHtml}
             </button>
           ) : (
             <>
-              <button className="rpt-export-btn csv" onClick={handleExportCSV}>
+              <button className="rpt-export-btn csv" onClick={() => {
+                if (!data.length) { alert('No data to export.'); return; }
+                setExportConfirm({ type: 'csv' });
+              }}>
                 <Icons.Download />
                 Export CSV
               </button>
-              <button className="rpt-export-btn pdf" onClick={handleExportPDF}>
+              <button className="rpt-export-btn pdf" onClick={() => {
+                if (!data.length) { alert('No data to export.'); return; }
+                setExportConfirm({ type: 'pdf' });
+              }}>
                 <Icons.FilePdf />
                 Export PDF
               </button>
@@ -971,9 +1251,8 @@ ${checklistHtml}
                                 )}
                               </div>
                               <div className="rpt-detail-item-ans">
-                                <span className={`rpt-detail-ans-tag ${
-                                  item.answer === 'Yes' ? 'yes' : item.answer === 'No' ? 'no' : 'na'
-                                }`}>
+                                <span className={`rpt-detail-ans-tag ${item.answer === 'Yes' ? 'yes' : item.answer === 'No' ? 'no' : 'na'
+                                  }`}>
                                   {item.answer}
                                 </span>
                               </div>
@@ -1014,7 +1293,7 @@ ${checklistHtml}
                       className={`rpt-type-select-trigger ${tabOpen ? 'open' : ''}`}
                       onClick={() => { setTabOpen(v => !v); setCatOpen(false); }}
                     >
-                      <span>{currentType?.name || 'Inspection History'}</span>
+                      <span>{activeTab === 'inspections' ? 'Select Report Type' : (currentType?.name || 'Select Report Type')}</span>
                       <svg className={`rpt-chevron ${tabOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6 9l6 6 6-6" />
                       </svg>
@@ -1062,14 +1341,14 @@ ${checklistHtml}
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </div>
-                    
+
                     {catOpen && (
                       <>
                         <div className="rpt-dropdown-overlay" onClick={() => setCatOpen(false)} />
                         <div className="rpt-custom-options">
                           {CATEGORIES.map(cat => (
-                            <div 
-                              key={cat.id} 
+                            <div
+                              key={cat.id}
                               className={`rpt-custom-option ${filter.module === cat.id ? 'active' : ''}`}
                               onClick={() => {
                                 setFilter({ ...filter, module: cat.id });

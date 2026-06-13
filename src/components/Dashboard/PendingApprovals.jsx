@@ -624,12 +624,17 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     <div className="rpt-page">
       <div className="rpt-header">
         <button className="rpt-back-btn" onClick={onBack} title="Back to Dashboard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
         <div className="rpt-header-info">
-          <div className="rpt-title-text">Pending Approvals</div>
+          <div>
+            <div className="rpt-title-text">Pending Approvals</div>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+              Review and manage pending inspection and maintenance requests
+            </p>
+          </div>
         </div>
       </div>
 

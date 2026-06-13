@@ -29,6 +29,13 @@ const ShiftManagement = ({ onBack }) => {
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Selected date for Daily Assignments view
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -134,8 +141,10 @@ const ShiftManagement = ({ onBack }) => {
 
       if (editTemplateTarget) {
         await ApiService.updateAdminShift(editTemplateTarget.id, payload);
+        showToast('Shift template updated successfully.');
       } else {
         await ApiService.createAdminShift(payload);
+        showToast('Shift template created successfully.');
       }
       setShowTemplateForm(false);
       await fetchShiftsOnly();
@@ -160,13 +169,19 @@ const ShiftManagement = ({ onBack }) => {
     setShowTemplateForm(true);
   };
 
-  const handleDeleteTemplate = async (id, name) => {
-    if (!window.confirm(`Delete shift template "${name}"?`)) return;
+  const confirmDeleteTemplate = (id, name) => {
+    setDeleteConfirm({ type: 'template', id, name });
+  };
+
+  const executeDeleteTemplate = async () => {
     try {
-      await ApiService.deleteAdminShift(id);
+      await ApiService.deleteAdminShift(deleteConfirm.id);
       await fetchShiftsOnly();
+      showToast('Shift template deleted successfully.');
     } catch (err) {
-      alert(err.message || 'Failed to delete template.');
+      showToast(err.message || 'Failed to delete template.', 'error');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -205,6 +220,7 @@ const ShiftManagement = ({ onBack }) => {
       await ApiService.createAdminShiftAssignment(payload);
       setShowAssignForm(false);
       await fetchAssignmentsOnly();
+      showToast('Shift assigned successfully.');
     } catch (err) {
       setFormError(err.message || 'Failed to assign shift.');
     } finally {
@@ -212,13 +228,19 @@ const ShiftManagement = ({ onBack }) => {
     }
   };
 
-  const handleDeleteAssignment = async (id, inspectorName, shiftName) => {
-    if (!window.confirm(`Remove shift "${shiftName}" from ${inspectorName}?`)) return;
+  const confirmDeleteAssignment = (id, inspectorName, shiftName) => {
+    setDeleteConfirm({ type: 'assignment', id, name: `${inspectorName} from ${shiftName}` });
+  };
+
+  const executeDeleteAssignment = async () => {
     try {
-      await ApiService.deleteAdminShiftAssignment(id);
+      await ApiService.deleteAdminShiftAssignment(deleteConfirm.id);
       await fetchAssignmentsOnly();
+      showToast('Shift assignment removed successfully.');
     } catch (err) {
-      alert(err.message || 'Failed to remove assignment.');
+      showToast(err.message || 'Failed to remove assignment.', 'error');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -235,16 +257,63 @@ const ShiftManagement = ({ onBack }) => {
 
   return (
     <div className="setup-page">
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px',
+          background: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff', padding: '12px 20px', borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontWeight: '500', animation: 'fe-fade 0.3s ease-out'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          {toast.message}
+        </div>
+      )}
+      {deleteConfirm && (
+        <div className="um-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="um-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="um-modal-head">
+              <div className="um-modal-title">
+                <span style={{ fontSize: 20, marginRight: '8px' }}>⚠️</span> Confirm Deletion
+              </div>
+              <button className="um-modal-close" onClick={() => setDeleteConfirm(null)}>×</button>
+            </div>
+            <div className="um-modal-body">
+              <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', lineHeight: '1.5' }}>
+                {deleteConfirm.type === 'template' 
+                  ? `Are you sure you want to delete shift template "${deleteConfirm.name}"? This action cannot be undone.`
+                  : `Are you sure you want to remove assignment for ${deleteConfirm.name}? This action cannot be undone.`
+                }
+              </p>
+            </div>
+            <div className="um-modal-foot">
+              <button className="um-btn-cancel" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="um-btn-save" style={{ background: '#ef4444', color: '#fff' }} onClick={() => {
+                if (deleteConfirm.type === 'template') executeDeleteTemplate();
+                else executeDeleteAssignment();
+              }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="setup-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <button className="setup-back-btn" onClick={onBack} title="Back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
           </button>
           <div className="setup-header-info">
-            <div className="setup-title">Shift Management</div>
+            <div>
+              <div className="setup-title">Shift Management</div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                Configure inspector rosters and daily schedules
+              </p>
+            </div>
           </div>
         </div>
 
@@ -331,7 +400,7 @@ const ShiftManagement = ({ onBack }) => {
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                   </svg>
                                 </button>
-                                <button className="um-action-btn delete" onClick={() => handleDeleteTemplate(s.id, s.shift_name || s.name)} title="Delete template">
+                                <button className="um-action-btn delete" onClick={() => confirmDeleteTemplate(s.id, s.shift_name || s.name)} title="Delete template">
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                                     <path d="M10 11v6" /><path d="M14 11v6" />
@@ -414,7 +483,7 @@ const ShiftManagement = ({ onBack }) => {
                               <div className="um-actions" style={{ justifyContent: 'center' }}>
                                 <button 
                                   className="um-action-btn delete" 
-                                  onClick={() => handleDeleteAssignment(a.id, a.inspector_name, a.shift_name)} 
+                                  onClick={() => confirmDeleteAssignment(a.id, a.inspector_name, a.shift_name)} 
                                   title="Remove assignment"
                                 >
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

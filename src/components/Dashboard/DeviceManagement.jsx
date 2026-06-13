@@ -140,24 +140,27 @@ const DeviceManagement = ({ onBack }) => {
     <div className="ea-page">
       {/* ── Header ── */}
       <div className="setup-header">
-        <button className="setup-back-btn" onClick={onBack} title="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
-        <div className="setup-header-info" style={{ flex: 1 }}>
-          <div className="setup-header-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-              <line x1="12" y1="18" x2="12.01" y2="18" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <button className="setup-back-btn" onClick={onBack} title="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
-          </div>
-          <div>
-            <div className="setup-title">FDA Compliance Device Monitoring</div>
-
+          </button>
+          <div className="setup-header-info">
+            <div className="setup-header-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </div>
+            <div>
+              <div className="setup-title">FDA Compliance Device Monitoring</div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                Manage and authorize registered inspector devices
+              </p>
+            </div>
           </div>
         </div>
-
       </div>
 
       <div className="ea-body">

@@ -98,14 +98,13 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
   return (
     <aside className={`sidebar ${navCollapsed ? 'collapsed' : ''}`}>
       <div className="sb-header" style={{ justifyContent: navCollapsed ? 'center' : 'space-between' }}>
-        {!navCollapsed && (
+        {!navCollapsed ? (
           <div className="topbar-logo-pill" style={{ margin: '0' }}>
-            <img src="/apitoria-logo.png" alt="Apitoria" className="topbar-logo" />
+            <img src="/images/eltrive.png" alt="Apitoria" className="topbar-logo" />
           </div>
-        )}
-        {navCollapsed && (
-          <div className="topbar-logo-pill" style={{ width: '38px', height: '38px', padding: '4px' }}>
-            <img src="/apitoria-logo.png" alt="Logo" style={{ height: '26px', width: '26px', objectFit: 'contain', display: 'block', margin: 'auto' }} />
+        ) : (
+          <div className="topbar-logo-pill" style={{ width: '40px', height: '40px', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/images/eltrive.png" alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', margin: 'auto', mixBlendMode: 'multiply' }} />
           </div>
         )}
         <button className="sidenav-toggle-btn" onClick={() => setNavCollapsed(!navCollapsed)} title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} style={{ marginLeft: navCollapsed ? '0' : '8px' }}>
@@ -170,15 +169,22 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
               <span className="nav-icon-small">🚀</span>
               <span className="nav-label-small">Onboarding</span>
             </div>
-            <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
-              <span className="nav-icon-small">🏢</span>
-              <span className="nav-label-small">Add Company</span>
+            {user?.role === 'superadmin' && (
+              <div className={`nav-submenu-item ${activePage === 'setup-company' ? 'active' : ''}`} onClick={() => setActivePage('setup-company')}>
+                <span className="nav-icon-small">🏢</span>
+                <span className="nav-label-small">Add Company</span>
+              </div>
+            )}
+            <div className={`nav-submenu-item ${activePage === 'setup-operator-mapping' ? 'active' : ''}`} onClick={() => setActivePage('setup-operator-mapping')}>
+              <span className="nav-icon-small">🗺️</span>
+              <span className="nav-label-small">Operator Mapping</span>
             </div>
-            <div className={`nav-submenu-item ${activePage === 'setup-domains' ? 'active' : ''}`} onClick={() => setActivePage('setup-domains')}>
-              <span className="nav-icon-small">🌐</span>
-              <span className="nav-label-small">Email Domains</span>
-            </div>
-
+            {(user?.role === 'admin' || user?.role === 'superadmin') && (
+              <div className={`nav-submenu-item ${activePage === 'locations-table' ? 'active' : ''}`} onClick={() => setActivePage('locations-table')}>
+                <span className="nav-icon-small">📍</span>
+                <span className="nav-label-small">Locations</span>
+              </div>
+            )}
           </div>
 
           {/* Users dropdown */}

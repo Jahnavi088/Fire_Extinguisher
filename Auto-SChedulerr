@@ -1,0 +1,144 @@
+# Autoscheduler Backend API Specification
+
+This document outlines the required API endpoints to power the Autoscheduler module on the frontend dashboard. The auto-assignment logic should be handled natively by the backend to optimize workload distribution without overloading the frontend payload.
+
+---
+
+### 1. Fetch General Schedules
+Fetches the list of inspection schedules. Supports filtering.
+**Endpoint:** `GET /v1/schedules`
+**Query Params:** `branch`, `building`, `floor`, `zone`, `equipmentType`, `status`, `search`
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "SCH-123",
+      "taskId": "T-1001",
+      "moduleCode": "fire_extinguisher",
+      "moduleName": "Fire Extinguisher",
+      "equipmentType": "Fire Suppression",
+      "sosCode": "FE-4091",
+      "branch": "North Branch",
+      "building": "Block A",
+      "floor": "Ground",
+      "zone": "Zone 1",
+      "assignedOperator": "Rahul Sharma",
+      "assignedOperatorId": "INS-01",
+      "inspectorRole": "Safety Lead",
+      "dueDate": "2026-06-12",
+      "dueTime": "08:00",
+      "priority": "High",
+      "status": "Pending",
+      "failureReason": null,
+      "whyAssigned": {
+        "floorMatch": true,
+        "lowestWorkload": true,
+        "nearbyLocation": true
+      }
+    }
+  ]
+}
+```
+
+### 2. Fetch Upcoming Schedules
+Fetches schedules that are due in the next 7 days and are not marked as completed or overdue.
+**Endpoint:** `GET /v1/schedules/upcoming`
+**Query Params:** Same as `/v1/schedules`
+**Response:** Same array of schedule objects as `GET /v1/schedules`.
+
+### 3. Fetch Overdue Schedules
+Fetches schedules where the due date has passed and the task is not completed.
+**Endpoint:** `GET /v1/schedules/overdue`
+**Query Params:** Same as `/v1/schedules`
+**Response:** Same array of schedule objects as `GET /v1/schedules`.
+
+### 4. Fetch Completed Schedules
+Fetches schedules that have been successfully marked as completed.
+**Endpoint:** `GET /v1/schedules/completed`
+**Query Params:** Same as `/v1/schedules`
+**Response:** Same array of schedule objects as `GET /v1/schedules`.
+
+### 5. Generate / Auto-Assign Schedules
+Triggers the backend auto-scheduler algorithm to generate upcoming inspections and assign them based on workload and location.
+**Endpoint:** `POST /v1/schedules/generate`
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Schedule generated successfully.",
+  "tasksCreated": 15,
+  "lastRunTime": "2026-06-11T12:00:00Z"
+}
+```
+
+### 6. Get Schedule Summary / KPIs
+Retrieves KPIs and counts for the dashboard header and summary strip.
+**Endpoint:** `GET /v1/schedules/summary`
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "scheduled": 150,
+    "dueToday": 12,
+    "upcoming7": 45,
+    "overdue": 3,
+    "completed": 85,
+    "unassigned": 5,
+    "coveragePercentage": 56
+  }
+}
+```
+
+### 7. Get Operator Workload
+Retrieves the workload distribution of operators for the insights panel.
+**Endpoint:** `GET /v1/schedules/workload`
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "INS-01",
+      "name": "Rahul Sharma",
+      "role": "Safety Lead",
+      "totalTasks": 25,
+      "completedTasks": 15,
+      "completionPercentage": 60
+    }
+  ]
+}
+```
+
+### 8. Update Task Status
+Updates the status of a specific task.
+**Endpoint:** `PATCH /v1/schedules/:id/status`
+**Payload:**
+```json
+{
+  "status": "In Progress"
+}
+```
+
+### 9. Assign Single Task
+Assigns an individual schedule task to an operator.
+**Endpoint:** `PATCH /v1/schedules/:id/assign`
+**Payload:**
+```json
+{
+  "assignedOperatorId": "INS-02"
+}
+```
+
+### 10. Bulk Assign Tasks
+Assigns multiple tasks to an operator at once.
+**Endpoint:** `POST /v1/schedules/bulk-assign`
+**Payload:**
+```json
+{
+  "taskIds": ["SCH-123", "SCH-124"],
+  "assignedOperatorId": "INS-02"
+}
+```

@@ -286,7 +286,7 @@ const HydrantStats = ({ module, onBack, onRaiseWorkOrder }) => {
           <div className="fe-header-info">
             <div className="fe-header-title">Hydrant Network Monitor</div>
           </div>
-          <span className="fe-score-badge" 
+          <span className="fe-score-badge"
             title="Health Calculation: ((Total Points - (Expired + Needs Service + Due Inspection)) / Total Points) * 100"
             style={{ color: scoreColor(summary?.readiness_score), borderColor: scoreColor(summary?.readiness_score) + '66', background: scoreColor(summary?.readiness_score) + '18', cursor: 'help' }}>
             {summary?.readiness_score ?? 0}% <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>ⓘ</span>

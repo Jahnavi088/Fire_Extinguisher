@@ -6,14 +6,14 @@ import { ApiService } from './services/apiService';
 async function loadNavAccess(userId) {
   try {
     const res = await ApiService.getUserNavAccess(userId);
-    const modules = Array.isArray(res?.modules) && res.modules.length > 0 ? res.modules : null;
+    const modules = Array.isArray(res?.modules) ? res.modules : null;
     if (modules) localStorage.setItem(`nav_access_${userId}`, JSON.stringify(modules));
     return modules;
   } catch {
     try {
       const stored = localStorage.getItem(`nav_access_${userId}`);
       const parsed = stored ? JSON.parse(stored) : null;
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      return Array.isArray(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -30,7 +30,7 @@ async function loadEquipmentAccess(userId) {
     try {
       const stored = localStorage.getItem(`eq_access_${userId}`);
       const parsed = stored ? JSON.parse(stored) : null;
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      return Array.isArray(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -53,7 +53,7 @@ const getStoredCompanyLogo = () => {
   } catch (e) {
     console.error(e);
   }
-  return '/apitoria-logo.png';
+  return '/images/eltrive.png';
 };
 
 function App() {

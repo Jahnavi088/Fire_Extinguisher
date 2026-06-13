@@ -51,6 +51,13 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const itemsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [toast, setToast] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     setSearchQuery(initialSearchQuery);
@@ -294,6 +301,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
       setSelectedModules([]);
       setAccessLevel('user');
       setView('list');
+      showToast('Access assigned successfully.');
     } catch (err) {
       alert(err.message || 'Failed to update access assignments. Please try again.');
     } finally {
@@ -301,17 +309,22 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
     }
   };
 
-  /* ── Remove assignment ────────────────────────────────────────────── */
-  const handleRemoveAssignment = async (assignment) => {
-    if (!window.confirm(`Revoke ${assignment.userName}'s access to ${assignment.moduleName}?`)) return;
-    setRemoving(assignment.id);
+  const confirmRemoveAssignment = (assignment) => {
+    setDeleteConfirm(assignment);
+  };
+
+  const executeRemoveAssignment = async () => {
+    if (!deleteConfirm) return;
+    setRemoving(deleteConfirm.id);
     try {
-      await ApiService.removeAdminUserModule(assignment.userId, assignment.moduleId);
-      dispatch({ type: 'remove', id: assignment.id });
+      await ApiService.removeAdminUserModule(deleteConfirm.userId, deleteConfirm.moduleId);
+      dispatch({ type: 'remove', id: deleteConfirm.id });
+      showToast('Access revoked successfully.');
     } catch (err) {
-      alert(err.message || 'Failed to revoke access. Please try again.');
+      showToast(err.message || 'Failed to revoke access. Please try again.', 'error');
     } finally {
       setRemoving(null);
+      setDeleteConfirm(null);
     }
   };
 
@@ -329,6 +342,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
         assignment: { ...editingAssignment, level: editLevel }
       });
       setEditingAssignment(null);
+      showToast('Access level updated successfully.');
     } catch (err) {
       alert(err.message || 'Failed to update access level. Please try again.');
     } finally {
@@ -354,6 +368,40 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
 
   return (
     <div className="setup-page ea-page">
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px',
+          background: toast.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff', padding: '12px 20px', borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontWeight: '500', animation: 'fe-fade 0.3s ease-out'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          {toast.message}
+        </div>
+      )}
+      {deleteConfirm && (
+        <div className="ea-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="ea-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="ea-modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca' }}>
+              <span className="ea-modal-card-icon" style={{ fontSize: '20px' }}>⚠️</span>
+              <div className="ea-modal-card-title" style={{ color: '#991b1b' }}>Confirm Revocation</div>
+            </div>
+            <div className="ea-modal-body">
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', color: '#1f2937' }}>
+                Are you sure you want to revoke <strong>{deleteConfirm.userName}</strong>'s access to <strong>{deleteConfirm.moduleName}</strong>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="ea-modal-footer">
+              <button className="ea-cancel-btn" style={{ color: '#374151', border: '1px solid #d1d5db', background: '#fff' }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="ea-submit-btn" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={executeRemoveAssignment} disabled={removing === deleteConfirm.id}>
+                {removing === deleteConfirm.id ? 'Revoking...' : 'Revoke Access'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="setup-header">
         <button className="setup-back-btn" onClick={view === 'list' ? onBack : () => setView('list')} title="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
@@ -496,7 +544,7 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                                   </button>
                                   <button
                                     className="ea-action-btn delete"
-                                    onClick={() => handleRemoveAssignment(a)}
+                                    onClick={() => confirmRemoveAssignment(a)}
                                     disabled={removing === a.id}
                                     title="Revoke Access"
                                   >

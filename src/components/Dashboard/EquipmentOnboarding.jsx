@@ -3,73 +3,26 @@ import { ApiService } from '../../services/apiService';
 import './EquipmentOnboarding.css';
 
 // ── Static master lists ──────────────────────────────────────────────────────
-const EQUIPMENT_TYPES = [
-  'Fire Extinguisher', 'Sprinkler System', 'Hose Reel', 'Fire Hydrant',
-  'Smoke Detector', 'Heat Detector', 'Emergency Exit', 'Emergency Lighting',
-  'PA System', 'SCBA Unit', 'First Aid Kit', 'Eyewash Station',
-  'Chemical Shower', 'Spill Kit', 'PPE Station', 'Fire Trolley',
-  'Fire Blanket', 'Suppression System', 'Wind Sock', 'Ambulance',
-];
 
-const FLOORS = [
-  { id: 'FLR-02', name: 'Ground Floor' },
-  { id: 'FLR-03', name: '1st Floor' },
-  { id: 'FLR-04', name: '2nd Floor' },
-  { id: 'FLR-05', name: '3rd Floor' },
-  { id: 'FLR-06', name: '4th Floor' },
-  { id: 'FLR-07', name: '5th Floor' },
-  { id: 'FLR-08', name: 'Terrace' },
-  { id: 'FLR-01', name: 'Basement' },
-];
 
-const DEPARTMENTS = [
-  { id: 'DEP-01', name: 'Administration' },
-  { id: 'DEP-02', name: 'Operations' },
-  { id: 'DEP-03', name: 'Production' },
-  { id: 'DEP-04', name: 'Quality Control' },
-  { id: 'DEP-05', name: 'Maintenance' },
-  { id: 'DEP-06', name: 'Security' },
-  { id: 'DEP-07', name: 'Warehouse' },
-  { id: 'DEP-08', name: 'Laboratory' },
-  { id: 'DEP-09', name: 'IT' },
-  { id: 'DEP-10', name: 'HR' },
-  { id: 'DEP-11', name: 'Finance' },
-  { id: 'DEP-12', name: 'Granulation' },
-  { id: 'DEP-13', name: 'Common Area' },
-];
-
-const CHECKLIST_TEMPLATES = [
-  { id: 'CHK-101', name: 'Standard Fire Extinguisher' },
-  { id: 'CHK-102', name: 'Hydrant System' },
-  { id: 'CHK-103', name: 'Sprinkler System' },
-  { id: 'CHK-104', name: 'Smoke Detector' },
-  { id: 'CHK-105', name: 'Emergency Exit' },
-  { id: 'CHK-106', name: 'First Aid Kit' },
-  { id: 'CHK-107', name: 'SCBA Unit' },
-  { id: 'CHK-108', name: 'Hose Reel' },
-  { id: 'CHK-109', name: 'Suppression System' },
-  { id: 'CHK-110', name: 'General Safety Equipment' },
-];
-
-const FREQUENCIES = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
-const SHIFT_OPTIONS = ['Morning', 'Evening', 'Night', 'General'];
-const STATUSES = ['Active', 'Inactive', 'Under Maintenance'];
+const SHIFT_OPTIONS = ['Morning', 'Evening', 'Night', 'Anytime'];
 
 const EMPTY_FORM = {
   equipment_code: '',
   equipment_type: '',
   company_id: '',
+  branch_id: '',
   building_id: '',
   floor_id: '',
   zone_id: '',
   department_id: '',
-  area_id: '',
   inspection_frequency: '',
-  shift_allowed: [],
+  custom_frequency_days: '',
+  shift_allowed: '',
   checklist_template_id: '',
   installation_date: '',
   expiry_date: '',
-  status: 'Active',
+  status: '',
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -213,9 +166,9 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
   const [form, setFormState] = useState(EMPTY_FORM);
   const [certified, setCertified] = useState(false);
   const [companies, setCompanies] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [allBuildings, setAllBuildings] = useState([]);
   const [allZones, setAllZones] = useState([]);
-  const [allAreas, setAllAreas] = useState([]);
   const [allDepartments, setAllDepartments] = useState([]);
   const [dropdownsLoading, setDropdownsLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -223,62 +176,192 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
   const [errors, setErrors] = useState({});
   const [dynamicFloors, setDynamicFloors] = useState([]);
   const [successData, setSuccessData] = useState(null);
-  const [shifts, setShifts] = useState([]);
+  const [equipmentTypes, setEquipmentTypes] = useState([]);
+  const [checklists, setChecklists] = useState([]);
+  const [frequencies, setFrequencies] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [actionError, setActionError] = useState(null);
 
-  // Load companies and shifts on mount
+  // Load companies, equipment types, checklists, frequencies, and statuses on mount
   useEffect(() => {
     Promise.allSettled([
       ApiService.getAdminCompanies(),
-      ApiService.getAdminShifts()
-    ]).then(([companiesRes, shiftsRes]) => {
+      ApiService.getAdminModules(),
+      ApiService.getChecklists(),
+      ApiService.getFrequencies(),
+      ApiService.getStatuses()
+    ]).then(([companiesRes, modulesRes, checklistsRes, frequenciesRes, statusesRes]) => {
       const compList = companiesRes.status === 'fulfilled'
         ? (Array.isArray(companiesRes.value) ? companiesRes.value : (companiesRes.value?.companies || companiesRes.value?.data || []))
         : [];
-      const shiftList = shiftsRes.status === 'fulfilled'
-        ? (Array.isArray(shiftsRes.value) ? shiftsRes.value : (shiftsRes.value?.shifts || shiftsRes.value?.data || []))
+      const moduleList = modulesRes.status === 'fulfilled'
+        ? (Array.isArray(modulesRes.value) ? modulesRes.value : (modulesRes.value?.data || modulesRes.value?.modules || []))
         : [];
+      const checklistList = checklistsRes.status === 'fulfilled'
+        ? (checklistsRes.value?.types || [])
+        : [];
+      const freqList = frequenciesRes.status === 'fulfilled'
+        ? (Array.isArray(frequenciesRes.value) ? frequenciesRes.value : (frequenciesRes.value?.frequencies || frequenciesRes.value?.data || []))
+        : [];
+      const statusList = statusesRes.status === 'fulfilled'
+        ? (Array.isArray(statusesRes.value) ? statusesRes.value : (statusesRes.value?.statuses || statusesRes.value?.data || []))
+        : [];
+
       setCompanies(compList);
-      setShifts(shiftList);
+      setChecklists(checklistList);
+      setFrequencies(freqList);
+      setStatuses(statusList);
+
+      if (moduleList.length > 0) {
+        const activeModules = moduleList.filter(m => m.is_active || m.status === 'active' || m.is_active === 1 || m.is_active === '1');
+        const types = activeModules.map(m => m.name).filter(Boolean);
+        if (types.length > 0) {
+          setEquipmentTypes(types);
+        }
+      }
     }).catch(() => {})
       .finally(() => setLoadingData(false));
   }, []);
 
-  // When company changes → fetch cascaded dropdowns
+  // When company changes → fetch branches
   useEffect(() => {
     if (!form.company_id) {
-      setAllBuildings([]); setAllZones([]); setAllAreas([]); setAllDepartments([]); setDynamicFloors([]);
+      setBranches([]); setAllBuildings([]); setAllZones([]); setAllDepartments([]); setDynamicFloors([]);
       return;
     }
     setDropdownsLoading(true);
+    ApiService.getBranches({ company_id: form.company_id })
+      .then(res => {
+        const branchList = (Array.isArray(res) ? res : (res?.branches || res?.data || []))
+          .filter(b => !form.company_id || String(b.company_id) === String(form.company_id));
+        setBranches(branchList);
+      })
+      .catch(err => {
+        console.error('Failed to fetch branches:', err);
+        setBranches([]);
+      })
+      .finally(() => setDropdownsLoading(false));
+
     ApiService.getOnboardingDropdowns(form.company_id)
       .then(d => {
-        setAllBuildings(d.buildings || []);
         setAllZones(d.zones || []);
-        setAllAreas(d.areas || []);
-        setAllDepartments(d.departments || []);
-        setDynamicFloors(d.floors || []);
       })
-      .catch(() => { setAllBuildings([]); setAllZones([]); setAllAreas([]); setAllDepartments([]); setDynamicFloors([]); })
-      .finally(() => setDropdownsLoading(false));
+      .catch(() => {});
   }, [form.company_id]);
 
+  // When branch changes → fetch buildings for this branch
+  useEffect(() => {
+    if (!form.branch_id) {
+      setAllBuildings([]);
+      return;
+    }
+    setDropdownsLoading(true);
+    ApiService.getBranchBuildings(form.branch_id)
+      .then(res => {
+        const buildingList = Array.isArray(res) ? res : (res?.buildings || res?.data || []);
+        setAllBuildings(buildingList);
+      })
+      .catch(err => {
+        console.error('Failed to fetch buildings for branch:', err);
+        setAllBuildings([]);
+      })
+      .finally(() => setDropdownsLoading(false));
+
+    // Fetch branch details
+    ApiService.getBranchById(form.branch_id)
+      .catch(() => {});
+  }, [form.branch_id]);
+
+  // When building changes → fetch branch floors dynamically
+  useEffect(() => {
+    if (!form.building_id) return;
+    
+    // Fetch floors
+    ApiService.getBuildingFloors(form.building_id)
+      .then(floors => {
+        const floorList = Array.isArray(floors) ? floors : (floors?.data || floors?.floors || []);
+        setDynamicFloors(floorList);
+      })
+      .catch(err => {
+        console.warn('Failed to fetch building floors:', err);
+        setDynamicFloors([]);
+      });
+  }, [form.building_id]);
+
+  // When floor changes → fetch zones dynamically
+  useEffect(() => {
+    if (!form.floor_id) {
+      setAllZones([]);
+      return;
+    }
+    setDropdownsLoading(true);
+    ApiService.getFloorZones(form.floor_id)
+      .then(zones => {
+        const zoneList = Array.isArray(zones) ? zones : (zones?.data || zones?.zones || []);
+        const mappedZones = zoneList.map(z => ({
+          ...z,
+          floor_id: form.floor_id,
+          name: z.zone_name || z.name
+        }));
+        setAllZones(mappedZones);
+      })
+      .catch(err => {
+        console.warn('Failed to fetch floor zones:', err);
+        setAllZones([]);
+      })
+      .finally(() => setDropdownsLoading(false));
+  }, [form.floor_id]);
+
+  // When zone changes → fetch departments dynamically
+  useEffect(() => {
+    if (!form.zone_id) {
+      setAllDepartments([]);
+      return;
+    }
+    setDropdownsLoading(true);
+    ApiService.getZoneDepartments(form.zone_id)
+      .then(depts => {
+        const deptList = Array.isArray(depts) ? depts : (depts?.data || depts?.departments || []);
+        const mappedDepts = deptList.map(d => ({
+          ...d,
+          zone_id: form.zone_id,
+          name: d.department_name || d.name
+        }));
+        setAllDepartments(mappedDepts);
+      })
+      .catch(err => {
+        console.warn('Failed to fetch zone departments:', err);
+        setAllDepartments([]);
+      })
+      .finally(() => setDropdownsLoading(false));
+  }, [form.zone_id]);
+
   // Cascaded options
-  const filteredZones = allZones.filter(z => !form.building_id || z.building_id === form.building_id);
-  const filteredAreas = allAreas.filter(a => !form.zone_id || a.zone_id === form.zone_id);
+  const filteredZones = allZones.filter(z => !form.floor_id || z.floor_id === form.floor_id);
 
   const set = (key, val) => {
     setFormState(f => ({ ...f, [key]: val }));
     setErrors(e => ({ ...e, [key]: undefined }));
   };
 
+  const setBranch = (val) => {
+    setFormState(f => ({ ...f, branch_id: val, building_id: '', floor_id: '', zone_id: '' }));
+    setErrors(e => ({ ...e, branch_id: undefined, building_id: undefined, floor_id: undefined, zone_id: undefined }));
+  };
+
   const setBuilding = (val) => {
-    setFormState(f => ({ ...f, building_id: val, zone_id: '', area_id: '' }));
-    setErrors(e => ({ ...e, building_id: undefined, zone_id: undefined, area_id: undefined }));
+    setFormState(f => ({ ...f, building_id: val, floor_id: '', zone_id: '' }));
+    setErrors(e => ({ ...e, building_id: undefined, floor_id: undefined, zone_id: undefined }));
+  };
+
+  const setFloor = (val) => {
+    setFormState(f => ({ ...f, floor_id: val, zone_id: '' }));
+    setErrors(e => ({ ...e, floor_id: undefined, zone_id: undefined }));
   };
 
   const setZone = (val) => {
-    setFormState(f => ({ ...f, zone_id: val, area_id: '' }));
-    setErrors(e => ({ ...e, zone_id: undefined, area_id: undefined }));
+    setFormState(f => ({ ...f, zone_id: val, department_id: '' }));
+    setErrors(e => ({ ...e, zone_id: undefined, department_id: undefined }));
   };
 
   const validate = () => {
@@ -286,13 +369,16 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
     if (!form.equipment_code.trim())     e.equipment_code = 'Required';
     if (!form.equipment_type)            e.equipment_type = 'Required';
     if (!form.company_id)                e.company_id = 'Required';
+    if (!form.branch_id)                 e.branch_id = 'Required';
     if (!form.building_id)               e.building_id = 'Required';
     if (!form.floor_id)                  e.floor_id = 'Required';
     if (!form.zone_id)                   e.zone_id = 'Required';
     if (!form.department_id)             e.department_id = 'Required';
-    if (!form.area_id)                   e.area_id = 'Required';
     if (!form.inspection_frequency)      e.inspection_frequency = 'Required';
-    if (form.shift_allowed.length === 0) e.shift_allowed = 'Select at least one shift';
+    if (String(form.inspection_frequency).toLowerCase() === 'custom' && (!form.custom_frequency_days || isNaN(form.custom_frequency_days) || Number(form.custom_frequency_days) <= 0)) {
+      e.custom_frequency_days = 'Valid positive number required';
+    }
+    if (!form.shift_allowed) e.shift_allowed = 'Select a shift';
     if (!form.checklist_template_id)     e.checklist_template_id = 'Required';
     if (!form.installation_date)         e.installation_date = 'Required';
     if (!form.expiry_date)               e.expiry_date = 'Required';
@@ -312,31 +398,38 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
   };
 
   const handleSubmit = async () => {
+    setActionError(null);
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setSubmitting(true);
     try {
-      const result = await ApiService.onboardEquipment({
+      const payload = {
         equipment_code: form.equipment_code.trim().toUpperCase(),
         equipment_type: form.equipment_type,
         company_id: form.company_id,
+        branch_id: form.branch_id,
         building_id: form.building_id,
         floor_id: form.floor_id,
         zone_id: form.zone_id,
         department_id: form.department_id,
-        area_id: form.area_id,
         inspection_frequency: form.inspection_frequency,
-        shift_allowed: form.shift_allowed,
+        shift_allowed: form.shift_allowed ? [form.shift_allowed] : [],
         checklist_template_id: form.checklist_template_id,
         auto_generate_qr: true,
         installation_date: formatDateToDDMMYYYY(form.installation_date),
         expiry_date: formatDateToDDMMYYYY(form.expiry_date),
         status: form.status,
         fda_21_cfr_part_11_certified: certified,
-      });
+      };
+
+      if (String(form.inspection_frequency).toLowerCase() === 'custom') {
+        payload.custom_frequency_days = Number(form.custom_frequency_days);
+      }
+
+      const result = await ApiService.onboardEquipment(payload);
       setSuccessData(result);
     } catch (err) {
-      alert('Failed to onboard equipment: ' + (err.message || 'Unknown error'));
+      setActionError(err.message || 'Unknown error');
     } finally {
       setSubmitting(false);
     }
@@ -346,13 +439,14 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
     setFormState(EMPTY_FORM);
     setCertified(false);
     setErrors({});
+    setActionError(null);
     setSuccessData(null);
-    setAllBuildings([]); setAllZones([]); setAllAreas([]);
+    setAllBuildings([]); setAllZones([]);
   };
 
-  // Company options — use company_ref as value for new API
+  // Company options — use database ID as value for APIs
   const companyOptions = companies.map(c => ({
-    value: c.comapany_ref || c.company_ref || c.id,
+    value: c.id || c.company_id,
     label: c.name || c.company_name,
   }));
 
@@ -451,6 +545,32 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
 
       {/* Form body */}
       <div className="eob-body">
+        {actionError && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '8px',
+            color: '#fca5a5',
+            padding: '12px 16px',
+            fontSize: '13px',
+            marginBottom: '20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px' }}>⚠️</span>
+              <span><strong>Failed to deploy:</strong> {actionError}</span>
+            </div>
+            <button
+              onClick={() => setActionError(null)}
+              style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         {/* ── SECTION 1: IDENTITY ── */}
         <SectionDivider icon="🏷️" title="Equipment Identity" />
@@ -471,7 +591,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               value={form.equipment_type}
               onChange={v => set('equipment_type', v)}
               placeholder="Select Type"
-              options={EQUIPMENT_TYPES.map(t => ({ value: t, label: t }))}
+              options={equipmentTypes.map(t => ({ value: t, label: t }))}
             />
           </Field>
 
@@ -489,26 +609,32 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
         {/* ── SECTION 2: LOCATION (cascades from company) ── */}
         <SectionDivider icon="📍" title="Location Details" />
         <div className="eob-grid">
+          <Field label="Branch" required error={errors.branch_id}>
+            <CustomSelect
+              value={form.branch_id}
+              onChange={setBranch}
+              placeholder={!form.company_id ? 'Select company first' : dropdownsLoading ? 'Loading…' : 'Select Branch'}
+              options={branches.map(b => ({ value: b.id, label: b.branch_name || b.name || `Branch #${b.id}` }))}
+              disabled={!form.company_id || dropdownsLoading}
+            />
+          </Field>
+
           <Field label="Building" required error={errors.building_id}>
             <CustomSelect
               value={form.building_id}
               onChange={setBuilding}
-              placeholder={!form.company_id ? 'Select company first' : dropdownsLoading ? 'Loading…' : 'Select Building'}
-              options={allBuildings.map(b => ({ value: b.id, label: b.name }))}
-              disabled={!form.company_id || dropdownsLoading}
+              placeholder={!form.branch_id ? 'Select branch first' : dropdownsLoading ? 'Loading…' : 'Select Building'}
+              options={allBuildings.map(b => ({ value: b.id, label: b.building_name || b.name || `Building #${b.id}` }))}
+              disabled={!form.branch_id || dropdownsLoading}
             />
           </Field>
 
           <Field label="Floor" required error={errors.floor_id}>
             <CustomSelect
               value={form.floor_id}
-              onChange={v => set('floor_id', v)}
+              onChange={setFloor}
               placeholder="Select Floor"
-              options={
-                dynamicFloors.length > 0
-                  ? dynamicFloors.map(f => ({ value: f.id, label: f.name }))
-                  : FLOORS.map(f => ({ value: f.id, label: f.name }))
-              }
+              options={dynamicFloors.map(f => ({ value: f.id, label: f.floor_name || f.name }))}
             />
           </Field>
 
@@ -516,9 +642,9 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
             <CustomSelect
               value={form.zone_id}
               onChange={setZone}
-              placeholder={!form.building_id ? 'Select building first' : 'Select Zone'}
-              options={filteredZones.map(z => ({ value: z.id, label: z.name }))}
-              disabled={!form.building_id}
+              placeholder={!form.floor_id ? 'Select floor first' : 'Select Zone'}
+              options={filteredZones.map(z => ({ value: z.id, label: z.zone_name || z.name }))}
+              disabled={!form.floor_id}
             />
           </Field>
 
@@ -526,21 +652,8 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
             <CustomSelect
               value={form.department_id}
               onChange={v => set('department_id', v)}
-              placeholder="Select Department"
-              options={
-                allDepartments.length > 0
-                  ? allDepartments.map(d => ({ value: d.id, label: d.name }))
-                  : DEPARTMENTS.map(d => ({ value: d.id, label: d.name }))
-              }
-            />
-          </Field>
-
-          <Field label="Area" required error={errors.area_id}>
-            <CustomSelect
-              value={form.area_id}
-              onChange={v => set('area_id', v)}
-              placeholder={!form.zone_id ? 'Select zone first' : 'Select Area'}
-              options={filteredAreas.map(a => ({ value: a.id, label: a.name }))}
+              placeholder={!form.zone_id ? 'Select zone first' : 'Select Department'}
+              options={allDepartments.map(d => ({ value: d.id, label: d.department_name || d.name }))}
               disabled={!form.zone_id}
             />
           </Field>
@@ -554,16 +667,35 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               value={form.inspection_frequency}
               onChange={v => set('inspection_frequency', v)}
               placeholder="Select Frequency"
-              options={FREQUENCIES.map(f => ({ value: f, label: f }))}
+              options={frequencies.map(f => ({ 
+                value: f.key || f.name || f, 
+                label: f.name || f.key || f 
+              }))}
             />
           </Field>
+
+          {String(form.inspection_frequency).toLowerCase() === 'custom' && (
+            <Field label="Custom Frequency (Days)" required error={errors.custom_frequency_days}>
+              <input
+                className="eob-input"
+                type="number"
+                min="1"
+                placeholder="e.g. 13"
+                value={form.custom_frequency_days}
+                onChange={e => set('custom_frequency_days', e.target.value)}
+              />
+            </Field>
+          )}
 
           <Field label="Checklist Template" required error={errors.checklist_template_id}>
             <CustomSelect
               value={form.checklist_template_id}
               onChange={v => set('checklist_template_id', v)}
               placeholder="Select Template"
-              options={CHECKLIST_TEMPLATES.map(t => ({ value: t.id, label: t.name }))}
+              options={checklists.map(t => ({ 
+                value: t.equipment_type, 
+                label: `${(t.equipment_type || '').replace(/_/g, ' ').toUpperCase()} (${t.total_items || 0} items)` 
+              }))}
             />
           </Field>
 
@@ -592,14 +724,13 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
             </div>
           </Field>
 
-          {/* Shift dropdown multi-select — reduced field size */}
+          {/* Shift dropdown single-select */}
           <Field label="Shift Allowed" required error={errors.shift_allowed} span={1}>
-            <ShiftDropdown
+            <CustomSelect
               value={form.shift_allowed}
-              onChange={v => { set('shift_allowed', v); }}
-              placeholder="Select Allowed Shifts"
-              error={errors.shift_allowed}
-              shifts={shifts}
+              onChange={v => set('shift_allowed', v)}
+              placeholder="Select Shift"
+              options={SHIFT_OPTIONS.map(s => ({ value: s, label: s }))}
             />
           </Field>
         </div>
@@ -630,7 +761,7 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               value={form.status}
               onChange={v => set('status', v)}
               placeholder="Select Status"
-              options={STATUSES.map(s => ({ value: s, label: s }))}
+              options={statuses.map(s => ({ value: s.key || s.name || s, label: s.name || s.key || s }))}
             />
           </Field>
         </div>
