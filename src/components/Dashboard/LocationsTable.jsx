@@ -19,7 +19,51 @@ const LocationsTable = ({ user, onBack }) => {
       const storedUser = storedUserStr ? JSON.parse(storedUserStr) : null;
       const currentUser = user || storedUser;
       const companyId = currentUser?.company_id || currentUser?.companyId || currentUser?.company?.id;
-      
+      const userBranchId = currentUser?.branch_id;
+      const userBuildingId = currentUser?.building_id;
+      const userFloorId = currentUser?.floor_id;
+      const userZoneId = currentUser?.zone_id;
+      const userDeptId = currentUser?.department_id;
+      const userRole = (currentUser?.role || '').toLowerCase();
+      const restrictedRoles = ['agm', 'supervisor', 'inspector', 'user'];
+
+      // For non-admin roles, show only operator-mapping assigned locations
+      if (restrictedRoles.includes(userRole) && currentUser?.id) {
+        try {
+          const mappingsRes = await ApiService.getOperatorMappings({ user_id: currentUser.id });
+          const mappings = Array.isArray(mappingsRes)
+            ? mappingsRes
+            : (mappingsRes?.data || mappingsRes?.items || []);
+
+          if (mappings.length > 0) {
+            const flat = mappings.map((m, i) => {
+              const name = m.zone_name || m.floor_name || m.building_name || m.branch_name || `Location ${i + 1}`;
+              const type = m.zone_name ? 'Zone' : m.floor_name ? 'Floor' : m.building_name ? 'Building' : 'Branch';
+              const parent = m.zone_name
+                ? (m.floor_name || m.building_name || '—')
+                : m.floor_name
+                  ? (m.building_name || m.branch_name || '—')
+                  : m.building_name
+                    ? (m.branch_name || '—')
+                    : '—';
+              return {
+                id: `om-${m.id || i}`,
+                name,
+                type,
+                parent,
+                rawId: m.zone_id || m.floor_id || m.building_id || m.branch_id,
+              };
+            });
+            setLocations(flat);
+            setLoading(false);
+            return;
+          }
+          // Fall through to company-wide fetch if no assignments found
+        } catch {
+          // Fall through to company-wide fetch on error
+        }
+      }
+
       if (!companyId) {
         setError('No company assigned to the current user.');
         setLoading(false);
@@ -29,67 +73,43 @@ const LocationsTable = ({ user, onBack }) => {
       try {
         const flatLocations = [];
 
-        // 1. Fetch Branches
-        const branchesRes = await ApiService.getBranches({ company_id: companyId });
-        const branchesList = (Array.isArray(branchesRes) ? branchesRes : (branchesRes?.branches || branchesRes?.data || []))
-          .filter(b => !companyId || String(b.company_id) === String(companyId));
+        const treeData = await ApiService.getLocationTree(companyId);
+        let branchesList = Array.isArray(treeData) ? treeData : (treeData?.branches || treeData?.data || []);
+        
+        branchesList = branchesList.filter(b => !companyId || String(b.company_id) === String(companyId));
+        if (userBranchId) branchesList = branchesList.filter(b => String(b.id) === String(userBranchId));
 
         branchesList.forEach(b => {
           flatLocations.push({ id: `branch-${b.id}`, name: b.branch_name || b.name, type: 'Branch', parent: '-', rawId: b.id });
-        });
-
-        let allBuildings = [];
-        let allFloors = [];
-        let allZones = [];
-        let allDepartments = [];
-
-        // 2. Fetch Buildings for all Branches concurrently
-        const branchPromises = branchesList.map(branch => 
-          ApiService.getBranchBuildings(branch.id).then(bRes => {
-            const bList = Array.isArray(bRes) ? bRes : (bRes?.buildings || bRes?.data || []);
-            bList.forEach(b => {
-              allBuildings.push({ id: b.id, name: b.building_name || b.name, branch_id: branch.id, branchName: branch.branch_name || branch.name });
-              flatLocations.push({ id: `bldg-${b.id}`, name: b.building_name || b.name, type: 'Building', parent: branch.branch_name || branch.name, rawId: b.id });
-            });
-          }).catch(e => console.warn(e))
-        );
-        await Promise.all(branchPromises);
-
-        // 3. Fetch Floors for all Buildings concurrently
-        const floorPromises = allBuildings.map(bld => 
-          ApiService.getBuildingFloors(bld.id).then(fRes => {
-            const fList = Array.isArray(fRes) ? fRes : (fRes?.floors || fRes?.data || []);
+          
+          let bList = Array.isArray(b.buildings) ? b.buildings : [];
+          if (userBuildingId) bList = bList.filter(bld => String(bld.id) === String(userBuildingId));
+          
+          bList.forEach(bld => {
+            flatLocations.push({ id: `bldg-${bld.id}`, name: bld.building_name || bld.name, type: 'Building', parent: b.branch_name || b.name, rawId: bld.id });
+            
+            let fList = Array.isArray(bld.floors) ? bld.floors : [];
+            if (userFloorId) fList = fList.filter(f => String(f.id) === String(userFloorId));
+            
             fList.forEach(f => {
-              allFloors.push({ id: f.id, name: f.floor_name || f.name, building_id: bld.id, buildingName: bld.name });
-              flatLocations.push({ id: `floor-${f.id}`, name: f.floor_name || f.name, type: 'Floor', parent: bld.name, rawId: f.id });
+              flatLocations.push({ id: `floor-${f.id}`, name: f.floor_name || f.name, type: 'Floor', parent: bld.building_name || bld.name, rawId: f.id });
+              
+              let zList = Array.isArray(f.zones) ? f.zones : [];
+              if (userZoneId) zList = zList.filter(z => String(z.id) === String(userZoneId));
+              
+              zList.forEach(z => {
+                flatLocations.push({ id: `zone-${z.id}`, name: z.zone_name || z.name, type: 'Zone', parent: f.floor_name || f.name, rawId: z.id });
+                
+                let dList = Array.isArray(z.departments) ? z.departments : [];
+                if (userDeptId) dList = dList.filter(d => String(d.id) === String(userDeptId));
+                
+                dList.forEach(d => {
+                  flatLocations.push({ id: `dept-${d.id}`, name: d.department_name || d.name, type: 'Department', parent: z.zone_name || z.name, rawId: d.id });
+                });
+              });
             });
-          }).catch(e => console.warn(e))
-        );
-        await Promise.all(floorPromises);
-
-        // 4. Fetch Zones for all Floors concurrently
-        const zonePromises = allFloors.map(fl => 
-          ApiService.getFloorZones(fl.id).then(zRes => {
-            const zList = Array.isArray(zRes) ? zRes : (zRes?.zones || zRes?.data || []);
-            zList.forEach(z => {
-              allZones.push({ id: z.id, name: z.zone_name || z.name, floor_id: fl.id, floorName: fl.name });
-              flatLocations.push({ id: `zone-${z.id}`, name: z.zone_name || z.name, type: 'Zone', parent: fl.name, rawId: z.id });
-            });
-          }).catch(e => console.warn(e))
-        );
-        await Promise.all(zonePromises);
-
-        // 5. Fetch Departments for all Zones concurrently
-        const deptPromises = allZones.map(zn => 
-          ApiService.getZoneDepartments(zn.id).then(dRes => {
-            const dList = Array.isArray(dRes) ? dRes : (dRes?.departments || dRes?.data || []);
-            dList.forEach(d => {
-              allDepartments.push({ id: d.id, name: d.department_name || d.name, zone_id: zn.id, zoneName: zn.name });
-              flatLocations.push({ id: `dept-${d.id}`, name: d.department_name || d.name, type: 'Department', parent: zn.name, rawId: d.id });
-            });
-          }).catch(e => console.warn(e))
-        );
-        await Promise.all(deptPromises);
+          });
+        });
 
         setLocations(flatLocations);
       } catch (err) {

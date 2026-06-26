@@ -11,10 +11,10 @@ const fmt = (d) => {
 };
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'CLEAR' || v === 'ACCESSIBLE' ? '#28a745'
+  v === 'OK' || v === 'CLEAR' || v === 'ACCESSIBLE' ? '#10b981'
     : (v === 'FADED' || v === 'DIRTY' || v === 'OBSTRUCTED') ? '#FF9800'
       : (v === 'UNSAFE' || v === 'DAMAGED' || v === 'MISSING') ? '#dc3545'
         : '#666';
@@ -23,7 +23,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all', label: 'Total Points', icon: '📍', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Accessible', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active', label: 'Accessible', icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'Maintenance', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Critical Faults', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -117,6 +117,7 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listLoading, setListLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -127,16 +128,16 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Muster Points, using fallback:', err);
-      setSummary({ total: 6, active: 6, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
-      setAlertsSummary({ total_alerts: 0, level_1: { count: 0, label: 'Low', description: 'Check' }, level_2: { count: 0, label: 'Med', description: 'Fault' }, level_3: { count: 0, label: 'High', description: 'Critical' } });
+      console.error('API Load failed:', err);
+      setSummary({ total: 0, active: 0, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
+      setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally { setLoading(false); }
   };
@@ -151,24 +152,13 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
       const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
-      if (!data.items || data.items.length === 0) {
-        const mock = Array.from({ length: 4 }).map((_, i) => ({
-          id: `mp_${i}`,
-          sos_code: `MP-00${i + 1}`,
-          equipment_type: 'Evacuation Assembly Point',
-          location_name: `Main Gate / Area ${i + 1}`,
-          building_name: 'Plant Perimeter',
-          readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 90).toISOString()
-        }));
-        setListItems(mock);
-        setListTotal(mock.length);
-      }
+      
     } catch { setListItems([]); }
     finally { setListLoading(false); }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     setSelectedUnit(item);
@@ -180,7 +170,7 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -227,7 +217,7 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-panel-title">🔔 Safety & Accessibility Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
               {topAlerts.length === 0 ? <div className="fe-empty">No active point alerts.</div> : topAlerts.map((a, i) => (
-                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+                <div key={i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
                     <div className="fe-alert-loc">{a.location_name}</div>
@@ -244,7 +234,7 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart data={[
-                      { name: 'Accessible', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                      { name: 'Accessible', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                       { name: 'Unsafe', val: summary.expired, color: '#dc3545' },
                     ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -252,7 +242,7 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        {[{ color: '#10b981' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -329,6 +319,21 @@ const MusterPointStats = ({ module, onBack, onRaiseWorkOrder }) => {
       </div>
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+          <div className="fe-detail-card fe-full">
+            <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+            <div className="fe-identity-grid">
+              {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                <div key={f.field_key} className="fe-field">
+                  <div className="fe-field-label">{f.field_label}</div>
+                  <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
+
           <div className="fe-detail-card fe-full"><div className="fe-section-title">Point Identity</div>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />

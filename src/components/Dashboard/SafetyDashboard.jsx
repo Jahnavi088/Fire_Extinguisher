@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import './SafetyDashboard.css';
 import { ApiService } from '../../services/apiService';
+import { configureLocationFilter } from '../../services/equipmentService';
+import { filterEquipmentByLocations } from '../../utils/locationFilter';
 import FireExtinguisherStats from './FireExtinguisherStats';
 import SprinklerStats from './SprinklerStats';
 import HoseReelStats from './HoseReelStats';
@@ -57,6 +59,7 @@ import AgmOverview from './AgmOverview';
 import SupervisorOverview from './SupervisorOverview';
 import InspectorOverview from './InspectorOverview';
 import OperatorMapping from './OperatorMapping';
+import AssignedLocations from './AssignedLocations';
 
 
 
@@ -303,8 +306,52 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
   const [topbarVisible, setTopbarVisible] = useState(true);
   const [adminCompanies, setAdminCompanies] = useState([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => {
+    try {
+      return localStorage.getItem('sd_selectedCompanyId') || '';
+    } catch { return ''; }
+  });
+
+  useEffect(() => {
+    const fetchDynamicModules = async (companyId) => {
+      if (!companyId) {
+        setModules(STATIC_MODULES);
+        return;
+      }
+      try {
+        const { ApiService } = await import('../../services/apiService');
+        const res = await ApiService.getAdminModules({ company_id: companyId });
+        const list = Array.isArray(res) ? res : (res?.items || res?.data || []);
+        if (list.length > 0) {
+          const dynamicModules = list.map(m => {
+            const staticMatch = STATIC_MODULES.find(sm => sm.code === m.code || String(sm.module_id) === String(m.id || m.module_id));
+            return {
+              ...m,
+              module_id: m.id || m.module_id,
+              image: staticMatch?.image || '/images/fire_extinguisher1.png',
+              category: staticMatch?.category || 'general'
+            };
+          });
+          setModules(dynamicModules);
+        } else {
+          setModules(STATIC_MODULES);
+        }
+      } catch (err) {
+        console.warn("Could not fetch dynamic modules, falling back to static", err);
+        setModules(STATIC_MODULES);
+      }
+    };
+
+    if (user?.role === 'superadmin') {
+      fetchDynamicModules(selectedCompanyId);
+    } else {
+      const cid = user?.company_id || user?.companyId || user?.company?.id || user?.company?.company_id || '';
+      fetchDynamicModules(cid);
+    }
+  }, [user, selectedCompanyId]);
   const [supervisorStats, setSupervisorStats] = useState(null);
   const [agmStats, setAgmStats] = useState(null);
+  const [userLocationMappings, setUserLocationMappings] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -423,7 +470,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
   useEffect(() => {
     if (!user) return;
     const isAllowed = (page) => {
-      if (page === 'grid' || page === 'overview' || page === 'equipment-grid') return true;
+      if (page === 'grid' || page === 'overview' || page === 'equipment-grid' || page === 'assigned-locations') return true;
       let code = page;
       if (PAGE_TO_MODULE_MAP[page]) {
         code = PAGE_TO_MODULE_MAP[page];
@@ -450,50 +497,75 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     }
   }, [activePage, user, navAccessList, equipmentAccessList]);
 
+  // Fetch location mappings + equipment together, then derive visible modules from
+  // equipment that actually exists at the user's assigned locations.
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) {
+      configureLocationFilter([], user?.role);
+      return;
+    }
     const role = (user.role || '').toLowerCase();
     const isGlobal = role === 'superadmin' || role === 'admin' || role === 'safety_manager';
 
-    if (!isGlobal) {
-      ApiService.getEquipment({ limit: 1000 })
-        .then(res => {
-          const eqList = Array.isArray(res) ? res : (res?.items || res?.data || []);
-          const moduleIds = new Set();
-          const moduleCodes = new Set();
-
-          let extractedCompanyName = null;
-
-          eqList.forEach(eq => {
-            if (eq.module_id) moduleIds.add(Number(eq.module_id));
-            if (eq.module_code) moduleCodes.add(eq.module_code);
-            else if (eq.equipment_type) moduleCodes.add(eq.equipment_type);
-
-            if (!extractedCompanyName && (eq.company_name || eq.company?.name || eq.company?.company_name)) {
-              extractedCompanyName = eq.company_name || eq.company?.name || eq.company?.company_name;
-            }
-          });
-
-          if (extractedCompanyName) {
-            setCompanyName(prev => (!prev || prev === 'Dashboard') ? extractedCompanyName : prev);
-          }
-
-          const onboardedMods = STATIC_MODULES.filter(m =>
-            moduleIds.has(m.module_id) || moduleCodes.has(m.code)
-          );
-
-          if (Array.isArray(equipmentAccess)) {
-            const permittedCodes = new Set(equipmentAccess.map(m => m.code));
-            const visibleModules = onboardedMods.filter(m => permittedCodes.has(m.code));
-            setEquipmentAccessList(visibleModules);
-          } else {
-            setEquipmentAccessList(onboardedMods.length > 0 ? onboardedMods : []);
-          }
-        })
-        .catch(err => {
-          console.error("Failed to load equipment list for inheritance:", err);
-        });
+    if (isGlobal) {
+      configureLocationFilter([], role);
+      return;
     }
+
+    Promise.all([
+      ApiService.getOperatorMappings({ user_id: user.id }).catch(() => []),
+      ApiService.getEquipment({ limit: 1000 }).catch(() => []),
+    ]).then(([mappingsRes, eqRes]) => {
+      const mappingsList = Array.isArray(mappingsRes) ? mappingsRes : (mappingsRes?.data || mappingsRes?.items || []);
+      const rawEqList = Array.isArray(eqRes) ? eqRes : (eqRes?.items || eqRes?.data || []);
+
+      setUserLocationMappings(mappingsList);
+      localStorage.setItem('user_operator_mappings', JSON.stringify(mappingsList));
+      configureLocationFilter(mappingsList, role);
+
+      // Extract company name from all equipment (same company regardless of location)
+      let extractedCompanyName = null;
+      for (const eq of rawEqList) {
+        const name = eq.company_name || eq.company?.name || eq.company?.company_name;
+        if (name) { extractedCompanyName = name; break; }
+      }
+      if (extractedCompanyName) {
+        setCompanyName(prev => (!prev || prev === 'Dashboard') ? extractedCompanyName : prev);
+      }
+
+      // Only show modules where the user's assigned locations have onboarded equipment
+      const locationFilteredEq = filterEquipmentByLocations(rawEqList, mappingsList, role);
+      const moduleIds = new Set();
+      const moduleCodes = new Set();
+      locationFilteredEq.forEach(eq => {
+        if (eq.module_id) moduleIds.add(Number(eq.module_id));
+        if (eq.module_code) moduleCodes.add(eq.module_code);
+        else if (eq.equipment_type) moduleCodes.add(eq.equipment_type);
+      });
+
+      // Also ensure any explicitly assigned modules in their mappings are visible
+      // even if there is no equipment for that location yet.
+      const explicitlyAssignedModules = new Set();
+      mappingsList.forEach(m => {
+         if (m.module_id) explicitlyAssignedModules.add(Number(m.module_id));
+         if (m.moduleId) explicitlyAssignedModules.add(Number(m.moduleId));
+         if (m.module_code) moduleCodes.add(m.module_code);
+      });
+
+      const onboardedMods = STATIC_MODULES.filter(m =>
+        moduleIds.has(m.module_id) || moduleCodes.has(m.code) || explicitlyAssignedModules.has(m.module_id)
+      );
+
+      if (Array.isArray(equipmentAccess)) {
+        const permittedCodes = new Set(equipmentAccess.map(m => m.code));
+        setEquipmentAccessList(onboardedMods.filter(m => permittedCodes.has(m.code)));
+      } else {
+        setEquipmentAccessList(onboardedMods.length > 0 ? onboardedMods : []);
+      }
+    }).catch(err => {
+      console.error('Failed to load equipment/location data:', err);
+      configureLocationFilter([], role);
+    });
   }, [user, equipmentAccess, refreshKey]);
   useEffect(() => {
     if (activePage !== 'checklist' || !(selectedEq?.module_id || selectedEq?.id)) return;
@@ -637,6 +709,14 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
       .then(d => {
         const list = Array.isArray(d) ? d : (d?.companies || d?.data || []);
         setAdminCompanies(list);
+        if (user?.role === 'superadmin' && list.length > 0) {
+          const saved = localStorage.getItem('sd_selectedCompanyId');
+          if (!saved || !list.find(c => String(c.id || c.company_id) === saved)) {
+            const firstId = String(list[0].id || list[0].company_id);
+            setSelectedCompanyId(firstId);
+            localStorage.setItem('sd_selectedCompanyId', firstId);
+          }
+        }
       })
       .catch(() => setAdminCompanies([]));
 
@@ -945,7 +1025,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     const hasExplicitAccess = (Array.isArray(equipmentAccessList) && equipmentAccessList.length > 0) ||
       (Array.isArray(navAccessList) && navAccessList.length > 0);
 
-    if (hasExplicitAccess || (!isGlobalUser && (equipmentAccessList || navAccessList))) {
+    if (hasExplicitAccess || (!isGlobalUser && (equipmentAccessList !== null || navAccessList !== null))) {
       const allowedCodes = new Set();
       if (equipmentAccessList) {
         equipmentAccessList.forEach(m => {
@@ -1118,6 +1198,11 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
     if (code === 'pending_updates') {
       if (role === 'supervisor' || role === 'agm' || role === 'admin' || role === 'superadmin') return true;
       return role !== 'user' && role !== 'inspector';
+    }
+
+    if (code === 'setup_operator_mapping') {
+      if (role === 'superadmin' || role === 'admin' || role === 'safety_manager' || role === 'agm' || role === 'supervisor') return true;
+      return false;
     }
 
     const isAdminOrSuper = role === 'superadmin' || role === 'admin';
@@ -1518,6 +1603,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         'users-manage': 'users-manage',
                         'pending-updates': 'pending-updates',
                         'reports': 'reports',
+                        'setup-operator-mapping': 'setup-operator-mapping',
                         'fire_extinguisher': 'fire-stats',
                         'sprinkler': 'sprinkler-stats',
                         'hose_reel': 'hose-stats',
@@ -1554,6 +1640,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         'users-manage': 'users-manage',
                         'pending-updates': 'pending-updates',
                         'reports': 'reports',
+                        'setup-operator-mapping': 'setup-operator-mapping',
                         'fire_extinguisher': 'fire-stats',
                         'sprinkler': 'sprinkler-stats',
                         'hose_reel': 'hose-stats',
@@ -1589,6 +1676,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                         'users-manage': 'users-manage',
                         'pending-updates': 'pending-updates',
                         'reports': 'reports',
+                        'setup-operator-mapping': 'setup-operator-mapping',
                         'fire_extinguisher': 'fire-stats',
                         'sprinkler': 'sprinkler-stats',
                         'hose_reel': 'hose-stats',
@@ -1611,7 +1699,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       setActivePage(page);
                     }}
                   />
-                ) : (user?.role === 'inspector' || user?.role === 'user') && activePage !== 'equipment-grid' ? (
+                ) : (user?.role === 'inspector' || user?.role === 'user') && activePage !== 'equipment-grid' && activePage !== 'assigned-locations' ? (
                   <InspectorOverview
                     user={user}
                     allModules={filteredModules}
@@ -1620,6 +1708,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                       const codeToPage = {
                         'grid': 'grid',
                         'equipment-grid': 'equipment-grid',
+                        'assigned-locations': 'assigned-locations',
                         'setup-company': 'setup-company',
                         'users-manage': 'users-manage',
                         'pending-updates': 'pending-updates',
@@ -2068,7 +2157,9 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── SETUP: COMPANY MANAGEMENT ── */}
             <section className={`page ${activePage === 'setup-company' ? 'active' : ''}`}>
               {activePage === 'setup-company' && (
-                <CompanyManagement onBack={() => setActivePage('grid')} onNavigate={setActivePage} />
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <CompanyManagement onBack={() => setActivePage('grid')} onNavigate={setActivePage} />
+                </div>
               )}
             </section>
 
@@ -2082,7 +2173,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             {/* ── SETUP: OPERATOR MAPPING ── */}
             <section className={`page ${activePage === 'setup-operator-mapping' ? 'active' : ''}`}>
               {activePage === 'setup-operator-mapping' && (
-                <OperatorMapping onBack={() => setActivePage('grid')} />
+                <OperatorMapping onBack={() => setActivePage('grid')} allowedModules={filteredModules} />
               )}
             </section>
 
@@ -2127,6 +2218,13 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
                 <ShiftManagement
                   onBack={() => setActivePage('grid')}
                 />
+              )}
+            </section>
+
+            {/* ── ASSIGNED LOCATIONS (Inspector) ── */}
+            <section className={`page ${activePage === 'assigned-locations' ? 'active' : ''}`}>
+              {activePage === 'assigned-locations' && (
+                <AssignedLocations user={user} onBack={() => setActivePage('grid')} />
               )}
             </section>
 

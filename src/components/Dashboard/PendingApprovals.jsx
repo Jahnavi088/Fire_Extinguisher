@@ -21,6 +21,7 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkRejectInput, setBulkRejectInput] = useState('');
 
   // Detailed view drawer states
   const [detailItem, setDetailItem] = useState(null);
@@ -267,9 +268,13 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     }
   };
 
-  const handleBulkApprove = async () => {
+  const handleBulkApprove = () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Are you sure you want to approve all ${selectedIds.length} selected request(s)?`)) return;
+    setModalMode('bulkApprove');
+  };
+
+  const executeBulkApprove = async () => {
+    setModalMode(null);
     setBulkActionLoading(true);
     
     const selectedItemsList = items.filter(item => selectedIds.includes(`${item._itemType}-${item.id}`));
@@ -347,11 +352,21 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
     }
   };
 
-  const handleBulkReject = async () => {
+  const handleBulkReject = () => {
     if (selectedIds.length === 0) return;
-    const reason = window.prompt(`Please enter the rejection reason for all ${selectedIds.length} selected request(s):`);
-    if (!reason || !reason.trim()) return;
+    setBulkRejectInput('');
+    setModalMode('bulkReject');
+  };
+
+  const executeBulkReject = async () => {
+    if (!bulkRejectInput || !bulkRejectInput.trim()) {
+      alert('Please enter a rejection reason.');
+      return;
+    }
+    setModalMode(null);
     setBulkActionLoading(true);
+
+    const reason = bulkRejectInput.trim();
 
     const selectedItemsList = items.filter(item => selectedIds.includes(`${item._itemType}-${item.id}`));
     const approvedLocally = JSON.parse(localStorage.getItem('approved_inspections') || '[]');
@@ -831,7 +846,7 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
       </div>
 
       {/* ── HIGHLY PROFESSIONAL APPROVAL REVIEW MODAL ── */}
-      {modalMode && selectedItem && (
+      {modalMode && (selectedItem || ['bulkApprove', 'bulkReject'].includes(modalMode)) && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div className="pa-light-modal" style={{ border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', width: modalMode === 'approve' ? '640px' : '400px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
             
@@ -839,10 +854,13 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
             <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#3b82f6' }}>
-                  {modalMode === 'approve' ? 'Verification & Checklist Review' : 'Reject Request'}
+                  {modalMode === 'approve' ? 'Verification & Checklist Review' : 
+                   modalMode === 'reject' ? 'Reject Request' : 
+                   modalMode === 'bulkApprove' ? 'Bulk Approve Requests' : 
+                   modalMode === 'bulkReject' ? 'Bulk Reject Requests' : ''}
                 </span>
                 <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 800, fontFamily: 'monospace' }}>
-                  {selectedItem.sos_code || selectedItem.equipment_code || '—'}
+                  {['bulkApprove', 'bulkReject'].includes(modalMode) ? `${selectedIds.length} Requests Selected` : (selectedItem?.sos_code || selectedItem?.equipment_code || '—')}
                 </h3>
               </div>
               <button onClick={() => setModalMode(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 0 }}>
@@ -856,6 +874,8 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
             {/* Modal Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }} className="pa-drawer-body">
               {modalMode === 'approve' ? (
+                // ... approve modal body is below
+
                 <>
                   {/* Request Metadata Info Card */}
                   <div className="pa-meta-card" style={{ padding: '12px 14px' }}>
@@ -996,37 +1016,81 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                     />
                   </div>
                 </>
-              ) : (
-                /* Rejection Reason Form */
-                <div>
-                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>Unit ID</div>
-                    <div style={{ fontSize: '14px', color: '#fff', fontWeight: 700, fontFamily: 'monospace' }}>{selectedItem.sos_code || selectedItem.equipment_code || '—'}</div>
+              ) : modalMode === 'reject' ? (
+                <>
+                  <div style={{ marginBottom: '10px' }}>
+                    <p style={{ fontSize: '13px', color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                      You are about to reject the request for <strong style={{ color: '#fff' }}>{selectedItem?.sos_code || selectedItem?.equipment_code}</strong>. Please provide a clear reason for this rejection so the inspector can correct the issue.
+                    </p>
+                    <textarea
+                      placeholder="Enter rejection reason here..."
+                      value={rejectInput}
+                      onChange={(e) => setRejectInput(e.target.value)}
+                      style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(15,23,42,0.6)', color: '#fff', fontSize: '13px', resize: 'vertical', outline: 'none' }}
+                      autoFocus
+                    />
                   </div>
-                  <label style={{ display: 'block', fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
-                    Reason for rejection *
-                  </label>
-                  <textarea
-                    value={rejectInput}
-                    onChange={e => setRejectInput(e.target.value)}
-                    placeholder="Provide a reason for rejection..."
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontSize: '12px', minHeight: '80px', outline: 'none', resize: 'vertical' }}
-                  />
-                </div>
-              )}
+                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '10px' }}>
+                    <button onClick={() => setModalMode(null)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                    <button onClick={handleReject} disabled={actionLoading === selectedItem?.id} style={{ flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      {actionLoading === selectedItem?.id ? <div className="pa-drawer-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} /> : 'Confirm Rejection'}
+                    </button>
+                  </div>
+                </>
+              ) : modalMode === 'bulkApprove' ? (
+                <>
+                  <div style={{ marginBottom: '10px' }}>
+                    <p style={{ fontSize: '14px', color: '#000', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                      Are you sure you want to approve all <strong style={{ color: '#000', fontSize: '16px' }}>{selectedIds.length}</strong> selected request(s)?
+                    </p>
+                    <div style={{ background: 'rgba(22, 163, 74, 0.1)', padding: '12px', borderRadius: '8px', border: '1px dashed rgba(22, 163, 74, 0.3)' }}>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#000' }}>
+                        This action will mark all selected requests as <strong>Successful</strong> and notify the respective inspectors.
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '10px' }}>
+                    <button onClick={() => setModalMode(null)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                    <button onClick={executeBulkApprove} style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      Confirm Bulk Approval
+                    </button>
+                  </div>
+                </>
+              ) : modalMode === 'bulkReject' ? (
+                <>
+                  <div style={{ marginBottom: '10px' }}>
+                    <p style={{ fontSize: '13px', color: '#e2e8f0', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                      You are about to reject <strong style={{ color: '#fff' }}>{selectedIds.length}</strong> selected request(s). Please provide a common reason for these rejections.
+                    </p>
+                    <textarea
+                      placeholder="Enter bulk rejection reason here..."
+                      value={bulkRejectInput}
+                      onChange={(e) => setBulkRejectInput(e.target.value)}
+                      style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(15,23,42,0.6)', color: '#fff', fontSize: '13px', resize: 'vertical', outline: 'none' }}
+                      autoFocus
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '10px' }}>
+                    <button onClick={() => setModalMode(null)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                    <button onClick={executeBulkReject} style={{ flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      Confirm Bulk Rejection
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             {/* Modal Footer Actions */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'rgba(255,255,255,0.01)' }}>
-              <button 
-                onClick={() => setModalMode(null)}
-                style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' }}
-                onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.08)'}
-                onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
-              >
-                Cancel
-              </button>
-              {modalMode === 'approve' ? (
+            {modalMode === 'approve' && (
+              <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'rgba(255,255,255,0.01)' }}>
+                <button 
+                  onClick={() => setModalMode(null)}
+                  style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.08)'}
+                  onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={handleApprove}
                   disabled={actionLoading === selectedItem.id}
@@ -1036,18 +1100,8 @@ const PendingApprovals = ({ user, onBack, allowedModules }) => {
                 >
                   {actionLoading === selectedItem.id ? 'Approving...' : 'Confirm & Approve'}
                 </button>
-              ) : (
-                <button
-                  onClick={handleReject}
-                  disabled={actionLoading === selectedItem.id || !rejectInput.trim()}
-                  style={{ padding: '8px 18px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: !rejectInput.trim() ? 0.5 : 1, transition: 'background 0.2s' }}
-                  onMouseEnter={e => !rejectInput.trim() ? null : e.target.style.background = '#b91c1c'}
-                  onMouseLeave={e => !rejectInput.trim() ? null : e.target.style.background = '#dc2626'}
-                >
-                  {actionLoading === selectedItem.id ? 'Rejecting...' : 'Confirm Reject'}
-                </button>
-              )}
-            </div>
+              </div>
+            )}
 
           </div>
         </div>

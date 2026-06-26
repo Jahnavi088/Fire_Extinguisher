@@ -7,7 +7,6 @@ import SortIndicator from './SortIndicator';
 import { sortItems } from '../../services/sorting';
 import BackBtn from './BackBtn';
 import InspectionHistoryPanel from './InspectionHistoryPanel';
-import EquipmentHistoryPanel from './EquipmentHistoryPanel';
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const fmt = (d) => {
@@ -17,10 +16,10 @@ const fmt = (d) => {
 const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 90 ? '#28a745' : n >= 80 ? '#FF9800' : '#dc3545';
+  return n >= 90 ? '#10b981' : n >= 80 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' ? '#28a745'
+  v === 'OK' ? '#10b981'
     : (v === 'LOW' || v === 'SCRATCHED') ? '#FF9800'
       : (v === 'MISSING' || v === 'DAMAGED') ? '#dc3545'
         : '#666';
@@ -29,7 +28,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all', label: 'Total Fleet', icon: '🧯', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Active', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active', label: 'Active', icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Expired', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -136,11 +135,14 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [showInspections, setShowInspections] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedForEdit, setSelectedForEdit] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -149,7 +151,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
@@ -168,6 +170,8 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
     setListTotal(0);
     setCurrentPage(1);
     setView('list');
+    setIsEditMode(false);
+    setSelectedForEdit(null);
     setListLoading(true);
     try {
       const data = await fetchEquipmentByStatus(modId, card.type);
@@ -180,13 +184,14 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
     }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     // Unwrap nested `details` so top-level fields like pressure_status, extinguisher_type are accessible
     setSelectedUnit({ ...item, ...(item.details || {}) });
     try {
-      const data = await ApiService.getEquipmentById(item.sos_code || item.id);
+      const data = await ApiService.getEquipmentBySosCode(item.sos_code || item.id);
       setSelectedUnit({ ...data, ...(data.details || {}) });
     } catch { /* keep row data */ }
     finally { setDetailLoading(false); }
@@ -220,7 +225,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
   }, [filteredItems, sortConfig]);
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -257,7 +262,45 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             {summary?.readiness_score ?? 0}%
           </span>
 
-          <div className="fe-header-search">
+          <div className="fe-header-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: 'none', width: 'auto' }}>
+            <button
+              className="fe-compliance-btn"
+              style={{
+                background: '#3b82f6',
+                borderColor: '#2563eb',
+                height: '36px',
+                padding: '0 16px',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={() => {
+                // Clicking Edit from Overview takes them to the full list in Edit Mode
+                setListCfg({ title: 'Total Units', type: 'all', color: '#3b82f6' });
+                setListItems([]);
+                setListTotal(0);
+                setCurrentPage(1);
+                setView('list');
+                setIsEditMode(true);
+                setSelectedForEdit(null);
+                setListLoading(true);
+                // Trigger the fetch logic manually or rely on useEffect (here we replicate openList)
+                ApiService.getEquipment({ module_id: modId, limit: 500 })
+                  .then(data => {
+                    setListItems(data.items || []);
+                    setListTotal(data.total || 0);
+                  })
+                  .catch(() => setListItems([]))
+                  .finally(() => setListLoading(false));
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Edit Mode
+            </button>
             <div className="fe-search-box">
               <input
                 type="text"
@@ -319,7 +362,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 return filtered.slice(0, 10).map((a, i) => {
                   const c = ALERT_COLOR[a.alert_level] || '#888';
                   return (
-                    <div key={a.id || i} className="fe-alert-row" style={{ '--alert-color': c }}>
+                    <div key={a.id || i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': c }}>
                       <div className="fe-alert-body">
                         <div className="fe-alert-code">{a.sos_code || a.barcode}</div>
                         <div className="fe-alert-loc">{[a.location_name, a.building_name].filter(Boolean).join(' · ')}</div>
@@ -349,7 +392,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                        { name: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Expired', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -377,7 +420,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
-                          { color: '#28a745' }, // Active
+                          { color: '#10b981' }, // Active
                           { color: '#f59e0b' }, // Needs Service
                           { color: '#8b5cf6' }, // Expired
                           { color: '#dc3545' }, // Due Inspection
@@ -390,7 +433,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { label: 'Active', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Expired', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -421,6 +464,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
   if (view === 'list') {
     const totalPages = Math.ceil(sortedItems.length / PAGE_SIZE);
     const pageSlice = sortedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    console.log("Rendering List View, isEditMode:", isEditMode);
 
     return (
       <div className="fe-page">
@@ -433,7 +477,59 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             </div>
           </div>
 
-          <div className="fe-header-search">
+          <div className="fe-header-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: 'none', width: 'auto' }}>
+            {isEditMode && selectedForEdit && (
+              <button
+                className="fe-compliance-btn"
+                style={{ background: '#10b981', borderColor: '#059669', height: '36px', padding: '0 16px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-edit-equipment', { detail: selectedForEdit }));
+                  setIsEditMode(false);
+                  setSelectedForEdit(null);
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+                Edit Selected
+              </button>
+            )}
+            <button
+              className="fe-compliance-btn"
+              style={{
+                background: isEditMode ? '#dc3545' : '#3b82f6',
+                borderColor: isEditMode ? '#dc3545' : '#2563eb',
+                height: '36px',
+                padding: '0 16px',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={() => {
+                setIsEditMode(!isEditMode);
+                setSelectedForEdit(null);
+              }}
+            >
+              {isEditMode ? (
+                <>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  Cancel Edit
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                  Edit Mode
+                </>
+              )}
+            </button>
             <div className="fe-search-box">
               <input
                 type="text"
@@ -456,6 +552,9 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
           <div className="fe-list-body">
             <div className="fe-table">
               <div className="fe-table-head">
+                {isEditMode && (
+                  <span className="fe-table-head-cell" style={{ width: '40px', flex: 'none' }}></span>
+                )}
                 {[
                   { label: 'SOS Code', key: 'sos_code' },
                   { label: 'Type', key: 'extinguisher_type' },
@@ -479,7 +578,25 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 const col = scoreColor(sc);
                 const d = item.details || {};
                 return (
-                  <div key={item.id || i} className="fe-table-row" onClick={() => openDetail(item)}>
+                  <div key={item.id || i} className="fe-table-row" onClick={() => {
+                      if (isEditMode) {
+                        // Allow only one selection at a time for editing
+                        setSelectedForEdit(selectedForEdit?.id === item.id || selectedForEdit?.sos_code === item.sos_code ? null : item);
+                      } else {
+                        openDetail(item);
+                      }
+                  }}>
+                    {isEditMode && (
+                      <span className="fe-table-sos" style={{ width: '40px', flex: 'none', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedForEdit?.id === item.id || selectedForEdit?.sos_code === item.sos_code}
+                          onChange={() => setSelectedForEdit(selectedForEdit?.id === item.id || selectedForEdit?.sos_code === item.sos_code ? null : item)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                        />
+                      </span>
+                    )}
                     <span className="fe-table-sos">{item.sos_code || d.equipment_code || item.equipment_code}</span>
                     <span className="fe-table-type">{d.extinguisher_type || item.extinguisher_type || '—'}</span>
                     <span className="fe-table-loc">{item.location_name || '—'}</span>
@@ -551,6 +668,21 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+          <div className="fe-detail-card fe-full">
+            <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+            <div className="fe-identity-grid">
+              {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                <div key={f.field_key} className="fe-field">
+                  <div className="fe-field-label">{f.field_label}</div>
+                  <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
+
 
           {/* Identity — full width */}
           <div className="fe-detail-card fe-full">
@@ -577,11 +709,51 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
           {/* Location */}
           <div className="fe-detail-card">
             <SectionTitle>📍 Location</SectionTitle>
-            <InfoRow label="Location" val={u.location_name} />
+            <InfoRow label="Branch" val={u.location_name} />
             <InfoRow label="Building" val={u.building_name} />
             <InfoRow label="Floor" val={u.floor_name} />
             <InfoRow label="Zone" val={u.zone_name} />
             <InfoRow label="Department" val={u.department_name} />
+            {u.exact_location_description && (
+              <InfoRow label="Exact Location" val={u.exact_location_description} />
+            )}
+            {u.latitude != null && u.longitude != null ? (
+              <div className="fe-info-row" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
+                <span className="fe-info-label">GPS Coordinates</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#5fd3f3', fontWeight: 700 }}>
+                    {u.latitude}°N, {u.longitude}°E
+                  </span>
+                  {u.geo_accuracy_m != null && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '1px 7px',
+                      background: 'rgba(16,185,129,0.12)', color: '#10b981',
+                      border: '1px solid rgba(16,185,129,0.25)', borderRadius: 4,
+                    }}>
+                      ± {u.geo_accuracy_m} m
+                    </span>
+                  )}
+                  <a
+                    href={`https://www.google.com/maps?q=${u.latitude},${u.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 11, fontWeight: 700, padding: '3px 10px',
+                      background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
+                      border: '1px solid rgba(59,130,246,0.25)', borderRadius: 5,
+                      textDecoration: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    🗺️ Open in Maps
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="fe-info-row">
+                <span className="fe-info-label">GPS Coordinates</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>Not captured</span>
+              </div>
+            )}
           </div>
 
           {/* Key Dates */}
@@ -634,7 +806,7 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <SectionTitle>📊 Status Classification</SectionTitle>
             <div className="fe-status-chips">
               {[
-                { label: 'Operational', val: u.operational_status, color: u.operational_status === 'active' ? '#28a745' : '#dc3545' },
+                { label: 'Operational', val: u.operational_status, color: u.operational_status === 'active' ? '#10b981' : '#dc3545' },
                 { label: 'Status Bucket', val: u.status_bucket, color: '#3b82f6' },
                 { label: 'Overall', val: u.status, color: '#FF9800' },
               ].map(s => (
@@ -650,9 +822,6 @@ const FireExtinguisherStats = ({ module, onBack, onRaiseWorkOrder }) => {
             </div>
           </div>
 
-          <div style={{ gridColumn: '1 / -1' }}>
-            <EquipmentHistoryPanel equipmentId={u.sos_code || u.equipment_code || u.id} />
-          </div>
         </div>
       )}
     </div>

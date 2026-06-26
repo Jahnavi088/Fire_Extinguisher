@@ -11,10 +11,10 @@ const fmt = (d) => {
 };
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' || v === 'VISIBLE' || v === 'GOOD' ? '#28a745'
+  v === 'OK' || v === 'VISIBLE' || v === 'GOOD' ? '#10b981'
     : (v === 'FADED' || v === 'DIRTY' || v === 'OBSTRUCTED') ? '#FF9800'
       : (v === 'MISSING' || v === 'DAMAGED' || v === 'INCORRECT') ? '#dc3545'
         : '#666';
@@ -23,7 +23,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all', label: 'Total Signage', icon: '⚠️', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Compliant', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active', label: 'Compliant', icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'Maintenance', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Missing/Damaged', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -95,6 +95,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listTotal, setListTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -105,16 +106,16 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(62),                       // /modules/27/summary
-        ApiService.getAlertsSummary(),                         // /alerts/summary
+        ApiService.getAlertsSummary({ module_id: 62 }),                         // /alerts/summary
         ApiService.getAlerts({ module_id: 62, limit: 100 }),    // /alerts?module_id=27
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Safety Signage, using fallback:', err);
-      setSummary({ total: 45, active: 42, upcoming: 2, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 98 });
-      setAlertsSummary({ total_alerts: 1, level_1: { count: 1, label: 'Low', description: 'Cleaning required' }, level_2: { count: 0, label: 'Med', description: 'Action' }, level_3: { count: 0, label: 'High', description: 'Critical' } });
+      console.error('API Load failed:', err);
+      setSummary({ total: 0, active: 0, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
+      setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -132,19 +133,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setListItems(data.items || []);
       setListTotal(data.total || 0);
 
-      if (!data.items || data.items.length === 0) {
-        const mock = Array.from({ length: 8 }).map((_, i) => ({
-          id: `sn_${i}`,
-          sos_code: `SN-${5000 + i}`,
-          equipment_type: 'Safety Signage',
-          location_name: `Exit Path Zone ${i + 1}`,
-          building_name: 'Main Block',
-          readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 90).toISOString()
-        }));
-        setListItems(mock);
-        setListTotal(mock.length);
-      }
+      
     } catch {
       setListItems([]);
     } finally {
@@ -152,7 +141,8 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
     }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     setSelectedUnit(item);
@@ -164,7 +154,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -219,7 +209,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-panel-title">🔔 Compliance Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
               {topAlerts.length === 0 ? <div className="fe-empty">No active signage alerts.</div> : topAlerts.map((a, i) => (
-                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+                <div key={i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
                     <div className="fe-alert-loc">{a.location_name}</div>
@@ -238,7 +228,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                        { name: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                         { name: 'Issues', val: summary.expired, color: '#dc3545' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -248,7 +238,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => (
+                        {[{ color: '#10b981' }, { color: '#dc3545' }].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
@@ -257,7 +247,7 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { label: 'Compliant', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                     { label: 'Missing/Damaged', val: summary.expired, color: '#dc3545' },
                   ].map(row => (
                     <div key={row.label} className="fe-legend-row">
@@ -341,6 +331,21 @@ const SafetySignageStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+          <div className="fe-detail-card fe-full">
+            <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+            <div className="fe-identity-grid">
+              {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                <div key={f.field_key} className="fe-field">
+                  <div className="fe-field-label">{f.field_label}</div>
+                  <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
+
           <div className="fe-detail-card fe-full">
             <SectionTitle>Signage Identity</SectionTitle>
             <div className="fe-identity-grid">

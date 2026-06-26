@@ -15,7 +15,7 @@ const CATEGORY_ICONS = {
 
 const ANSWER_OPTIONS = ['Yes', 'No', 'N/A'];
 
-export default function FireExtinguisherChecklist({ selectedEq, equipmentType, displayName, onBack }) {
+export default function FireExtinguisherChecklist({ selectedEq, equipmentType, moduleId, displayName, onBack }) {
   const [checklistData, setChecklistData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [answers, setAnswers] = useState({});
@@ -25,7 +25,7 @@ export default function FireExtinguisherChecklist({ selectedEq, equipmentType, d
   // SOS code of the specific equipment unit being inspected
   const [equipmentSosCode, setEquipmentSosCode] = useState('');
 
-  const module_id = selectedEq?.module_id || 30;
+  const module_id = selectedEq?.module_id || selectedEq?.id || moduleId || 30;
   // equipmentType prop takes priority (sidebar-driven); fall back to module-based
   const useTypeApi = !!equipmentType;
 

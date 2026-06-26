@@ -11,10 +11,10 @@ const fmt = (d) => {
 };
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'READY' || v === 'OK' || v === 'GOOD' ? '#28a745'
+  v === 'READY' || v === 'OK' || v === 'GOOD' ? '#10b981'
     : (v === 'MAINTENANCE' || v === 'LOW_FUEL' || v === 'DIRTY') ? '#FF9800'
       : (v === 'OUT_OF_SERVICE' || v === 'FAILED' || v === 'DAMAGED') ? '#dc3545'
         : '#666';
@@ -23,7 +23,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all', label: 'Total Fleet', icon: '🚑', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Operational', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active', label: 'Operational', icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'In Maintenance', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Out of Service', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -116,6 +116,7 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listLoading, setListLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -126,16 +127,16 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Ambulance, using fallback:', err);
-      setSummary({ total: 2, active: 1, upcoming: 0, needs_service: 1, expired: 0, due_inspection: 0, readiness_score: 50 });
-      setAlertsSummary({ total_alerts: 1, level_1: { count: 0, label: 'Low', description: 'Minor' }, level_2: { count: 1, label: 'Med', description: 'Action' }, level_3: { count: 0, label: 'High', description: 'Critical' } });
+      console.error('API Load failed:', err);
+      setSummary({ total: 0, active: 0, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
+      setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally { setLoading(false); }
   };
@@ -161,7 +162,8 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
     finally { setListLoading(false); }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     setSelectedUnit(item);
@@ -173,7 +175,7 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -220,7 +222,7 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-panel-title">🔔 Fleet Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
               {topAlerts.length === 0 ? <div className="fe-empty">No active vehicle alerts.</div> : topAlerts.map((a, i) => (
-                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+                <div key={i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
                     <div className="fe-alert-loc">{a.location_name}</div>
@@ -237,7 +239,7 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart data={[
-                      { name: 'Operational', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                      { name: 'Operational', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                       { name: 'Faulty', val: summary.expired, color: '#dc3545' },
                     ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -245,7 +247,7 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        {[{ color: '#10b981' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -313,6 +315,21 @@ const AmbulanceStats = ({ module, onBack, onRaiseWorkOrder }) => {
       </div>
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+          <div className="fe-detail-card fe-full">
+            <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+            <div className="fe-identity-grid">
+              {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                <div key={f.field_key} className="fe-field">
+                  <div className="fe-field-label">{f.field_label}</div>
+                  <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
+
           <div className="fe-detail-card fe-full"><div className="fe-section-title">Vehicle Identity</div>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />

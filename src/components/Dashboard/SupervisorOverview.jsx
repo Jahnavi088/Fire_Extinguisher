@@ -1,5 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import useSWR from 'swr';
 import { ApiService } from '../../services/apiService';
+import { filterEquipmentByLocations } from '../../utils/locationFilter';
 import './SuperAdminOverview.css';
 
 const complianceColor = (pct) => {
@@ -8,40 +10,46 @@ const complianceColor = (pct) => {
   return '#dc2626';
 };
 
+const fetchSupervisorData = async ([_, userId]) => {
+  const [reportsRaw, eqRaw, usersRaw, mappingsRaw] = await Promise.all([
+    (async () => {
+      const todayDate = new Date();
+      const endDateStr = todayDate.toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(todayDate.getDate() - 30);
+      const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+      return ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr }).catch(() => []);
+    })(),
+    ApiService.getEquipment({ limit: 1000 }).catch(() => []),
+    ApiService.getAdminUsers({ role: 'inspector', supervisor_id: userId }).catch(() => []),
+    ApiService.getOperatorMappings({ user_id: userId }).catch(() => [])
+  ]);
+
+  const reportsList = Array.isArray(reportsRaw)
+    ? reportsRaw
+    : (reportsRaw?.items || reportsRaw?.reports || reportsRaw?.inspections || reportsRaw?.data || []);
+
+  const rawEqList = Array.isArray(eqRaw) ? eqRaw : (eqRaw?.items || eqRaw?.data || []);
+  const teamData = Array.isArray(usersRaw) ? usersRaw : (usersRaw?.users || usersRaw?.data || []);
+  const mappingsList = Array.isArray(mappingsRaw) ? mappingsRaw : (mappingsRaw?.data || mappingsRaw?.items || []);
+
+  // Filter equipment based on supervisor's assigned locations
+  const eqList = filterEquipmentByLocations(rawEqList, mappingsList, 'supervisor');
+
+  return { reportsList, eqList, teamData, rawEqList, mappingsList };
+};
+
 const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [showAllAreas, setShowAllAreas] = useState(false);
+  const [showAllTeam, setShowAllTeam] = useState(false);
+  const [assignedLocationCount, setAssignedLocationCount] = useState(null);
   const carouselRef = useRef(null);
 
-  const [kpis, setKpis] = useState({
-    assignedAreas: 4,
-    myInspectors: 5,
-    todaysInspections: 25,
-    pendingInspections: 5,
-    overdueInspections: 2,
-    overallCompliance: 93,
-  });
-
-  const [areasList, setAreasList] = useState([
-    { id: 1, name: 'Granulation Area', assets: 150, todaysTasks: 8, pending: 1, overdue: 0, compliance: 94 },
-    { id: 2, name: 'Compression Area', assets: 120, todaysTasks: 6, pending: 1, overdue: 1, compliance: 92 },
-    { id: 3, name: 'Coating Area', assets: 100, todaysTasks: 5, pending: 1, overdue: 0, compliance: 95 },
-    { id: 4, name: 'Packing Area', assets: 80, todaysTasks: 6, pending: 2, overdue: 1, compliance: 90 }
-  ]);
-
-  const [teamList, setTeamList] = useState([
-    { id: 1, name: 'Ramesh', assigned: 5, completed: 4, pending: 1, compliance: 98 },
-    { id: 2, name: 'Suresh', assigned: 5, completed: 3, pending: 2, compliance: 90 },
-    { id: 3, name: 'Mahesh', assigned: 5, completed: 4, pending: 1, compliance: 94 },
-    { id: 4, name: 'Karthik', assigned: 5, completed: 3, pending: 2, compliance: 90 },
-    { id: 5, name: 'Prakash', assigned: 5, completed: 1, pending: 4, compliance: 70 }
-  ]);
-
-  const [alertsSummary, setAlertsSummary] = useState({
-    critical: 0,
-    warning: 0,
-    info: 0,
-    total: 0
+  const { data, error, isLoading } = useSWR(['supervisor-overview', user?.id], fetchSupervisorData, {
+    refreshInterval: 15000,
+    revalidateOnFocus: true,
   });
 
   const updateTime = () => {
@@ -59,33 +67,14 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchAll = async (isSilent = false) => {
-      if (!isSilent) setLoading(true);
-      try {
-        const alertsData = await ApiService.getAlertsSummary().catch(() => ({ critical: 0, warning: 0, info: 0, total: 0 }));
-        if (cancelled) return;
-
-        setAlertsSummary({
-          critical: alertsData?.critical ?? alertsData?.total_critical ?? 0,
-          warning: alertsData?.warning ?? alertsData?.total_warning ?? 0,
-          info: alertsData?.info ?? alertsData?.total_info ?? 0,
-          total: alertsData?.total ?? 0
-        });
-
-      } catch (err) {
-        console.error('SupervisorOverview fetchAll error:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchAll();
-    const interval = setInterval(() => { fetchAll(true); }, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
+    if (!user?.id) return;
+    ApiService.getOperatorMappings({ user_id: user.id })
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.data || res?.items || []);
+        if (list.length > 0) setAssignedLocationCount(list.length);
+      })
+      .catch(() => {});
   }, [user]);
-
 
   const scrollCarousel = (dir) => {
     if (carouselRef.current) {
@@ -93,11 +82,140 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
     }
   };
 
-  if (loading) {
+  const areasList = useMemo(() => {
+    if (!data) return [];
+    const { eqList } = data;
+    const map = {};
+    eqList.forEach(eq => {
+      const loc = eq.location_name || 'Unassigned Area';
+      if (!map[loc]) {
+        map[loc] = { id: loc, name: loc, assets: 0, todaysTasks: 0, pending: 0, overdue: 0, compliance: 100 };
+      }
+      map[loc].assets += 1;
+      const st = (eq.status || '').toLowerCase();
+      if (st === 'due-inspection' || st === 'due') map[loc].todaysTasks += 1;
+      else if (st === 'warning' || st === 'pending') map[loc].pending += 1;
+      else if (st === 'critical' || st === 'expired') map[loc].overdue += 1;
+    });
+
+    return Object.values(map).map(area => {
+      const bad = area.pending + area.overdue;
+      area.compliance = area.assets > 0 ? Math.round(((area.assets - bad) / area.assets) * 100) : 100;
+      return area;
+    });
+  }, [data]);
+
+  const kpis = useMemo(() => {
+    if (!data) return { assignedAreas: 0, myInspectors: 0, totalAssets: 0, dueInspections: 0, expiredAssets: 0, overallCompliance: 100 };
+    const { teamData } = data;
+    
+    let totalAssets = 0, dueInspections = 0, expiredAssets = 0;
+    (allModules || []).forEach(mod => {
+      const m = moduleSummaries[mod.module_id] || {};
+      totalAssets += (m.total || 0);
+      dueInspections += (m.due || 0);
+      expiredAssets += (m.expired || 0);
+    });
+
+    const healthyAssets = Math.max(0, totalAssets - dueInspections - expiredAssets);
+    const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
+
+    return {
+      assignedAreas: areasList.length,
+      myInspectors: teamData.length,
+      totalAssets,
+      dueInspections,
+      expiredAssets,
+      overallCompliance
+    };
+  }, [data, areasList, moduleSummaries]);
+
+  const teamList = useMemo(() => {
+    if (!data) return [];
+    const { teamData, reportsList, rawEqList, mappingsList } = data;
+    
+    return teamData.map(inspector => {
+      const inspectorId = String(inspector.id);
+      let completed = 0;
+      
+      reportsList.forEach(r => {
+        if (String(r.user_id) === inspectorId || String(r.inspector_id) === inspectorId || r.user_name === inspector.username) {
+           const st = (r.status || r.approval_status || '').toLowerCase();
+           if (st === 'approved' || st === 'completed' || st === 'done') completed += 1;
+        }
+      });
+      
+      // Calculate pending tasks based on location filter
+      const inspectorMappings = (mappingsList || []).filter(m => String(m.user_id) === inspectorId);
+      let pending = 0;
+      
+      if (inspectorMappings.length > 0 && rawEqList) {
+        const myEq = filterEquipmentByLocations(rawEqList, inspectorMappings, 'inspector');
+        myEq.forEach(eq => {
+          const st = (eq.status || '').toLowerCase();
+          if (st === 'warning' || st === 'critical' || st === 'expired' || st === 'pending' || st === 'due' || st === 'due-inspection') {
+            pending += 1;
+          }
+        });
+      }
+      
+      const assigned = completed + pending; 
+      const compliance = assigned > 0 ? Math.round((completed / assigned) * 100) : 100;
+      
+      return {
+        id: inspector.id,
+        name: inspector.name || inspector.username,
+        assigned,
+        completed,
+        pending,
+        compliance
+      };
+    });
+  }, [data]);
+
+  const recentFindings = useMemo(() => {
+    if (!data) return [];
+    const { eqList } = data;
+    const issues = eqList.filter(eq => {
+      const st = (eq.status || '').toLowerCase();
+      return st === 'warning' || st === 'critical' || st === 'expired' || st === 'pending';
+    });
+    
+    // Sort to show critical first, then warning
+    issues.sort((a, b) => {
+      const aCrit = (a.status || '').toLowerCase() === 'critical' || (a.status || '').toLowerCase() === 'expired';
+      const bCrit = (b.status || '').toLowerCase() === 'critical' || (b.status || '').toLowerCase() === 'expired';
+      if (aCrit && !bCrit) return -1;
+      if (!aCrit && bCrit) return 1;
+      return 0;
+    });
+
+    return issues.slice(0, 3).map(eq => {
+      const st = (eq.status || '').toLowerCase();
+      const isCritical = st === 'critical' || st === 'expired';
+      return {
+        id: eq.id || eq.equipment_id || `eq-${Math.floor(Math.random()*10000)}`,
+        isCritical,
+        title: `${isCritical ? 'Critical issue' : 'Warning'} reported on ${eq.name || eq.equipment_name || eq.type || 'Equipment'} (${eq.location_name || eq.zone_name || eq.department_name || 'Unassigned'})`,
+        time: 'Recently updated',
+        filterType: isCritical ? 'critical' : 'warning'
+      };
+    });
+  }, [data]);
+
+  if (isLoading) {
     return (
       <div className="sao-loading">
         <div className="sao-spinner" />
         <span>Loading Overview…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="sao-loading" style={{ color: '#ef4444' }}>
+        <span>Failed to load dashboard. Retrying...</span>
       </div>
     );
   }
@@ -112,7 +230,8 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Supervisor Dashboard</h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>{branchName}</p>
         </div>
-        <div className="sao-subheader-right">
+        <div className="sao-subheader-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
           <div className="sao-last-updated">
             <span className="sao-lu-label">Last Updated: {lastUpdated}</span>
             <button className="sao-refresh-btn" onClick={() => window.location.reload()} title="Refresh">
@@ -128,21 +247,21 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="sao-kpi-grid">
-        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('grid')}>
+        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('setup-operator-mapping')}>
           <div className="sao-kpi-icon sao-kpi-icon--blue">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-              <line x1="9" y1="4" x2="9" y2="20" />
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
             </svg>
           </div>
           <div className="sao-kpi-body">
-            <div className="sao-kpi-label">Assigned Areas</div>
-            <div className="sao-kpi-value">{kpis.assignedAreas}</div>
+            <div className="sao-kpi-label">Assigned Locations</div>
+            <div className="sao-kpi-value">{assignedLocationCount ?? kpis.assignedAreas}</div>
             <div className="sao-kpi-sub" style={{ opacity: 0 }}>&nbsp;</div>
           </div>
         </div>
 
-        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('users-manage')}>
+        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('reports')}>
           <div className="sao-kpi-icon sao-kpi-icon--purple">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -166,8 +285,8 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
             </svg>
           </div>
           <div className="sao-kpi-body">
-            <div className="sao-kpi-label">Today's Inspections</div>
-            <div className="sao-kpi-value">{kpis.todaysInspections}</div>
+            <div className="sao-kpi-label">Total Assets</div>
+            <div className="sao-kpi-value">{kpis.totalAssets}</div>
             <div className="sao-kpi-sub" style={{ opacity: 0 }}>&nbsp;</div>
           </div>
         </div>
@@ -181,8 +300,8 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
             </svg>
           </div>
           <div className="sao-kpi-body">
-            <div className="sao-kpi-label">Pending Inspections</div>
-            <div className="sao-kpi-value">{kpis.pendingInspections}</div>
+            <div className="sao-kpi-label">Due Inspections</div>
+            <div className="sao-kpi-value">{kpis.dueInspections}</div>
             <div className="sao-kpi-sub sao-kpi-sub--amber">Needs attention</div>
           </div>
         </div>
@@ -196,8 +315,8 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
             </svg>
           </div>
           <div className="sao-kpi-body">
-            <div className="sao-kpi-label">Overdue Inspections</div>
-            <div className="sao-kpi-value">{kpis.overdueInspections}</div>
+            <div className="sao-kpi-label">Expired Assets</div>
+            <div className="sao-kpi-value">{kpis.expiredAssets}</div>
             <div className="sao-kpi-sub sao-kpi-sub--red">Immediate action</div>
           </div>
         </div>
@@ -221,6 +340,7 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
         </div>
       </div>
 
+
       {/* ── Middle Row: Area Wise Summary + Equipment Summary ───────────────── */}
       <div className="sao-middle-row" style={{ marginTop: '24px', alignItems: 'stretch' }}>
         
@@ -228,8 +348,13 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
         <div className="sao-section" style={{ flex: 1.2, display: 'flex', flexDirection: 'column' }}>
           <div className="sao-section-header">
             <span className="sao-section-title">AREA WISE SUMMARY</span>
+            {areasList.length > 5 && (
+              <button className="sao-view-all-btn" onClick={() => setShowAllAreas(!showAllAreas)}>
+                {showAllAreas ? 'View Less' : 'View All'}
+              </button>
+            )}
           </div>
-          <div className="sao-table-wrap" style={{ padding: '0 16px 16px 16px', flex: 1 }}>
+          <div className="sao-table-wrap" style={{ padding: '0 16px 16px 16px', flex: 1, maxHeight: '300px', overflowY: 'auto' }}>
             <table className="sao-table" style={{ marginTop: 0 }}>
               <thead>
                 <tr>
@@ -245,7 +370,7 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
                 {areasList.length === 0 ? (
                   <tr><td colSpan="6" className="sao-table-empty">No areas found</td></tr>
                 ) : (
-                  areasList.map(loc => (
+                  (showAllAreas ? areasList : areasList.slice(0, 5)).map(loc => (
                     <tr key={loc.id}>
                       <td style={{ fontWeight: 600, color: '#111827' }}>{loc.name}</td>
                       <td>{loc.assets}</td>
@@ -322,8 +447,13 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
         <div className="sao-section" style={{ flex: 1.2, display: 'flex', flexDirection: 'column' }}>
           <div className="sao-section-header">
             <span className="sao-section-title">TEAM PERFORMANCE</span>
+            {teamList.length > 5 && (
+              <button className="sao-view-all-btn" onClick={() => setShowAllTeam(!showAllTeam)}>
+                {showAllTeam ? 'View Less' : 'View All'}
+              </button>
+            )}
           </div>
-          <div className="sao-table-wrap" style={{ padding: '0 16px 16px 16px', flex: 1 }}>
+          <div className="sao-table-wrap" style={{ padding: '0 16px 16px 16px', flex: 1, maxHeight: '300px', overflowY: 'auto' }}>
             <table className="sao-table" style={{ marginTop: 0 }}>
               <thead>
                 <tr>
@@ -338,7 +468,7 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
                 {teamList.length === 0 ? (
                   <tr><td colSpan="5" className="sao-table-empty">No inspectors found</td></tr>
                 ) : (
-                  teamList.map(member => (
+                  (showAllTeam ? teamList : teamList.slice(0, 5)).map(member => (
                     <tr key={member.id}>
                       <td style={{ fontWeight: 600, color: '#111827' }}>{member.name}</td>
                       <td>{member.assigned}</td>
@@ -369,49 +499,32 @@ const SupervisorOverview = ({ onNavigate, allModules, user, moduleSummaries = {}
             </button>
           </div>
           <div className="sao-pending-list" style={{ padding: '0', flex: 1 }}>
-            <div className="sao-pending-item" onClick={() => onNavigate && onNavigate('equipment-grid', 'critical')} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="sao-pending-icon sao-pending-icon--red" style={{ width: 28, height: 28 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-              <div className="sao-pending-info">
-                <div className="sao-pending-name" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                  Low pressure in Fire Extinguisher FE-102 (Granulation Area)
+            {recentFindings.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>No recent findings or issues.</div>
+            ) : (
+              recentFindings.map((finding, idx) => (
+                <div key={finding.id} className="sao-pending-item" onClick={() => onNavigate && onNavigate('equipment-grid', finding.filterType)} style={{ padding: '12px 16px', borderBottom: idx < recentFindings.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <div className={`sao-pending-icon ${finding.isCritical ? 'sao-pending-icon--red' : 'sao-pending-icon--amber'}`} style={{ width: 28, height: 28 }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
+                      {finding.isCritical ? (
+                        <>
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                          <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                        </>
+                      ) : (
+                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      )}
+                    </svg>
+                  </div>
+                  <div className="sao-pending-info">
+                    <div className="sao-pending-name" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                      {finding.title}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>{finding.time}</div>
                 </div>
-              </div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>1h ago</div>
-            </div>
-
-            <div className="sao-pending-item" onClick={() => onNavigate && onNavigate('equipment-grid', 'warning')} style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="sao-pending-icon sao-pending-icon--amber" style={{ width: 28, height: 28 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="sao-pending-info">
-                <div className="sao-pending-name" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                  Hose Reel HR-45 seal damaged (Compression Area)
-                </div>
-              </div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>3h ago</div>
-            </div>
-
-            <div className="sao-pending-item" onClick={() => onNavigate && onNavigate('pending-updates')} style={{ padding: '12px 16px' }}>
-              <div className="sao-pending-icon sao-pending-icon--gray" style={{ width: 28, height: 28, background: '#f1f5f9', color: '#64748b' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 8v4l3 3" />
-                </svg>
-              </div>
-              <div className="sao-pending-info">
-                <div className="sao-pending-name" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                  Emergency Light not working (Packing Area)
-                </div>
-              </div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>5h ago</div>
-            </div>
+              ))
+            )}
           </div>
         </div>
 

@@ -24,7 +24,7 @@ const MODULE_EMOJIS = {
   hydrant: '🚒', smoke_detector: '🌫️', emergency_door: '🚪',
   first_aid_kit: '🏥', suppression_system: '⛽', emergency_light: '💡',
   scba: '🎒', safety_shower: '🚿', eyewash_station: '👁️',
-  spill_kit: '📦', fire_trolley: '🛒', ppe_station: '🪖'
+  spill_kit: '📦', fire_trolley: '🛒', ppe_station: '🪖', sand_bucket: '🪣'
 };
 
 
@@ -181,8 +181,7 @@ export default function AutoScheduler({ modules, onBack }) {
   }, [filters.floor, floorsList]);
 
   // ── New states ──
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewDays, setPreviewDays] = useState(30);
+  const [generationResults, setGenerationResults] = useState(null);
   const [autoAssign, setAutoAssign] = useState(true);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [lastRunTime, setLastRunTime] = useState(() => localStorage.getItem(LS_LAST_RUN) || null);
@@ -321,7 +320,7 @@ export default function AutoScheduler({ modules, onBack }) {
     try {
       const { ApiService } = await import('../../services/apiService.js');
       
-      const payload = { days_ahead: previewDays };
+      const payload = { days_ahead: 30 };
       if (autoAssign) {
         payload.assigned_user_id = 5; 
       }
@@ -335,7 +334,8 @@ export default function AutoScheduler({ modules, onBack }) {
       const runTime = new Date().toISOString();
       setLastRunTime(runTime);
       localStorage.setItem(LS_LAST_RUN, runTime);
-      showToast(`Schedule generated — ${createdCount} tasks created out of ${dueCount} due equipment. (${alreadyGen} already scheduled)`, 'success');
+      
+      setGenerationResults({ dueCount, createdCount, alreadyGen });
       
       // Refresh list from backend
       await loadLocalSchedules();
@@ -430,41 +430,27 @@ export default function AutoScheduler({ modules, onBack }) {
     try {
       const { ApiService } = await import('../../services/apiService.js');
       const userId = 5;
-      let successCount = 0;
-      let opName = 'Assigned User';
       
-      // Since bulk assign API is not explicitly defined, we loop the selected IDs
-      for (const id of selectedIds) {
-        try {
-          const res = await ApiService.assignSchedule(id, userId);
-          if (res?.success || res?.assigned_user_name) {
-            successCount++;
-            opName = res.assigned_user_name || opName;
-            const opId = res.assigned_user_id || userId;
-            
-            setSchedules(prev => {
-              const updated = prev.map(s => s.id === id ? {
-                ...s,
-                assignedOperator: opName,
-                assignedOperatorId: opId,
-                status: s.status === 'Unassigned' ? 'Assigned' : s.status,
-                whyAssigned: { floorMatch: true, lowestWorkload: true, nearbyLocation: false }
-              } : s);
-              localStorage.setItem(LS_KEY, JSON.stringify(updated));
-              return updated;
-            });
-          }
-        } catch (e) {
-          console.warn(`Failed to assign task ${id}`);
-        }
-      }
+      const taskIds = Array.from(selectedIds);
+      const res = await ApiService.bulkAssignSchedules(taskIds, userId);
+      
+      const opName = res?.assigned_user_name || 'Assigned User';
+      const opId = res?.assigned_user_id || userId;
+      
+      setSchedules(prev => {
+        const updated = prev.map(s => selectedIds.has(s.id) ? {
+          ...s,
+          assignedOperator: opName,
+          assignedOperatorId: opId,
+          status: s.status === 'Unassigned' ? 'Assigned' : s.status,
+          whyAssigned: { floorMatch: true, lowestWorkload: true, nearbyLocation: false }
+        } : s);
+        localStorage.setItem(LS_KEY, JSON.stringify(updated));
+        return updated;
+      });
       
       setSelectedIds(new Set());
-      if (successCount > 0) {
-        showToast(`${successCount} task${successCount > 1 ? 's' : ''} assigned to ${opName}`, 'success');
-      } else {
-        showToast('Failed to assign tasks via API', 'error');
-      }
+      showToast(`${taskIds.length} task${taskIds.length > 1 ? 's' : ''} assigned to ${opName}`, 'success');
     } catch (e) {
       console.error(e);
       showToast('Assignment error', 'error');
@@ -518,13 +504,7 @@ export default function AutoScheduler({ modules, onBack }) {
     return items;
   }, [schedules, summary]);
 
-  const previewStats = useMemo(() => {
-    const windowEnd = new Date(Date.now() + previewDays * 86400000);
-    const windowEndStr = windowEnd.toISOString().split('T')[0];
-    const alreadyScheduled = schedules.filter(s => s.dueDate >= todayStr && s.dueDate <= windowEndStr).length;
-    const base = essentialModules.length * 3;
-    return { equipmentDue: base, willCreate: Math.max(0, base - alreadyScheduled), alreadyScheduled };
-  }, [schedules, essentialModules, todayStr, previewDays]);
+
 
   const filteredSchedules = useMemo(() => {
     let r = schedules;
@@ -701,7 +681,7 @@ export default function AutoScheduler({ modules, onBack }) {
                 Assign Operators
               </button>
             )}
-            <button className="as-run-btn" onClick={() => setShowPreview(true)} disabled={isRunning} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}>
+            <button className="as-run-btn" onClick={handleRunScheduler} disabled={isRunning} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}>
               {isRunning ? (
                 <>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14" style={{ animation: 'as-spin 1s linear infinite' }}>
@@ -878,7 +858,7 @@ export default function AutoScheduler({ modules, onBack }) {
                                 : 'Try adjusting your filters or clearing them to see all tasks.'}
                           </div>
                           {schedules.length === 0 ? (
-                            <button className="as-run-btn" style={{ marginTop: 14 }} onClick={() => setShowPreview(true)} disabled={isRunning}>
+                            <button className="as-run-btn" style={{ marginTop: 14 }} onClick={handleRunScheduler} disabled={isRunning}>
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                                 strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -1010,81 +990,7 @@ export default function AutoScheduler({ modules, onBack }) {
           </div>
         </div>{/* end as-main-card */}
 
-        {/* ── Right Sidebar Panels ── */}
-        {schedules.length > 0 && (
-          <div className="as-sidebar-panels" style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="as-panel" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '16px' }}>
-              <div className="as-panel-title">Shift Workload</div>
-                <table className="as-workload-table">
-                  <thead><tr><th>Operator</th><th>Shift</th><th>Tasks</th><th>Done</th><th>Progress</th></tr></thead>
-                  <tbody>
-                    {workload.map(w => (
-                      <tr key={w.id}>
-                        <td>
-                          <div className="as-operator-cell">
-                            <div className="as-operator-avatar" style={{ background: INSPECTOR_COLORS[w.id] }}>{w.name[0]}</div>
-                            <div><div className="as-op-name">{w.name}</div><div className="as-op-role">{w.role}</div></div>
-                          </div>
-                        </td>
-                        <td><span className="as-shift-badge">Shift {w.shift}</span></td>
-                        <td className="as-num-cell">{w.total}</td>
-                        <td className="as-num-cell as-done-num">{w.completed}</td>
-                        <td>
-                          <div className="as-workload-bar-wrap">
-                            <div className="as-workload-bar">
-                              <div className="as-workload-fill" style={{
-                                width: `${w.pct}%`,
-                                background: w.pct >= 80 ? '#22c55e' : w.pct >= 50 ? '#3b82f6' : '#f59e0b'
-                              }} />
-                            </div>
-                            <span className="as-workload-pct">{w.pct}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
 
-
-            <div className="as-panel" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', padding: '16px' }}>
-              <div className="as-panel-title as-title-red">Overdue Alerts</div>
-                {overdueItems.length === 0 ? (
-                  <div className="as-no-alerts">No overdue inspections</div>
-                ) : (
-                  <div className="as-alert-list">
-                    {overdueItems.map(s => (
-                      <div key={s.id} className="as-alert-row alert-overdue" onClick={() => setSelectedTask(s)}>
-                        <span className="as-equip-emoji">{MODULE_EMOJIS[s.moduleCode] || '📦'}</span>
-                        <div className="as-alert-info">
-                          <div className="as-alert-name">{s.moduleName} — {s.sosCode}</div>
-                          <div className="as-alert-sub">{s.building} · {s.assignedOperator || 'Unassigned'}</div>
-                        </div>
-                        <span className="as-alert-delay">{s.daysOverdue ?? getDaysOverdue(s.dueDate)}d overdue</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {failedItems.length > 0 && (
-                  <>
-                    <div className="as-panel-title as-title-orange" style={{ marginTop: 16 }}>Failed Inspections</div>
-                    <div className="as-alert-list">
-                      {failedItems.map(s => (
-                        <div key={s.id} className="as-alert-row alert-failed" onClick={() => setSelectedTask(s)}>
-                          <span className="as-equip-emoji">{MODULE_EMOJIS[s.moduleCode] || '📦'}</span>
-                          <div className="as-alert-info">
-                            <div className="as-alert-name">{s.moduleName} — {s.sosCode}</div>
-                            <div className="as-alert-sub">{s.failureReason || 'Inspection failed'}</div>
-                          </div>
-                          <span className="as-alert-delay failed-delay">{s.building}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-          </div>
-        )}
 
       </div>{/* end Layout Wrapper */}
 
@@ -1265,70 +1171,37 @@ export default function AutoScheduler({ modules, onBack }) {
         </div>
       )}
 
-      {/* ── Generate Schedule Preview Modal ── */}
-      {showPreview && (
-        <div className="as-modal-overlay" onClick={() => setShowPreview(false)}>
+      {/* ── Generation Results Modal ── */}
+      {generationResults && (
+        <div className="as-modal-overlay" onClick={() => setGenerationResults(null)}>
           <div className="as-preview-modal" onClick={e => e.stopPropagation()}>
 
             <div className="as-modal-header">
               <div>
-                <div className="as-modal-title">Generate Inspection Schedule</div>
-                <div className="as-modal-sub">Review parameters before creating tasks</div>
+                <div className="as-modal-title">Generation Complete</div>
+                <div className="as-modal-sub">Schedule tasks have been successfully generated</div>
               </div>
-              <button className="as-modal-close" onClick={() => setShowPreview(false)}>✕</button>
+              <button className="as-modal-close" onClick={() => setGenerationResults(null)}>✕</button>
             </div>
 
             <div className="as-preview-body">
-              <div>
-                <div className="as-preview-label">Schedule Window</div>
-                <div className="as-preview-options">
-                  {[{ days: 7, label: '7 Days' }, { days: 30, label: '30 Days' }, { days: 90, label: '90 Days' }].map(opt => (
-                    <button
-                      key={opt.days}
-                      className={`as-preview-opt ${previewDays === opt.days ? 'active' : ''}`}
-                      onClick={() => setPreviewDays(opt.days)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="as-preview-stats">
+              <div className="as-preview-stats" style={{ marginTop: '10px', marginBottom: '20px' }}>
                 <div className="as-preview-stat">
-                  <div className="as-preview-stat-value">{previewStats.equipmentDue}</div>
+                  <div className="as-preview-stat-value">{generationResults.dueCount}</div>
                   <div className="as-preview-stat-label">Equipment Due</div>
                 </div>
                 <div className="as-preview-stat">
-                  <div className="as-preview-stat-value as-stat-blue">{previewStats.willCreate}</div>
-                  <div className="as-preview-stat-label">Will Create</div>
+                  <div className="as-preview-stat-value as-stat-blue">{generationResults.createdCount}</div>
+                  <div className="as-preview-stat-label">Tasks Created</div>
                 </div>
                 <div className="as-preview-stat">
-                  <div className="as-preview-stat-value as-stat-green">{previewStats.alreadyScheduled}</div>
+                  <div className="as-preview-stat-value as-stat-green">{generationResults.alreadyGen}</div>
                   <div className="as-preview-stat-label">Already Scheduled</div>
                 </div>
               </div>
 
-              <div className="as-preview-toggle-row">
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>Auto-Assign Operators</div>
-                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>Assign inspectors based on shift, workload &amp; proximity</div>
-                </div>
-                <label className="as-toggle">
-                  <input type="checkbox" checked={autoAssign} onChange={e => setAutoAssign(e.target.checked)} />
-                  <span className="as-toggle-slider" />
-                </label>
-              </div>
-
-              <div className="as-preview-actions">
-                <button className="as-run-btn" onClick={() => { setShowPreview(false); handleRunScheduler(); }} disabled={isRunning}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                  Generate Schedule
-                </button>
-                <button className="as-btn-secondary" onClick={() => setShowPreview(false)}>Cancel</button>
+              <div className="as-preview-actions" style={{ justifyContent: 'center' }}>
+                <button className="as-btn-secondary" onClick={() => setGenerationResults(null)} style={{ width: '100%', padding: '10px', fontSize: '14px' }}>Close</button>
               </div>
             </div>
 

@@ -3,6 +3,7 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { ApiService } from '../../services/apiService';
+import { filterEquipmentByLocations } from '../../utils/locationFilter';
 import './SuperAdminOverview.css';
 
 const complianceColor = (pct) => {
@@ -15,6 +16,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('');
   const carouselRef = useRef(null);
+  const [assignedLocationCount, setAssignedLocationCount] = useState(null);
 
   const [kpis, setKpis] = useState({
     totalLocations: 0,
@@ -59,25 +61,40 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
         const companyId = user?.company_id || user?.companyId || 21;
 
         const branchesRaw = await ApiService.getBranches({ company_id: companyId }).catch(() => []);
-        const buildings = (Array.isArray(branchesRaw) ? branchesRaw : (branchesRaw?.branches || branchesRaw?.data || []))
+        let buildings = (Array.isArray(branchesRaw) ? branchesRaw : (branchesRaw?.branches || branchesRaw?.data || []))
           .filter(b => !companyId || String(b.company_id) === String(companyId));
+          
+        if (user?.branch_id) {
+          buildings = buildings.filter(b => String(b.id) === String(user.branch_id));
+        }
         
         const dash = await ApiService.getDashboard().catch(() => ({}));
-        const eqRaw = await ApiService.getEquipment({ limit: 1000 }).catch(() => []);
-        const eqList = Array.isArray(eqRaw) ? eqRaw : (eqRaw?.items || eqRaw?.data || []);
+        
+        const [eqRaw, mappingsRaw] = await Promise.all([
+          ApiService.getEquipment({ limit: 1000 }).catch(() => []),
+          ApiService.getOperatorMappings({ user_id: user?.id }).catch(() => [])
+        ]);
+
+        const rawEqList = Array.isArray(eqRaw) ? eqRaw : (eqRaw?.items || eqRaw?.data || []);
+        const mappingsList = Array.isArray(mappingsRaw) ? mappingsRaw : (mappingsRaw?.data || mappingsRaw?.items || []);
+        
+        if (mappingsList.length > 0) setAssignedLocationCount(mappingsList.length);
+
+        // Filter equipment based on AGM's assigned locations
+        const eqList = filterEquipmentByLocations(rawEqList, mappingsList, 'agm');
 
         const alertsData = await ApiService.getAlertsSummary().catch(() => ({ critical: 0, warning: 0, info: 0, total: 0 }));
 
         if (cancelled) return;
 
         const totalLocations = buildings.length;
-        setKpis(prev => ({ ...prev, totalLocations }));
-        
-        setAlertsSummary({
-          critical: alertsData?.critical ?? alertsData?.total_critical ?? 0,
-          warning: alertsData?.warning ?? alertsData?.total_warning ?? 0,
-          info: alertsData?.info ?? alertsData?.total_info ?? 0,
-          total: alertsData?.total ?? 0
+
+        let totalAssets = eqList.length;
+        let dueInspections = 0;
+        let expiredAssets = 0;
+        eqList.forEach(eq => {
+          if (eq.status === 'due-inspection' || eq.status === 'due' || eq.status === 'warning') dueInspections += 1;
+          if (eq.status === 'expired' || eq.status === 'critical') expiredAssets += 1;
         });
 
         const locMap = {};
@@ -86,12 +103,43 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
         });
 
         eqList.forEach(eq => {
+
           const locId = eq.branch_id || eq.location_id || eq.building_id;
           if (locId && locMap[locId]) {
             locMap[locId].total += 1;
-            if (eq.status === 'due-inspection' || eq.status === 'due') locMap[locId].due += 1;
-            if (eq.status === 'expired') locMap[locId].expired += 1;
+            if (eq.status === 'due-inspection' || eq.status === 'due' || eq.status === 'warning') locMap[locId].due += 1;
+            if (eq.status === 'expired' || eq.status === 'critical') locMap[locId].expired += 1;
           }
+        });
+
+        const healthyAssets = Math.max(0, totalAssets - dueInspections - expiredAssets);
+        const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
+
+        setKpis(prev => ({ 
+          ...prev, 
+          totalLocations,
+          totalAssets,
+          dueInspections,
+          expiredAssets,
+          overallCompliance
+        }));
+
+        const completed = Math.round(healthyAssets * 0.58);
+        const inProgress = Math.round(healthyAssets * 0.25);
+        const pending = Math.max(0, totalAssets - completed - inProgress);
+        
+        setTotalInspections(totalAssets);
+        setDonutData([
+          { name: 'Completed', value: completed, color: '#22c55e', pct: '58%' },
+          { name: 'In Progress', value: inProgress, color: '#3b82f6', pct: '25%' },
+          { name: 'Pending', value: pending, color: '#f97316', pct: '17%' }
+        ]);
+
+        setAlertsSummary({
+          critical: alertsData?.critical ?? alertsData?.total_critical ?? 0,
+          warning: alertsData?.warning ?? alertsData?.total_warning ?? 0,
+          info: alertsData?.info ?? alertsData?.total_info ?? 0,
+          total: alertsData?.total ?? 0
         });
 
         const locationsArr = Object.values(locMap).map(loc => {
@@ -116,38 +164,10 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
     return () => { cancelled = true; clearInterval(interval); };
   }, [user]);
 
+  // (Moved into fetchAll to use mappings for equipment filtering)
 
-  // Sync KPIs perfectly with moduleSummaries real-time data
-  useEffect(() => {
-    const modulesArr = (allModules || []).map(mod => moduleSummaries[mod.module_id] || {});
-    if (modulesArr.length > 0) {
-      const due = modulesArr.reduce((s, m) => s + (m.due || 0), 0);
-      const expired = modulesArr.reduce((s, m) => s + (m.expired || 0), 0);
-      const totalAssets = modulesArr.reduce((s, m) => s + (m.total || 0), 0);
-      const healthyAssets = Math.max(0, totalAssets - due - expired);
-      const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
 
-      setKpis(prev => ({
-        ...prev,
-        totalAssets: totalAssets > 0 ? totalAssets : prev.totalAssets,
-        dueInspections: due,
-        expiredAssets: expired,
-        overallCompliance
-      }));
 
-      // Update inspection status based on real-time assets
-      const completed = Math.round(healthyAssets * 0.58);
-      const inProgress = Math.round(healthyAssets * 0.25);
-      const pending = Math.max(0, totalAssets - completed - inProgress);
-      
-      setTotalInspections(totalAssets);
-      setDonutData([
-        { name: 'Completed', value: completed, color: '#22c55e', pct: '58%' },
-        { name: 'In Progress', value: inProgress, color: '#3b82f6', pct: '25%' },
-        { name: 'Pending', value: pending, color: '#f97316', pct: '17%' }
-      ]);
-    }
-  }, [moduleSummaries, allModules]);
 
   const scrollCarousel = (dir) => {
     if (carouselRef.current) {
@@ -174,7 +194,8 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>AGM Dashboard</h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>{branchName}</p>
         </div>
-        <div className="sao-subheader-right">
+        <div className="sao-subheader-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
           <div className="sao-last-updated">
             <span className="sao-lu-label">Last Updated: {lastUpdated}</span>
             <button className="sao-refresh-btn" onClick={() => window.location.reload()} title="Refresh">
@@ -190,7 +211,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="sao-kpi-grid sao-kpi-grid--5cols">
-        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('setup-company')}>
+        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('setup-operator-mapping')}>
           <div className="sao-kpi-icon sao-kpi-icon--blue">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -199,7 +220,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Assigned Locations</div>
-            <div className="sao-kpi-value">{kpis.totalLocations}</div>
+            <div className="sao-kpi-value">{assignedLocationCount ?? kpis.totalLocations}</div>
             <div className="sao-kpi-sub" style={{ opacity: 0 }}>&nbsp;</div>
           </div>
         </div>
@@ -212,7 +233,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Total Assets</div>
-            <div className="sao-kpi-value">{kpis.totalAssets.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.totalAssets || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub" style={{ opacity: 0 }}>&nbsp;</div>
           </div>
         </div>
@@ -227,7 +248,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Due Inspections</div>
-            <div className="sao-kpi-value">{kpis.dueInspections.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.dueInspections || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--amber">Needs attention</div>
           </div>
         </div>
@@ -241,7 +262,7 @@ const AgmOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => 
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Expired Assets</div>
-            <div className="sao-kpi-value">{kpis.expiredAssets.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.expiredAssets || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--red">Immediate action</div>
           </div>
         </div>

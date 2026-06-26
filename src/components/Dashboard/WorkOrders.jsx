@@ -11,16 +11,6 @@ const WorkOrders = ({ onBack, prefill, clearPrefill, allowedModules }) => {
   const [form, setForm] = useState({ title: '', description: '', equipment_id: '', priority: 'medium', assignee: '' });
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { loadOrders(); }, []);
-
-  useEffect(() => {
-    if (prefill) {
-      setForm(prev => ({ ...prev, equipment_id: prefill }));
-      setShowModal(true);
-      if (clearPrefill) clearPrefill();
-    }
-  }, [prefill, clearPrefill]);
-
   const loadOrders = async () => {
     setLoading(true);
     try {
@@ -100,6 +90,16 @@ const WorkOrders = ({ onBack, prefill, clearPrefill, allowedModules }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => { loadOrders(); }, []);
+
+  useEffect(() => {
+    if (prefill) {
+      setForm(prev => ({ ...prev, equipment_id: prefill }));
+      setShowModal(true);
+      if (clearPrefill) clearPrefill();
+    }
+  }, [prefill, clearPrefill]);
 
   const openCreate = () => {
     setEditOrder(null);

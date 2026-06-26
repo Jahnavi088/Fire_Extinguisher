@@ -14,10 +14,10 @@ const fmt = (d) => {
 const isExpired = (d) => d && new Date(d) < new Date();
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'OK' ? '#28a745'
+  v === 'OK' ? '#10b981'
     : (v === 'LOW' || v === 'SCRATCHED') ? '#FF9800'
       : (v === 'MISSING' || v === 'DAMAGED') ? '#dc3545'
         : '#666';
@@ -26,7 +26,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all', label: 'Total Units', icon: '🛢️', color: '#3b82f6', key: 'total' },
-  { type: 'active', label: 'Functional', icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active', label: 'Functional', icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'Needs Service', icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired', label: 'Critical/Faulty', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection', label: 'Due Inspection', icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -134,6 +134,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -144,30 +145,16 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Drum Hose Reels, using fallback data:', err);
-      // Fallback Demo Data
-      setSummary({
-        total: 42,
-        active: 42,
-        upcoming: 0,
-        needs_service: 0,
-        expired: 0,
-        due_inspection: 0,
-        readiness_score: 100
-      });
-      setAlertsSummary({
-        total_alerts: 0,
-        level_1: { count: 0, label: 'Low', description: 'Minor observations' },
-        level_2: { count: 0, label: 'Medium', description: 'Maintenance required' },
-        level_3: { count: 0, label: 'High', description: 'Critical faults' },
-      });
+      console.error('API Load failed:', err);
+      setSummary({ total: 0, active: 0, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
+      setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally {
       setLoading(false);
@@ -192,7 +179,8 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
     }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     setSelectedUnit(item);
@@ -204,7 +192,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -303,7 +291,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 return filtered.slice(0, 10).map((a, i) => {
                   const c = ALERT_COLOR[a.alert_level] || '#888';
                   return (
-                    <div key={a.id || i} className="fe-alert-row" style={{ '--alert-color': c }}>
+                    <div key={a.id || i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': c }}>
                       <div className="fe-alert-body">
                         <div className="fe-alert-code">{a.sos_code || a.barcode}</div>
                         <div className="fe-alert-loc">{[a.location_name, a.building_name].filter(Boolean).join(' · ')}</div>
@@ -333,7 +321,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
                   <ResponsiveContainer>
                     <BarChart
                       data={[
-                        { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                        { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                         { name: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                         { name: 'Faulty', val: summary.expired, color: '#8b5cf6' },
                         { name: 'Due Insp.', val: summary.due_inspection, color: '#dc3545' },
@@ -361,7 +349,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
                         {[
-                          { color: '#28a745' },
+                          { color: '#10b981' },
                           { color: '#f59e0b' },
                           { color: '#8b5cf6' },
                           { color: '#dc3545' },
@@ -374,7 +362,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 </div>
                 <div className="fe-fleet-legend" style={{ marginTop: 20 }}>
                   {[
-                    { label: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { label: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                     { label: 'Needs Service', val: summary.needs_service, color: '#f59e0b' },
                     { label: 'Faulty/Critical', val: summary.expired, color: '#8b5cf6' },
                     { label: 'Due Inspection', val: summary.due_inspection, color: '#dc3545' },
@@ -419,7 +407,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
           <div className="fe-header-search">
             <div className="fe-search-box">
-              <span className="fe-search-icon">🔍</span>
+
               <input
                 type="text"
                 placeholder="Search within this list..."
@@ -534,6 +522,21 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
 
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+            <div className="fe-detail-card fe-full">
+              <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+              <div className="fe-identity-grid">
+                {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                  <div key={f.field_key} className="fe-field">
+                    <div className="fe-field-label">{f.field_label}</div>
+                    <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
 
           {/* Identity — full width */}
           <div className="fe-detail-card fe-full">
@@ -617,7 +620,7 @@ const DrumHoseStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <SectionTitle>📊 Status Classification</SectionTitle>
             <div className="fe-status-chips">
               {[
-                { label: 'Operational', val: u.operational_status, color: u.operational_status === 'active' ? '#28a745' : '#dc3545' },
+                { label: 'Operational', val: u.operational_status, color: u.operational_status === 'active' ? '#10b981' : '#dc3545' },
                 { label: 'Status Bucket', val: u.status_bucket, color: '#3b82f6' },
                 { label: 'Overall', val: u.status, color: '#FF9800' },
               ].map(s => (

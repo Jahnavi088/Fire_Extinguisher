@@ -114,11 +114,9 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
           ? reportsRaw
           : (reportsRaw?.items || reportsRaw?.reports || reportsRaw?.inspections || reportsRaw?.data || []);
 
-        // 5. Fetch equipment status report for totals
-        const eqStatusRaw = await ApiService.getEquipmentStatusReports().catch(() => ({}));
-        const eqStatusList = Array.isArray(eqStatusRaw)
-          ? eqStatusRaw
-          : (eqStatusRaw?.items || eqStatusRaw?.data || []);
+        // 5. Fetch equipment list for accurate totals
+        const eqRaw = await ApiService.getEquipment({ limit: 1000 }).catch(() => []);
+        const eqList = Array.isArray(eqRaw) ? eqRaw : (eqRaw?.items || eqRaw?.data || []);
 
         if (cancelled) return;
 
@@ -126,14 +124,28 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
         const totalCompanies = companiesList.length;
         const totalUsers = usersList.length;
 
-        // Instead of pulling these from dash/eqStatusList, we initialize them.
-        // The real-time sync with moduleSummaries will keep them perfectly matched.
+        let totalAssets = 0;
+        let dueInspections = 0;
+        let expiredAssets = 0;
+        (allModules || []).forEach(mod => {
+          const m = moduleSummaries[mod.module_id] || {};
+          totalAssets += (m.total || 0);
+          dueInspections += (m.due || 0);
+          expiredAssets += (m.expired || 0);
+        });
+
+        const healthyAssets = Math.max(0, totalAssets - dueInspections - expiredAssets);
+        const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
+
         setKpis(prev => ({
           ...prev,
           totalCompanies,
           totalUsers,
+          totalAssets,
+          dueInspections,
+          expiredAssets,
+          overallCompliance
         }));
-
         // ── Compliance Trend (last 7 days from reports) ─────────────────────
         const trendDays = trendPeriod === 'Last 30 Days' ? 30 : trendPeriod === 'Last 14 Days' ? 14 : 7;
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -158,7 +170,7 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
             dayCompliance = Math.round((approved.length / dayReports.length) * 100);
           } else {
             // No data for that day - display overall compliance stably
-            dayCompliance = overallCompliance;
+            dayCompliance = 100;
           }
           trendData.push({ date: label, compliance: dayCompliance });
         }
@@ -265,25 +277,6 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
     };
   }, [trendPeriod]);
 
-  // Sync KPIs perfectly with moduleSummaries real-time data
-  useEffect(() => {
-    const modulesArr = (allModules || []).map(mod => moduleSummaries[mod.module_id] || {});
-    if (modulesArr.length > 0) {
-      const due = modulesArr.reduce((s, m) => s + (m.due || 0), 0);
-      const expired = modulesArr.reduce((s, m) => s + (m.expired || 0), 0);
-      const totalAssets = modulesArr.reduce((s, m) => s + (m.total || 0), 0);
-      const healthyAssets = Math.max(0, totalAssets - due - expired);
-      const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
-
-      setKpis(prev => ({
-        ...prev,
-        totalAssets: totalAssets > 0 ? totalAssets : prev.totalAssets,
-        dueInspections: due,
-        expiredAssets: expired,
-        overallCompliance
-      }));
-    }
-  }, [moduleSummaries, allModules]);
 
 
   const scrollCarousel = (dir) => {
@@ -320,19 +313,10 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
       </div>
 
       {(() => {
-        const activeSummaries = (allModules || []).map(mod => moduleSummaries[mod.module_id] || {});
-        
-        let liveAssets = activeSummaries.reduce((s, m) => s + (m.total || 0), 0);
-        let liveDue = activeSummaries.reduce((s, m) => s + (m.due || 0), 0);
-        let liveExpired = activeSummaries.reduce((s, m) => s + (m.expired || 0), 0);
-
-        let liveCompliance = kpis.overallCompliance;
-        if (liveAssets > 0) {
-          const issues = liveExpired + liveDue;
-          liveCompliance = Math.round(((liveAssets - issues) / liveAssets) * 100);
-        } else {
-          liveCompliance = 100;
-        }
+        let liveAssets = kpis.totalAssets || 0;
+        let liveDue = kpis.dueInspections || 0;
+        let liveExpired = kpis.expiredAssets || 0;
+        let liveCompliance = kpis.overallCompliance || 100;
 
         return (
           <div className="sao-kpi-grid">
@@ -359,7 +343,7 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Total Users</div>
-            <div className="sao-kpi-value">{kpis.totalUsers.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.totalUsers || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--green">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11"><polyline points="18 15 12 9 6 15" /></svg>
               12 this week
@@ -559,7 +543,7 @@ const SuperAdminOverview = ({ onNavigate, allModules, moduleSummaries = {} }) =>
                       </td>
                       <td>{c.locations}</td>
                       <td>{c.users}</td>
-                      <td>{c.assets.toLocaleString()}</td>
+                      <td>{(c.assets || 0).toLocaleString()}</td>
                       <td>
                         <span className="sao-compliance-badge"
                           style={{ background: complianceBg(c.compliance), color: complianceColor(c.compliance) }}>

@@ -2,7 +2,7 @@ import { useState, useEffect, useReducer, useMemo } from 'react';
 import { ApiService } from '../../services/apiService';
 import './UserManagement.css';
 
-const NAV_MODULES = [
+export const NAV_MODULES = [
   // --- MAIN ---
   { code: 'overview', label: 'Overview', icon: '🏠', category: 'Main' },
 
@@ -41,16 +41,17 @@ const NAV_MODULES = [
   { code: 'emergency_comm', label: 'Emergency Comms', icon: '📞', category: 'Modules' },
   { code: 'fire_blanket', label: 'Fire Blankets', icon: '🧲', category: 'Modules' },
   { code: 'muster_point', label: 'Muster Points', icon: '📌', category: 'Modules' },
+  { code: 'sand_bucket', label: 'Sand Buckets', icon: '🪣', category: 'Modules' },
 
   // --- SETUP ---
   { code: 'add_company', label: 'Add Company', icon: '🏢', category: 'Setup' },
   { code: 'add_equipment', label: 'Onboarding', icon: '🚀', category: 'Setup' },
 
   // --- USERS ---
-  { code: 'user_manage', label: 'Manage Users', icon: '👥', category: 'Users' },
+  { code: 'user_manage', label: 'User Management', icon: '👥', category: 'Users' },
   { code: 'equipment_access', label: 'Equipment Access', icon: '🔐', category: 'Users' },
 ];
-const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Modules', 'Setup', 'Users'];
+export const NAV_CATEGORIES = ['Main', 'Operations', 'System & Security', 'Modules', 'Setup', 'Users'];
 
 const ROLE_CONFIG = {
   superadmin: { label: 'Superadmin', color: '#5fd3f3', bg: 'rgba(95,211,243,0.18)' },
@@ -89,10 +90,11 @@ const CODE_TO_ID = {
   safety_signage: 62,
   emergency_comm: 61,
   fire_blanket: 41,
-  muster_point: 59
+  muster_point: 59,
+  sand_bucket: 63
 };
 
-const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'inspector', status: 'active', company_id: '', shift_id: '', supervisor_id: '', agm_id: '', availability_status: 'active', leave_start_at: '', leave_end_at: '', leave_reason: '' };
+const EMPTY_FORM = { name: '', username: '', email: '', password: '', role: 'inspector', status: 'active', company_id: '', shift_id: '', supervisor_id: '', agm_id: '', availability_status: 'active', leave_start_at: '', leave_end_at: '', leave_reason: '', branch_id: '', building_id: '', floor_id: '', zone_id: '', department_id: '' };
 const ROLE_ORDER = ['superadmin', 'admin', 'agm', 'supervisor', 'inspector'];
 const PAGE_SIZE = 10;
 
@@ -157,10 +159,17 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
   const [fetchState, dispatch] = useReducer(fetchReducer, { loading: true, error: null, users: [] });
   const { loading, error, users } = fetchState;
 
+  const loggedInUserStr = localStorage.getItem('user');
+  const loggedInUser = loggedInUserStr ? JSON.parse(loggedInUserStr) : null;
+  const isAGM = loggedInUser?.role === 'agm';
+  const [roleAllowedModules, setRoleAllowedModules] = useState(null);
+
   const displayModules = useMemo(() => {
     let list = NAV_MODULES;
 
-    if (navAccess && navAccess.length > 0) {
+    if (roleAllowedModules) {
+      list = list.filter(m => roleAllowedModules.has(m.code));
+    } else if (navAccess && navAccess.length > 0) {
       const allowedCodes = new Set(navAccess);
       list = list.filter(m => allowedCodes.has(m.code));
     } else if (allowedModules) {
@@ -172,7 +181,7 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
     }
 
     return list;
-  }, [allowedModules, navAccess]);
+  }, [allowedModules, navAccess, roleAllowedModules]);
 
   const displayCategories = useMemo(() => {
     return NAV_CATEGORIES.filter(cat =>
@@ -199,6 +208,13 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
   const [shifts, setShifts] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [agms, setAgms] = useState([]);
+
+  // Location hierarchy for user assignment
+  const [branches, setBranches] = useState([]);
+  const [buildings, setBuildings] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   const similarityWarning = useMemo(() => {
     if (!form.email || !form.email.trim() || !form.company_id) return null;
@@ -266,6 +282,63 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
     return () => { active = false; };
   }, [refreshKey]);
 
+  // Cascading location loads when form is open
+  useEffect(() => {
+    if (!showForm) return;
+    const cId = form.company_id;
+    if (!cId) { setBranches([]); setBuildings([]); setFloors([]); setZones([]); setDepartments([]); return; }
+    ApiService.getBranches({ company_id: cId })
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.branches || res?.data || []);
+        setBranches(list);
+      })
+      .catch(() => setBranches([]));
+    setBuildings([]); setFloors([]); setZones([]); setDepartments([]);
+  }, [form.company_id, showForm]);
+
+  useEffect(() => {
+    if (!showForm || !form.branch_id) { setBuildings([]); setFloors([]); setZones([]); setDepartments([]); return; }
+    ApiService.getBranchBuildings(form.branch_id)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.buildings || res?.data || []);
+        setBuildings(list);
+      })
+      .catch(() => setBuildings([]));
+    setFloors([]); setZones([]); setDepartments([]);
+  }, [form.branch_id, showForm]);
+
+  useEffect(() => {
+    if (!showForm || !form.building_id) { setFloors([]); setZones([]); setDepartments([]); return; }
+    ApiService.getBuildingFloors(form.building_id)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.floors || res?.data || []);
+        setFloors(list);
+      })
+      .catch(() => setFloors([]));
+    setZones([]); setDepartments([]);
+  }, [form.building_id, showForm]);
+
+  useEffect(() => {
+    if (!showForm || !form.floor_id) { setZones([]); setDepartments([]); return; }
+    ApiService.getFloorZones(form.floor_id)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.zones || res?.data || []);
+        setZones(list);
+      })
+      .catch(() => setZones([]));
+    setDepartments([]);
+  }, [form.floor_id, showForm]);
+
+  useEffect(() => {
+    if (!showForm || !form.zone_id) { setDepartments([]); return; }
+    ApiService.getZoneDepartments(form.zone_id)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.departments || res?.data || []);
+        setDepartments(list);
+      })
+      .catch(() => setDepartments([]));
+  }, [form.zone_id, showForm]);
+
   const filteredUsers = useMemo(() => {
     const activeUsers = users.filter(u => u.status !== 'inactive');
     const q = search.trim().toLowerCase();
@@ -287,7 +360,11 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
   const openAdd = () => {
     setShowPasswordText(false);
     setEditUser(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      company_id: isAGM && loggedInUser?.company_id ? loggedInUser.company_id : '',
+      branch_id: isAGM && loggedInUser?.branch_id ? loggedInUser.branch_id : ''
+    });
     setFormError('');
     setShowForm(true);
   };
@@ -319,14 +396,19 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
       password: '',
       role: u.role || 'user',
       status: u.status || 'active',
-      company_id: u.company_id || '',
+      company_id: u.company_id || (isAGM && loggedInUser?.company_id ? loggedInUser.company_id : ''),
       shift_id: u.shift_id || '',
       supervisor_id: u.supervisor_id || '',
       agm_id: u.agm_id || '',
       availability_status: u.availability_status || 'active',
       leave_start_at: u.leave_start_at ? u.leave_start_at.split('T')[0] : '',
       leave_end_at: u.leave_end_at ? u.leave_end_at.split('T')[0] : '',
-      leave_reason: u.leave_reason || ''
+      leave_reason: u.leave_reason || '',
+      branch_id: u.branch_id || (isAGM && loggedInUser?.branch_id ? loggedInUser.branch_id : ''),
+      building_id: u.building_id || '',
+      floor_id: u.floor_id || '',
+      zone_id: u.zone_id || '',
+      department_id: u.department_id || '',
     });
     setFormError('');
     setShowForm(true);
@@ -341,14 +423,19 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
         password: '',
         role: actualUser.role || 'user',
         status: actualUser.status || 'active',
-        company_id: actualUser.company_id || '',
+        company_id: actualUser.company_id || (isAGM && loggedInUser?.company_id ? loggedInUser.company_id : ''),
         shift_id: actualUser.shift_id || '',
         supervisor_id: actualUser.supervisor_id || '',
         agm_id: actualUser.agm_id || '',
         availability_status: actualUser.availability_status || 'active',
         leave_start_at: actualUser.leave_start_at ? actualUser.leave_start_at.split('T')[0] : '',
         leave_end_at: actualUser.leave_end_at ? actualUser.leave_end_at.split('T')[0] : '',
-        leave_reason: actualUser.leave_reason || ''
+        leave_reason: actualUser.leave_reason || '',
+        branch_id: actualUser.branch_id || (isAGM && loggedInUser?.branch_id ? loggedInUser.branch_id : ''),
+        building_id: actualUser.building_id || '',
+        floor_id: actualUser.floor_id || '',
+        zone_id: actualUser.zone_id || '',
+        department_id: actualUser.department_id || '',
       });
     } catch (err) {
       console.error('Failed to fetch full user details:', err);
@@ -358,12 +445,35 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
   const openViewModules = (u) => {
     setViewUser(u);
     setModLoading(true);
+    setRoleAllowedModules(null);
 
     Promise.allSettled([
       ApiService.getAdminUserModules(u.id),
-      ApiService.getAdminUserNavAccess(u.id)
+      ApiService.getAdminUserNavAccess(u.id),
+      ApiService.getAdminRoles()
     ])
-      .then(([modulesRes, navRes]) => {
+      .then(async ([modulesRes, navRes, rolesRes]) => {
+        let allowedSet = null;
+        if (rolesRes.status === 'fulfilled' && rolesRes.value) {
+          const val = rolesRes.value;
+          const rolesList = Array.isArray(val) ? val : (val?.roles || val?.data || []);
+          const uRole = (u.role || '').toLowerCase();
+          const matchingRole = rolesList.find(r => r.name && r.name.toLowerCase() === uRole);
+          if (matchingRole) {
+            try {
+              const rModRes = await ApiService.getAdminRoleModules(matchingRole.id);
+              let nList = [];
+              if (rModRes && rModRes.data) nList = Array.isArray(rModRes.data) ? rModRes.data : (rModRes.data.modules || []);
+              else if (rModRes && rModRes.modules) nList = rModRes.modules;
+              else if (Array.isArray(rModRes)) nList = rModRes;
+              allowedSet = new Set(nList);
+            } catch (e) {
+              console.error("Failed to fetch role allowed modules", e);
+            }
+          }
+        }
+        setRoleAllowedModules(allowedSet);
+
         const checks = {};
         let hasData = false;
 
@@ -543,10 +653,15 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
           email: form.email,
           role: form.role,
           status: form.status,
-          company_id: form.company_id,
+          company_id: form.company_id ? Number(form.company_id) : null,
           shift_id: form.shift_id ? Number(form.shift_id) : null,
-          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
-          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
+          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id ? Number(form.supervisor_id) : null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id ? Number(form.agm_id) : null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId ? Number(supervisorAgmId) : null) : null),
+          branch_id: form.branch_id ? Number(form.branch_id) : null,
+          building_id: form.building_id ? Number(form.building_id) : null,
+          floor_id: form.floor_id ? Number(form.floor_id) : null,
+          zone_id: form.zone_id ? Number(form.zone_id) : null,
+          department_id: form.department_id ? Number(form.department_id) : null,
         };
         if (form.password.trim()) payload.password = form.password;
         await ApiService.updateAdminUser(editUser.id, payload);
@@ -571,10 +686,15 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
           password: form.password,
           role: form.role,
           status: form.status,
-          company_id: form.company_id,
+          company_id: form.company_id ? Number(form.company_id) : null,
           shift_id: form.shift_id ? Number(form.shift_id) : null,
-          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id || null) : null,
-          agm_id: form.role === 'supervisor' ? (form.agm_id || null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId || null) : null)
+          supervisor_id: (form.role === 'inspector' || form.role === 'user') ? (form.supervisor_id ? Number(form.supervisor_id) : null) : null,
+          agm_id: form.role === 'supervisor' ? (form.agm_id ? Number(form.agm_id) : null) : ((form.role === 'inspector' || form.role === 'user') ? (supervisorAgmId ? Number(supervisorAgmId) : null) : null),
+          branch_id: form.branch_id ? Number(form.branch_id) : null,
+          building_id: form.building_id ? Number(form.building_id) : null,
+          floor_id: form.floor_id ? Number(form.floor_id) : null,
+          zone_id: form.zone_id ? Number(form.zone_id) : null,
+          department_id: form.department_id ? Number(form.department_id) : null,
         });
         showToast('User created successfully.');
       }
@@ -874,13 +994,68 @@ const UserManagement = ({ onBack, allowedModules, navAccess, onViewEquipmentAcce
                 </div>
                 <div className="um-form-field">
                   <label>Assign Company</label>
-                  <select value={form.company_id} onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))}>
+                  <select value={form.company_id} disabled={isAGM} onChange={e => setForm(f => ({ ...f, company_id: e.target.value, branch_id: '', building_id: '', floor_id: '', zone_id: '', department_id: '' }))}>
                     <option value="">No Company</option>
                     {companies.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
+                {branches.length > 0 && (
+                  <div className="um-form-field">
+                    <label>Assign Branch</label>
+                    <select value={form.branch_id || ''} disabled={isAGM} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value, building_id: '', floor_id: '', zone_id: '', department_id: '' }))}>
+                      <option value="">All Branches</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name || b.branch_name || `Branch ${b.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {form.branch_id && buildings.length > 0 && (
+                  <div className="um-form-field">
+                    <label>Assign Building</label>
+                    <select value={form.building_id || ''} onChange={e => setForm(f => ({ ...f, building_id: e.target.value, floor_id: '', zone_id: '', department_id: '' }))}>
+                      <option value="">All Buildings</option>
+                      {buildings.map(b => (
+                        <option key={b.id} value={b.id}>{b.name || b.building_name || `Building ${b.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {form.building_id && floors.length > 0 && (
+                  <div className="um-form-field">
+                    <label>Assign Floor</label>
+                    <select value={form.floor_id || ''} onChange={e => setForm(f => ({ ...f, floor_id: e.target.value, zone_id: '', department_id: '' }))}>
+                      <option value="">All Floors</option>
+                      {floors.map(fl => (
+                        <option key={fl.id} value={fl.id}>{fl.name || fl.floor_name || `Floor ${fl.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {form.floor_id && zones.length > 0 && (
+                  <div className="um-form-field">
+                    <label>Assign Zone</label>
+                    <select value={form.zone_id || ''} onChange={e => setForm(f => ({ ...f, zone_id: e.target.value, department_id: '' }))}>
+                      <option value="">All Zones</option>
+                      {zones.map(z => (
+                        <option key={z.id} value={z.id}>{z.name || z.zone_name || `Zone ${z.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {form.zone_id && departments.length > 0 && (
+                  <div className="um-form-field">
+                    <label>Assign Department</label>
+                    <select value={form.department_id || ''} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
+                      <option value="">All Departments</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name || d.department_name || `Department ${d.id}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="um-form-field">
                   <label>Assign Shift</label>
                   <select value={form.shift_id || ''} onChange={e => setForm(f => ({ ...f, shift_id: e.target.value }))}>

@@ -1,4 +1,20 @@
 import { ApiService } from './apiService';
+import { filterEquipmentByLocations } from '../utils/locationFilter';
+
+// Module-level location filter config — set once from SafetyDashboard
+let _userMappings = null;
+let _userRole = null;
+
+export const configureLocationFilter = (userMappings, userRole) => {
+  _userMappings = userMappings || null;
+  _userRole = userRole || null;
+};
+
+const applyLocationFilter = (items) => {
+  // Filtering is now handled globally in ApiService.getEquipment
+  // and ApiService.getEquipmentStatusReports.
+  return items;
+};
 
 /**
  * Shared equipment fetcher used by all module stats components.
@@ -12,9 +28,8 @@ import { ApiService } from './apiService';
 export const fetchEquipmentByStatus = async (moduleId, type) => {
   if (type === 'all') {
     const data = await ApiService.getEquipmentStatusReports({ module_id: moduleId, limit: 1000 });
-    const items = data.items || [];
-    const total = data.pagination?.total_matched ?? items.length;
-    return { items, total };
+    const items = applyLocationFilter(data.items || []);
+    return { items, total: items.length };
   }
 
   if (type === 'active') {
@@ -22,12 +37,15 @@ export const fetchEquipmentByStatus = async (moduleId, type) => {
       ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'active' }),
       ApiService.getEquipment({ module_id: moduleId, limit: 500, status: 'upcoming' }),
     ]);
-    return {
-      items: [...(activeData.items || []), ...(upcomingData.items || [])],
-      total: (activeData.total || 0) + (upcomingData.total || 0),
-    };
+    const combined = [
+      ...(activeData.items || []),
+      ...(upcomingData.items || []),
+    ];
+    const items = applyLocationFilter(combined);
+    return { items, total: items.length };
   }
 
   const data = await ApiService.getEquipment({ module_id: moduleId, limit: 500, status: type });
-  return { items: data.items || [], total: data.total || 0 };
+  const items = applyLocationFilter(data.items || []);
+  return { items, total: items.length };
 };

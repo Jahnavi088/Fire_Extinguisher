@@ -12,10 +12,10 @@ const fmt = (d) => {
 };
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const healthColour = (c) => {
-  if (c === 'green') return '#28a745';
+  if (c === 'green') return '#10b981';
   if (c === 'amber') return '#FF9800';
   return '#dc3545';
 };
@@ -24,7 +24,7 @@ const ALERT_COLOR = { 1: '#FF9800', 2: '#f43f5e', 3: '#dc3545' };
 
 const KPI_CARDS = [
   { type: 'all',           label: 'Total Fleet',     icon: '🛒', color: '#3b82f6', key: 'total' },
-  { type: 'active',        label: 'Functional',      icon: '✅', color: '#28a745', key: 'active' },
+  { type: 'active',        label: 'Functional',      icon: '✅', color: '#10b981', key: 'active' },
   { type: 'needs-service', label: 'Needs Service',   icon: '🔧', color: '#f59e0b', key: 'needs_service' },
   { type: 'expired',       label: 'Critical/Faulty', icon: '⌛', color: '#8b5cf6', key: 'expired' },
   { type: 'due-inspection',label: 'Due Inspection',  icon: '🚨', color: '#dc3545', key: 'due_inspection' },
@@ -72,6 +72,8 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listLoading, setListLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
+  const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { load(); }, [modId]);
@@ -81,7 +83,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData, plantData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
         ApiService.getModulePlantHealth(modId).catch(() => null),
       ]);
@@ -124,13 +126,20 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
     finally { setListLoading(false); }
   };
 
-  const openDetail = (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setSelectedUnit({ ...item, ...(item.details || {}) });
     setView('detail');
+    setDetailLoading(true);
+    try {
+      const data = await ApiService.getEquipmentBySosCode(item.sos_code || item.id);
+      setSelectedUnit({ ...data, ...(data.details || {}) });
+    } catch { /* keep row data */ }
+    finally { setDetailLoading(false); }
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -178,7 +187,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
               {topAlerts.length === 0
                 ? <div className="fe-empty">No active faults.</div>
                 : topAlerts.slice(0, 8).map((a, i) => (
-                  <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+                  <div key={i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': ALERT_COLOR[a.alert_level] }}>
                     <div className="fe-alert-body">
                       <div className="fe-alert-code">{a.sos_code}</div>
                       <div className="fe-alert-loc">{a.location_name}</div>
@@ -196,7 +205,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
               <div style={{ height: 150, width: '100%', marginTop: 5 }}>
                 <ResponsiveContainer>
                   <BarChart data={[
-                    { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                    { name: 'Functional', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                     { name: 'Needs Svc',  val: summary.needs_service, color: '#f59e0b' },
                     { name: 'Expired',    val: summary.expired,       color: '#8b5cf6' },
                     { name: 'Due Insp',   val: summary.due_inspection,color: '#dc3545' },
@@ -206,7 +215,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
                     <YAxis hide />
                     <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', fontSize: '12px' }} />
                     <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={42}>
-                      {['#28a745','#f59e0b','#8b5cf6','#dc3545'].map((col, i) => <Cell key={i} fill={col} />)}
+                      {['#10b981','#f59e0b','#8b5cf6','#dc3545'].map((col, i) => <Cell key={i} fill={col} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -327,6 +336,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
         )}
         <span className="fe-score-badge" style={{ color: c, borderColor: c + '66', background: c + '18' }}>{sc}%</span>
       </div>
+      {detailLoading ? <Spinner /> : (
       <div className="fe-detail-grid">
         <div className="fe-detail-card fe-full">
           <SectionTitle>Trolley Specifications</SectionTitle>
@@ -334,7 +344,15 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <InfoRow label="SOS Code" val={u.sos_code} />
             <InfoRow label="Serial No." val={u.serial_number} />
             <InfoRow label="Operational Status" val={u.operational_status} />
-            <InfoRow label="Status Bucket" val={u.status_bucket} />
+            
+            {/* DYNAMIC FIELDS FROM API */}
+            {Array.isArray(u.field_definitions) && u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+              <InfoRow 
+                key={f.field_key} 
+                label={f.field_label} 
+                val={u.details?.[f.field_key] ?? u[f.field_key]} 
+              />
+            ))}
           </div>
         </div>
         <div className="fe-detail-card">
@@ -354,6 +372,7 @@ const FireTrolleyStats = ({ module, onBack, onRaiseWorkOrder }) => {
           <InfoRow label="Remarks" val={u.remarks} />
         </div>
       </div>
+      )}
     </div>
   );
 };

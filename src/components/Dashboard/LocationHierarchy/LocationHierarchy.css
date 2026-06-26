@@ -1,0 +1,679 @@
+/* ── LocationHierarchyWorkspace Design System ─────────────────────────────── */
+
+/* Level color tokens */
+:root {
+  --lh-branch-color:   #3b82f6;
+  --lh-branch-light:   #eff6ff;
+  --lh-branch-border:  #bfdbfe;
+
+  --lh-building-color: #10b981;
+  --lh-building-light: #f0fdf4;
+  --lh-building-border:#bbf7d0;
+
+  --lh-floor-color:    #f59e0b;
+  --lh-floor-light:    #fffbeb;
+  --lh-floor-border:   #fde68a;
+
+  --lh-zone-color:     #8b5cf6;
+  --lh-zone-light:     #f5f3ff;
+  --lh-zone-border:    #ddd6fe;
+
+  --lh-dept-color:     #ec4899;
+  --lh-dept-light:     #fdf2f8;
+  --lh-dept-border:    #f9a8d4;
+}
+
+/* ── Workspace shell ──────────────────────────────────────────────────────── */
+.lh-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #111827;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.lh-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px 10px;
+  background: transparent;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.lh-back-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.05);
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.lh-back-btn:hover {
+  background: rgba(0,0,0,0.1);
+  color: #0f172a;
+}
+
+.lh-header-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lh-header-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.lh-header-subtitle {
+  font-size: 11px;
+  color: #475569;
+  margin-top: 2px;
+}
+
+.lh-reload-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.04);
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.lh-reload-btn:hover {
+  background: rgba(0,0,0,0.09);
+  color: #0f172a;
+}
+
+
+/* ── Main content area ────────────────────────────────────────────────────── */
+.lh-content {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Level header ─────────────────────────────────────────────────────────── */
+.lh-level-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lh-level-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lh-level-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lh-level-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lh-level-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.lh-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+}
+.lh-add-btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+/* ── Card grid ────────────────────────────────────────────────────────────── */
+.lh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* ── Individual card ──────────────────────────────────────────────────────── */
+.lh-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.lh-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+  border-color: #d1d5db;
+}
+.lh-card.no-click { cursor: default; }
+.lh-card.no-click:hover { transform: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+.lh-card-accent {
+  height: 4px;
+  flex-shrink: 0;
+}
+
+.lh-card-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lh-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lh-card-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.lh-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.lh-card-id {
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: monospace;
+}
+
+/* ── Card badges row ──────────────────────────────────────────────────────── */
+.lh-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.lh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lh-badge-coord {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.lh-badge-children {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+/* ── Card actions ─────────────────────────────────────────────────────────── */
+.lh-card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  background: #fafafa;
+}
+
+.lh-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.lh-action-btn.edit {
+  background: #f0f9ff;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+.lh-action-btn.edit:hover { background: #e0f2fe; }
+.lh-action-btn.del {
+  background: #fff1f2;
+  color: #be123c;
+  border-color: #fecdd3;
+}
+.lh-action-btn.del:hover { background: #ffe4e6; }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.lh-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 72px 24px;
+  border: 2px dashed #e5e7eb;
+  border-radius: 14px;
+  text-align: center;
+  gap: 10px;
+  background: #fff;
+}
+.lh-empty-icon { font-size: 52px; opacity: 0.35; }
+.lh-empty-title { font-size: 17px; font-weight: 600; color: #374151; }
+.lh-empty-sub { font-size: 14px; color: #9ca3af; }
+
+/* ── Loading ──────────────────────────────────────────────────────────────── */
+.lh-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 14px;
+  color: #6b7280;
+}
+
+/* ── Data Table View ── */
+.lh-table-container {
+  width: 100%;
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.lh-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.lh-table th {
+  background: #f9fafb;
+  padding: 12px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.lh-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.lh-table-row-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.lh-table-row-clickable:hover {
+  background: #f8fafc;
+}
+
+.lh-table-row-clickable:last-child td {
+  border-bottom: none;
+}
+
+.lh-table-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lh-table-icon {
+  font-size: 18px;
+  background: #f3f4f6;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Next navigation button ──────────────────────────────────────────────── */
+.lh-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.lh-next-btn:hover {
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+}
+
+.lh-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+.lh-loading-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: lh-spin 0.8s linear infinite;
+}
+
+/* ── Modal overlay ────────────────────────────────────────────────────────── */
+.lh-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: lh-fadein 0.18s ease;
+}
+
+.lh-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+  animation: lh-slidein 0.22s ease;
+}
+
+.lh-modal-header {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lh-modal-header-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.lh-modal-title { font-size: 18px; font-weight: 700; color: #111827; }
+.lh-modal-subtitle { font-size: 12.5px; color: #6b7280; margin-top: 2px; }
+
+.lh-modal-body {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lh-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 7px;
+}
+.lh-field-hint {
+  font-size: 11.5px;
+  color: #9ca3af;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.lh-text-input {
+  width: 100%;
+  padding: 10px 13px;
+  border-radius: 8px;
+  border: 1.5px solid #d1d5db;
+  font-size: 14px;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.18s;
+}
+.lh-text-input:focus { border-color: #3b82f6; }
+
+/* ── Coordinate section ───────────────────────────────────────────────────── */
+.lh-coord-section {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lh-coord-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lh-coord-row {
+  display: flex;
+  gap: 10px;
+}
+.lh-coord-row .lh-text-input { flex: 1; }
+
+.lh-coord-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lh-coord-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 7px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #374151;
+  font-family: inherit;
+}
+.lh-coord-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+.lh-coord-btn.active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+.lh-coord-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Auto-detected badge ──────────────────────────────────────────────────── */
+.lh-geocoded-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 13px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #166534;
+}
+.lh-geocoded-badge .place-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+.lh-geocoded-badge .coords-mono {
+  font-family: monospace;
+  font-size: 11.5px;
+  color: #15803d;
+  margin-top: 2px;
+}
+.lh-geocoded-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.lh-geocoded-close:hover { color: #111827; }
+
+/* ── Map toggle section ───────────────────────────────────────────────────── */
+.lh-map-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid #bfdbfe;
+  animation: lh-fadein 0.2s ease;
+}
+
+/* ── Modal footer ─────────────────────────────────────────────────────────── */
+.lh-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #fafafa;
+  border-radius: 0 0 16px 16px;
+}
+
+.lh-btn-cancel {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.lh-btn-cancel:hover { background: #f3f4f6; }
+
+.lh-btn-save {
+  padding: 10px 22px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #fff;
+  font-family: inherit;
+}
+.lh-btn-save:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.lh-btn-save:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+
+/* ── Delete confirm modal ─────────────────────────────────────────────────── */
+.lh-delete-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  animation: lh-slidein 0.2s ease;
+}
+.lh-delete-icon { font-size: 44px; margin-bottom: 12px; }
+.lh-delete-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+.lh-delete-sub { font-size: 13.5px; color: #6b7280; margin-bottom: 24px; line-height: 1.5; }
+.lh-delete-actions { display: flex; gap: 10px; justify-content: center; }
+
+.lh-btn-delete {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.lh-btn-delete:hover { background: #dc2626; }
+
+/* ── Keyframes ────────────────────────────────────────────────────────────── */
+@keyframes lh-spin { to { transform: rotate(360deg); } }
+@keyframes lh-fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lh-slidein {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .lh-header { padding: 16px 16px 12px; }
+  .lh-content { padding: 16px; }
+  .lh-grid { grid-template-columns: 1fr; }
+  .lh-stats-row { gap: 6px; }
+  .lh-stat-pill { padding: 5px 10px; font-size: 11.5px; }
+  .lh-breadcrumb-bar { padding: 8px 14px; }
+}

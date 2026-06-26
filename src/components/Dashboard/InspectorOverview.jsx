@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import useSWR from 'swr';
 import { ApiService } from '../../services/apiService';
+import { filterEquipmentByLocations } from '../../utils/locationFilter';
 import './SuperAdminOverview.css';
 
 const complianceColor = (pct) => {
@@ -8,25 +10,66 @@ const complianceColor = (pct) => {
   return '#dc2626';
 };
 
-const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => {
-  const [loading, setLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState('');
 
-  const [kpis, setKpis] = useState({
-    todaysTasks: 8,
-    completed: 5,
-    pending: 2,
-    overdue: 1,
-    myCompliance: 90,
+const fetchInspectorData = async ([_, userId]) => {
+  const [reportsRaw, eqRaw, statsRaw, mappingsRaw] = await Promise.all([
+    (async () => {
+      const todayDate = new Date();
+      const endDateStr = todayDate.toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(todayDate.getDate() - 30);
+      const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+      return ApiService.getInspectionReports({ start_date: startDateStr, end_date: endDateStr, inspector_id: userId }).catch(() => []);
+    })(),
+    ApiService.getEquipment({ limit: 1000 }).catch(() => []),
+    ApiService.getInspectorOverviewStats(userId).catch(() => null),
+    ApiService.getOperatorMappings({ user_id: userId }).catch(() => [])
+  ]);
+
+  const reportsList = Array.isArray(reportsRaw)
+    ? reportsRaw
+    : (reportsRaw?.items || reportsRaw?.reports || reportsRaw?.inspections || reportsRaw?.data || []);
+
+  const rawEqList = Array.isArray(eqRaw) ? eqRaw : (eqRaw?.items || eqRaw?.data || []);
+  const mappingsList = Array.isArray(mappingsRaw) ? mappingsRaw : (mappingsRaw?.data || mappingsRaw?.items || []);
+
+  const eqList = filterEquipmentByLocations(rawEqList, mappingsList, 'inspector');
+
+  return { reportsList, eqList, statsData: statsRaw, mappingsList };
+};
+
+const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) => {
+  const [lastUpdated, setLastUpdated] = useState('');
+  const [showAllInspections, setShowAllInspections] = useState(false);
+  const [assignedLocationCount, setAssignedLocationCount] = useState(0);
+  const { data, error, isLoading } = useSWR(['inspector-overview', user?.id], fetchInspectorData, {
+    refreshInterval: 15000,
+    revalidateOnFocus: true,
   });
 
-  const [todaysInspections, setTodaysInspections] = useState([
-    { id: 1, name: 'Fire Extinguisher FE-101', area: 'Granulation Area', time: '09:00 AM', status: 'Completed', icon: '/images/fire_extinguisher1.png' },
-    { id: 2, name: 'Sprinkler SP-201', area: 'Granulation Area', time: '10:00 AM', status: 'Completed', icon: '/images/sprinkler1.png' },
-    { id: 3, name: 'Hose Reel HR-301', area: 'Compression Area', time: '11:00 AM', status: 'Pending', icon: '/images/hosereels1.png' },
-    { id: 4, name: 'Emergency Light EL-12', area: 'Packing Area', time: '01:00 PM', status: 'Pending', icon: '/images/emergencylight1.png' },
-    { id: 5, name: 'Smoke Detector SD-45', area: 'Packing Area', time: '02:00 PM', status: 'Overdue', icon: '/images/smoke_detector1.png' }
-  ]);
+  const updateTime = () => {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    setLastUpdated(`${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`);
+  };
+
+  useEffect(() => {
+    updateTime();
+    const timer = setInterval(updateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (data?.mappingsList) {
+      setAssignedLocationCount(data.mappingsList.length);
+    }
+  }, [data?.mappingsList]);
+
+
+
+  const userName = user?.name || user?.username || 'Inspector';
 
   const equipmentSummary = React.useMemo(() => {
     if (!allModules || allModules.length === 0) {
@@ -50,29 +93,6 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
     );
   }, [allModules, moduleSummaries]);
 
-  const [recentActivity, setRecentActivity] = useState([
-    { id: 1, type: 'inspection', text: 'Inspection completed for FE-100', time: '30m ago' },
-    { id: 2, type: 'alert', text: 'Found low pressure in FE-98', time: '2h ago' },
-    { id: 3, type: 'photo', text: 'Photo uploaded for HR-300', time: '3h ago' }
-  ]);
-
-  const updateTime = () => {
-    const now = new Date();
-    const h = now.getHours(), m = now.getMinutes();
-    const suffix = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    setLastUpdated(`${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`);
-  };
-
-  useEffect(() => {
-    updateTime();
-    const timer = setInterval(updateTime, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const branchName = user?.branch_name || user?.company_name || 'Production Zone A';
-  const userName = user?.name || user?.username || 'Inspector';
-
   // Calculate percentages for donut chart
   const totalSafe = equipmentSummary.total || 1;
   const normalPct = (equipmentSummary.normal / totalSafe) * 100;
@@ -90,6 +110,109 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
   const normalOffset = 0;
   const attentionOffset = -normalDash;
   const criticalOffset = -(normalDash + attentionDash);
+
+  const kpis = useMemo(() => {
+    if (!data) return { todaysTasks: 0, completed: 0, pending: 0, overdue: 0, myCompliance: 100 };
+    const { eqList, reportsList, statsData } = data;
+    
+    let todaysTasks = 0, pending = 0, overdue = 0;
+    eqList.forEach(eq => {
+      if (!eq) return;
+      const st = (eq.status || '').toLowerCase();
+      if (st === 'due-inspection' || st === 'due') todaysTasks += 1;
+      else if (st === 'warning' || st === 'pending') pending += 1;
+      else if (st === 'critical' || st === 'expired') overdue += 1;
+    });
+
+    let completed = 0;
+    const inspectorIdStr = String(user?.id);
+    reportsList.forEach(r => {
+      if (!r) return;
+      if (String(r.user_id) === inspectorIdStr || String(r.inspector_id) === inspectorIdStr || r.user_name === user?.username) {
+        const st = (r.status || r.approval_status || '').toLowerCase();
+        if (st === 'approved' || st === 'completed' || st === 'done') completed += 1;
+      }
+    });
+
+    const assigned = todaysTasks + pending + overdue + completed;
+    const myCompliance = assigned > 0 ? Math.round((completed / assigned) * 100) : 100;
+
+    const apiKpis = statsData?.kpis || statsData || {};
+
+    return { 
+      todaysTasks: apiKpis.todays_tasks ?? apiKpis.todaysTasks ?? apiKpis.due_inspections ?? todaysTasks, 
+      completed: apiKpis.completed_tasks ?? apiKpis.completedTasks ?? apiKpis.completed ?? completed, 
+      pending: apiKpis.pending_tasks ?? apiKpis.pendingTasks ?? apiKpis.pending ?? pending, 
+      overdue: apiKpis.overdue_tasks ?? apiKpis.overdueTasks ?? apiKpis.expired_assets ?? overdue, 
+      myCompliance: apiKpis.my_compliance ?? apiKpis.myCompliance ?? apiKpis.overall_compliance ?? myCompliance 
+    };
+  }, [data, user]);
+
+  const todaysInspections = useMemo(() => {
+    if (!data) return [];
+    const { eqList } = data;
+    const issues = eqList.filter(eq => {
+      const st = (eq.status || '').toLowerCase();
+      return st === 'due-inspection' || st === 'due' || st === 'warning' || st === 'pending' || st === 'critical' || st === 'expired';
+    });
+    
+    return issues.map(eq => {
+      const st = (eq.status || '').toLowerCase();
+      let status = 'Pending';
+      if (st === 'critical' || st === 'expired') status = 'Overdue';
+      else if (st === 'due' || st === 'due-inspection') status = 'Due';
+      
+      return {
+        id: eq.id || eq.equipment_id || `eq-${eq.type}-${Math.floor(Math.random()*10000)}`,
+        name: eq.name || eq.equipment_id || eq.type || 'Equipment',
+        area: eq.location_name || 'Unassigned Area',
+        time: 'Today',
+        status,
+        icon: null
+      };
+    });
+  }, [data]);
+
+
+  const recentActivity = useMemo(() => {
+    if (!data) return [];
+    const { reportsList } = data;
+    
+    const inspectorIdStr = String(user?.id);
+    const myReports = reportsList.filter(r => String(r.user_id) === inspectorIdStr || String(r.inspector_id) === inspectorIdStr || r.user_name === user?.username);
+    
+    return myReports.slice(0, 5).map(r => {
+      let type = 'inspection';
+      let text = `Inspection completed for ${r.equipment_id || 'Equipment'}`;
+      if ((r.status || '').toLowerCase() === 'warning' || (r.status || '').toLowerCase() === 'critical') {
+        type = 'alert';
+        text = `Flagged issue on ${r.equipment_id || 'Equipment'}`;
+      }
+      return {
+        id: r.id || `report-${r.equipment_id || Math.floor(Math.random()*10000)}`,
+        type,
+        text,
+        time: 'Recently'
+      };
+    });
+  }, [data, user]);
+
+  if (isLoading) {
+    return (
+      <div className="sao-loading">
+        <div className="sao-spinner" />
+        <span>Loading Overview…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="sao-loading" style={{ color: '#ef4444' }}>
+        <span>Failed to load dashboard. Retrying...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="sao-root">
@@ -115,6 +238,20 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="sao-kpi-grid">
+        <div className="sao-kpi-card" style={{ cursor: 'pointer' }} onClick={() => onNavigate && onNavigate('assigned-locations')}>
+          <div className="sao-kpi-icon sao-kpi-icon--blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+          </div>
+          <div className="sao-kpi-body">
+            <div className="sao-kpi-label">Assigned Locations</div>
+            <div className="sao-kpi-value">{assignedLocationCount}</div>
+            <div className="sao-kpi-sub" style={{ color: '#2563eb', fontSize: '11px' }}>View →</div>
+          </div>
+        </div>
+
         <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('equipment-grid', 'all')}>
           <div className="sao-kpi-icon sao-kpi-icon--blue">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -193,6 +330,7 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
         </div>
       </div>
 
+
       {/* ── Main Layout: 2 Columns ─────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: '24px', marginTop: '24px', alignItems: 'flex-start' }}>
         
@@ -202,7 +340,10 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
             <span className="sao-section-title">TODAY'S INSPECTIONS</span>
           </div>
           <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {todaysInspections.map((item, index) => {
+            {todaysInspections.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>No inspections for today.</div>
+            ) : (
+            (showAllInspections ? todaysInspections : todaysInspections.slice(0, 5)).map((item, index) => {
               const isCompleted = item.status === 'Completed';
               const isPending = item.status === 'Pending';
               const isOverdue = item.status === 'Overdue';
@@ -232,15 +373,17 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
                   </div>
                 </div>
               );
-            })}
+            }))}
             
-            <div style={{ marginTop: '8px', textAlign: 'center' }}>
-              <button 
-                onClick={() => onNavigate && onNavigate('equipment-grid')}
-                style={{ background: 'transparent', border: 'none', color: '#2563eb', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                View All My Inspections
-              </button>
-            </div>
+            {todaysInspections.length > 5 && (
+              <div style={{ marginTop: '8px', textAlign: 'center' }}>
+                <button 
+                  onClick={() => setShowAllInspections(!showAllInspections)}
+                  style={{ background: 'transparent', border: 'none', color: '#2563eb', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  {showAllInspections ? 'View Less' : 'View All My Inspections'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -348,6 +491,8 @@ const InspectorOverview = ({ onNavigate, allModules, user, moduleSummaries = {} 
         </div>
 
       </div>
+
+
     </div>
   );
 };

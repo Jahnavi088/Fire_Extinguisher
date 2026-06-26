@@ -99,16 +99,15 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
 
         const totalLocations = buildings.length;
 
-        setKpis(prev => ({ ...prev, totalLocations }));
-        
-        setAlertsSummary({
-          critical: alertsData?.critical ?? alertsData?.total_critical ?? 0,
-          warning: alertsData?.warning ?? alertsData?.total_warning ?? 0,
-          info: alertsData?.info ?? alertsData?.total_info ?? 0,
-          total: alertsData?.total ?? 0
+        // Count from the location-filtered equipment list so admin only sees
+        // equipment that belongs to their assigned company/branches.
+        let totalAssets = eqList.length;
+        let dueInspections = 0;
+        let expiredAssets = 0;
+        eqList.forEach(eq => {
+          if (eq.status === 'due-inspection' || eq.status === 'due' || eq.status === 'warning') dueInspections += 1;
+          if (eq.status === 'expired' || eq.status === 'critical') expiredAssets += 1;
         });
-
-
 
         const locMap = {};
         buildings.forEach(b => {
@@ -116,6 +115,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
         });
 
         eqList.forEach(eq => {
+
           // Prioritize branch_id since getOnboardingDropdowns populates buildings from branchesData
           const locId = eq.branch_id || eq.location_id || eq.building_id;
           if (locId && locMap[locId]) {
@@ -123,6 +123,31 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
             if (eq.status === 'due-inspection' || eq.status === 'due') locMap[locId].due += 1;
             if (eq.status === 'expired') locMap[locId].expired += 1;
           }
+        });
+
+        const healthyAssets = Math.max(0, totalAssets - dueInspections - expiredAssets);
+        const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
+
+        setKpis(prev => ({ 
+          ...prev, 
+          totalLocations,
+          totalAssets,
+          dueInspections,
+          expiredAssets,
+          overallCompliance
+        }));
+
+        setDonutData([
+          { name: 'Healthy', value: healthyAssets, color: '#22c55e' },
+          { name: 'Due', value: dueInspections, color: '#f59e0b' },
+          { name: 'Expired', value: expiredAssets, color: '#ef4444' }
+        ]);
+        
+        setAlertsSummary({
+          critical: alertsData?.critical ?? alertsData?.total_critical ?? 0,
+          warning: alertsData?.warning ?? alertsData?.total_warning ?? 0,
+          info: alertsData?.info ?? alertsData?.total_info ?? 0,
+          total: alertsData?.total ?? 0
         });
 
         const locationsArr = Object.values(locMap).map(loc => {
@@ -178,31 +203,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
   }, [trendPeriod, user]);
 
 
-  // Sync KPIs perfectly with moduleSummaries real-time data
-  useEffect(() => {
-    const modulesArr = (allModules || []).map(mod => moduleSummaries[mod.module_id] || {});
-    if (modulesArr.length > 0) {
-      const due = modulesArr.reduce((s, m) => s + (m.due || 0), 0);
-      const expired = modulesArr.reduce((s, m) => s + (m.expired || 0), 0);
-      const totalAssets = modulesArr.reduce((s, m) => s + (m.total || 0), 0);
-      const healthyAssets = Math.max(0, totalAssets - due - expired);
-      const overallCompliance = totalAssets > 0 ? Math.round((healthyAssets / totalAssets) * 100) : 100;
 
-      setKpis(prev => ({
-        ...prev,
-        totalAssets: totalAssets > 0 ? totalAssets : prev.totalAssets,
-        dueInspections: due,
-        expiredAssets: expired,
-        overallCompliance
-      }));
-
-      setDonutData([
-        { name: 'Healthy', value: healthyAssets, color: '#22c55e' },
-        { name: 'Due', value: due, color: '#f59e0b' },
-        { name: 'Expired', value: expired, color: '#ef4444' }
-      ]);
-    }
-  }, [moduleSummaries, allModules]);
 
   const scrollCarousel = (dir) => {
     if (carouselRef.current) {
@@ -222,8 +223,13 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
   return (
     <div className="sao-root">
       {/* ── Sub-header ────────────────────────────────────────────────────── */}
-      <div className="sao-subheader">
-        <div className="sao-subheader-right">
+      <div className="sao-subheader" style={{ padding: '0 0 16px 0', borderBottom: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Admin Dashboard</h2>
+          <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Location & Asset Overview</p>
+        </div>
+        <div className="sao-subheader-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
           <div className="sao-last-updated">
             <span className="sao-lu-label">Last Updated: {lastUpdated}</span>
             <button className="sao-refresh-btn" onClick={() => window.location.reload()} title="Refresh">
@@ -239,7 +245,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="sao-kpi-grid sao-kpi-grid--5cols">
-        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('locations-table')}>
+        <div className="sao-kpi-card" onClick={() => onNavigate && onNavigate('setup-operator-mapping')}>
           <div className="sao-kpi-icon sao-kpi-icon--blue">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -261,7 +267,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Total Assets</div>
-            <div className="sao-kpi-value">{kpis.totalAssets.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.totalAssets || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--gray">Across all locations</div>
           </div>
         </div>
@@ -276,7 +282,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Due Inspections</div>
-            <div className="sao-kpi-value">{kpis.dueInspections.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.dueInspections || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--amber">Needs attention</div>
           </div>
         </div>
@@ -290,7 +296,7 @@ const AdminOverview = ({ onNavigate, allModules, user, moduleSummaries = {} }) =
           </div>
           <div className="sao-kpi-body">
             <div className="sao-kpi-label">Expired Assets</div>
-            <div className="sao-kpi-value">{kpis.expiredAssets.toLocaleString()}</div>
+            <div className="sao-kpi-value">{(kpis.expiredAssets || 0).toLocaleString()}</div>
             <div className="sao-kpi-sub sao-kpi-sub--red">Immediate action</div>
           </div>
         </div>

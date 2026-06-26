@@ -1,0 +1,33 @@
+1. Location Hierarchy API
+Full CRUD for a 5-level location tree: Company → Branch → Building → Floor → Zone → Department
+
+Endpoints (all under /app1/v1/admin/, Bearer token required, admin/superadmin only)
+Method	Endpoint	Purpose
+GET	/branches?company_id=	List branches for a company
+POST	/branches	Create branch (GPS lat/lng supported)
+PUT/PATCH	/branches/:id	Edit branch
+DELETE	/branches/:id	Soft delete (blocked if active children exist)
+GET	/buildings?branch_id=	List buildings for a branch
+POST	/buildings	Create building (GPS lat/lng supported)
+PUT/PATCH	/buildings/:id	Edit building
+DELETE	/buildings/:id	Soft delete
+PUT	/buildings/:id/move	Move building to different branch
+GET	/floors?building_id=	List floors
+POST	/floors	Create floor
+PUT/PATCH	/floors/:id	Edit floor
+DELETE	/floors/:id	Soft delete
+PUT	/floors/:id/move	Move to different building
+GET	/zones?floor_id=	List zones
+POST	/zones	Create zone
+PUT/PATCH	/zones/:id	Edit zone
+DELETE	/zones/:id	Soft delete
+PUT	/zones/:id/move	Move to different floor
+GET	/departments?zone_id=	List departments
+POST	/departments	Create department
+PUT/PATCH	/departments/:id	Edit department
+DELETE	/departments/:id	Soft delete
+PUT	/departments/:id/move	Move to different zone
+GET	/companies/:company_id/location-tree	Full nested tree in one call
+All responses: { success: true, data: ... } or { success: false, error: "..." }
+
+Unique name enforcement: Duplicate names within the same parent are rejected (partial unique index on active rows). Soft-deleted names can be reused.

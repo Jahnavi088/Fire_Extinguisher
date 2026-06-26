@@ -11,10 +11,10 @@ const fmt = (d) => {
 };
 const scoreColor = (s) => {
   const n = parseFloat(s) || 0;
-  return n >= 80 ? '#28a745' : n >= 50 ? '#FF9800' : '#dc3545';
+  return n >= 80 ? '#10b981' : n >= 50 ? '#FF9800' : '#dc3545';
 };
 const condColor = (v) =>
-  v === 'CLEAR' || v === 'OK' || v === 'HEALTHY' || v === 'SECURE' ? '#28a745'
+  v === 'CLEAR' || v === 'OK' || v === 'HEALTHY' || v === 'SECURE' ? '#10b981'
     : (v === 'PARTIAL' || v === 'DIRTY' || v === 'STIFF' || v === 'WORN') ? '#FF9800'
       : (v === 'BLOCKED' || v === 'FAILED' || v === 'JAMMED' || v === 'UNSECURED') ? '#dc3545'
         : '#666';
@@ -88,6 +88,7 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
   const [listTotal, setListTotal] = useState(0);
   const [listLoading, setListLoading] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [detailSource, setDetailSource] = useState('list');
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -98,15 +99,15 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       setLoading(true);
       const [sum, alertsSum, alertsData] = await Promise.all([
         ApiService.getModuleSummary(modId),
-        ApiService.getAlertsSummary(),
+        ApiService.getAlertsSummary({ module_id: modId }),
         ApiService.getAlerts({ module_id: modId, limit: 100 }),
       ]);
       setSummary(sum);
       setAlertsSummary(alertsSum);
       setTopAlerts(alertsData.alerts || []);
     } catch (err) {
-      console.error('API Load failed for Doors, using fallback:', err);
-      setSummary({ total: 48, active: 44, upcoming: 2, needs_service: 2, expired: 0, due_inspection: 0, readiness_score: 95.8 });
+      console.error('API Load failed:', err);
+      setSummary({ total: 0, active: 0, upcoming: 0, needs_service: 0, expired: 0, due_inspection: 0, readiness_score: 100 });
       setAlertsSummary({ total_alerts: 0, level_1: { count: 0 }, level_2: { count: 0 }, level_3: { count: 0 } });
       setTopAlerts([]);
     } finally { setLoading(false); }
@@ -121,24 +122,13 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       const data = await fetchByType(card.type, modId);
       setListItems(data.items || []);
       setListTotal(data.total || 0);
-      if (!data.items || data.items.length === 0) {
-        const mock = Array.from({ length: 6 }).map((_, i) => ({
-          id: `door_${i}`,
-          sos_code: `EDR-0${i + 1}`,
-          equipment_type: 'Emergency Push-Bar Door',
-          location_name: `Floor ${Math.floor(i / 2) + 1} - Exit Route ${i % 2 + 1}`,
-          building_name: 'Main Block',
-          readiness_score: 100,
-          next_inspection_due: new Date(Date.now() + 86400000 * 45).toISOString()
-        }));
-        setListItems(mock);
-        setListTotal(mock.length);
-      }
+      
     } catch { setListItems([]); }
     finally { setListLoading(false); }
   };
 
-  const openDetail = async (item) => {
+  const openDetail = async (item, source = 'list') => {
+    setDetailSource(source);
     setView('detail');
     setDetailLoading(true);
     setSelectedUnit(item);
@@ -150,7 +140,7 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
   };
 
   const goBack = () => {
-    if (view === 'detail') setView('list');
+    if (view === 'detail') setView(detailSource);
     else if (view === 'list') setView('overview');
     else onBack();
   };
@@ -197,7 +187,7 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
             <div className="fe-panel-title">🔔 Door Integrity Alerts <span className="fe-panel-title-count">{totalAlerts}</span></div>
             <div className="fe-alert-list">
               {topAlerts.length === 0 ? <div className="fe-empty">All emergency doors are secure and operational.</div> : topAlerts.map((a, i) => (
-                <div key={i} className="fe-alert-row" style={{ '--alert-color': ALERT_COLOR[a.alert_level] }}>
+                <div key={i} className="fe-alert-row" onClick={() => openDetail(a, 'overview')} style={{ cursor: 'pointer', '--alert-color': ALERT_COLOR[a.alert_level] }}>
                   <div className="fe-alert-body">
                     <div className="fe-alert-code">{a.sos_code}</div>
                     <div className="fe-alert-loc">{a.location_name}</div>
@@ -214,7 +204,7 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
                 <div style={{ height: 160, width: '100%', marginTop: 5 }}>
                   <ResponsiveContainer>
                     <BarChart data={[
-                      { name: 'Ready', val: (summary.active || 0) + (summary.upcoming || 0), color: '#28a745' },
+                      { name: 'Ready', val: (summary.active || 0) + (summary.upcoming || 0), color: '#10b981' },
                       { name: 'Faulty', val: summary.expired, color: '#dc3545' },
                     ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -222,7 +212,7 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
                       <YAxis hide />
                       <Tooltip cursor={false} contentStyle={{ background: 'var(--surface)', border: 'none', borderRadius: '8px' }} />
                       <Bar dataKey="val" radius={[4, 4, 0, 0]} barSize={55}>
-                        {[{ color: '#28a745' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        {[{ color: '#10b981' }, { color: '#dc3545' }].map((entry, index) => <Cell key={index} fill={entry.color} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -290,6 +280,21 @@ const EmergencyDoorStats = ({ module, onBack, onRaiseWorkOrder }) => {
       </div>
       {detailLoading ? <Spinner /> : (
         <div className="fe-detail-grid">
+          {/* Dynamic Specifications */}
+          {Array.isArray(u.field_definitions) && u.field_definitions.length > 0 && (
+          <div className="fe-detail-card fe-full">
+            <div className="fe-section-title">📋 Specifications (Dynamic)</div>
+            <div className="fe-identity-grid">
+              {u.field_definitions.sort((a, b) => a.sort_order - b.sort_order).map(f => (
+                <div key={f.field_key} className="fe-field">
+                  <div className="fe-field-label">{f.field_label}</div>
+                  <div className="fe-field-value">{u.details?.[f.field_key] ?? u[f.field_key] ?? '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
+
           <div className="fe-detail-card fe-full"><div className="fe-section-title">Door Specifications</div>
             <div className="fe-identity-grid">
               <InfoRow label="SOS Code" val={u.sos_code} />

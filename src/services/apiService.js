@@ -5,6 +5,63 @@
 
 const BASE_URL = 'https://ehs.garrev.com/app1/v1';
 
+import { filterEquipmentByLocations } from '../utils/locationFilter';
+
+let cachedMappings = null;
+let cachedMappingsTime = 0;
+let cachedMappingsUserId = null;
+
+const applyGlobalLocationFilter = async (items) => {
+  if (!items || !Array.isArray(items)) return items;
+  const userStr = localStorage.getItem('auth_user');
+  if (!userStr) return items;
+  try {
+    const user = JSON.parse(userStr);
+    const role = (user.role || '').toLowerCase();
+    if (['superadmin', 'safety_manager'].includes(role)) return items;
+
+    if (!user.id) return [];
+
+    // Ensure fresh mappings (cache for 15 seconds in memory)
+    if (!cachedMappings || cachedMappingsUserId !== String(user.id) || (Date.now() - cachedMappingsTime > 15000)) {
+      try {
+        // We can safely call getOperatorMappings because it doesn't call applyGlobalLocationFilter
+        const res = await ApiService.getOperatorMappings({ user_id: user.id });
+        cachedMappings = Array.isArray(res) ? res : (res?.data || res?.items || []);
+        cachedMappingsTime = Date.now();
+        cachedMappingsUserId = String(user.id);
+        localStorage.setItem('user_operator_mappings', JSON.stringify(cachedMappings));
+      } catch (e) {
+        // Fallback to localStorage if API fails
+        const str = localStorage.getItem('user_operator_mappings');
+        cachedMappings = str ? JSON.parse(str) : [];
+      }
+    }
+
+    if (!cachedMappings || cachedMappings.length === 0) return [];
+
+    let filteredByLoc = filterEquipmentByLocations(items, cachedMappings, role);
+
+    // Filter by module access
+    try {
+      // getMockUserModules is available in the same file
+      const allowedModules = getMockUserModules(user.id);
+      if (allowedModules && allowedModules.length > 0) {
+        const allowedIds = new Set(allowedModules.map(m => String(m.module_id || m.id)));
+        filteredByLoc = filteredByLoc.filter(eq => {
+          const mId = String(eq.module_id || eq.moduleId);
+          if (!mId) return true; // Allow equipment with no module specified
+          return allowedIds.has(mId);
+        });
+      }
+    } catch (e) {}
+
+    return filteredByLoc;
+  } catch (e) {
+    return [];
+  }
+};
+
 let _cachedUser = null;
 
 let _pendingReportsCache = null;
@@ -130,16 +187,22 @@ const enhanceLocation = async (item) => {
   const map = globalLocMap;
   
   const mapItem = (cloned) => {
+    // Normalize: location_id in the DB is the branch_id — copy it so downstream code finds it
+    if (!cloned.branch_id && cloned.location_id) {
+      cloned.branch_id = cloned.location_id;
+    }
+    const br = map.bMap[String(cloned.branch_name)] || map.bMap[String(cloned.branch_id)] || map.bMap[String(cloned.location_id)];
     const b = map.bMap[String(cloned.building_name)] || map.bMap[String(cloned.building_id)];
     const f = map.fMap[String(cloned.floor_name)] || map.fMap[String(cloned.floor_id)];
     const z = map.zMap[String(cloned.zone_name)] || map.zMap[String(cloned.zone_id)];
     const d = map.dMap[String(cloned.department_name)] || map.dMap[String(cloned.department_id)];
 
     let changed = false;
-    if (b && b !== String(cloned.building_name)) { cloned.building_name = b; changed = true; }
-    if (f && f !== String(cloned.floor_name)) { cloned.floor_name = f; changed = true; }
-    if (z && z !== String(cloned.zone_name)) { cloned.zone_name = z; changed = true; }
-    if (d && d !== String(cloned.department_name)) { cloned.department_name = d; changed = true; }
+    if (br && br !== String(cloned.branch_name)) { cloned.branch_name = br; cloned.branch = br; changed = true; }
+    if (b && b !== String(cloned.building_name)) { cloned.building_name = b; cloned.building = b; changed = true; }
+    if (f && f !== String(cloned.floor_name)) { cloned.floor_name = f; cloned.floor = f; changed = true; }
+    if (z && z !== String(cloned.zone_name)) { cloned.zone_name = z; cloned.zone = z; changed = true; }
+    if (d && d !== String(cloned.department_name)) { cloned.department_name = d; cloned.department = d; changed = true; }
 
     if (changed || (cloned.location_name && !isNaN(cloned.location_name.split(' / ')[0]))) {
        const newLoc = [
@@ -234,7 +297,8 @@ const getMockUserModules = (userId) => {
       { module_id: 36, name: 'Fire Trolley', code: 'fire_trolley' },
       { module_id: 37, name: 'Suppression System', code: 'suppression_system' },
       { module_id: 38, name: 'Fire Blanket', code: 'fire_blanket' },
-      { module_id: 39, name: 'Smoke Detector', code: 'smoke_detector' }
+      { module_id: 39, name: 'Smoke Detector', code: 'smoke_detector' },
+      { module_id: 63, name: 'Sand Bucket', code: 'sand_bucket' }
     ];
 
     // AGM gets 5 modules
@@ -261,7 +325,11 @@ const getMockUserModules = (userId) => {
       const storedUser = localStorage.getItem('auth_user');
       const current = storedUser ? JSON.parse(storedUser) : null;
       if (current && current.id && ![71, 72, 73, 74, 75, 76, 81, 82].includes(Number(current.id))) {
-        if (current.role === 'supervisor') {
+        if (['superadmin', 'admin', 'safety_manager'].includes((current.role || '').toLowerCase())) {
+          defaultModules.forEach(m => {
+            assignments.push({ userId: current.id, module: m, access_level: 'admin' });
+          });
+        } else if (current.role === 'supervisor') {
           defaultModules.slice(0, 3).forEach(m => {
             assignments.push({ userId: current.id, module: m, access_level: 'manage' });
           });
@@ -308,7 +376,8 @@ const addMockUserModule = (userId, data) => {
     { module_id: 36, name: 'Fire Trolley', code: 'fire_trolley' },
     { module_id: 37, name: 'Suppression System', code: 'suppression_system' },
     { module_id: 38, name: 'Fire Blanket', code: 'fire_blanket' },
-    { module_id: 39, name: 'Smoke Detector', code: 'smoke_detector' }
+    { module_id: 39, name: 'Smoke Detector', code: 'smoke_detector' },
+    { module_id: 63, name: 'Sand Bucket', code: 'sand_bucket' }
   ];
 
   const targetModule = defaultModules.find(m => String(m.module_id) === String(data.module_id)) || {
@@ -466,7 +535,11 @@ export const ApiService = {
     }
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('user_operator_mappings');
     _cachedUser = null;
+    cachedMappings = null;
+    cachedMappingsTime = 0;
+    cachedMappingsUserId = null;
     return { success: true };
   },
 
@@ -480,8 +553,22 @@ export const ApiService = {
   },
 
   // --- OPERATOR MAPPING ---
-  getOperatorMappings: async () => {
-    return await request('/operator-mappings');
+  getOperatorMappings: async (params = {}) => {
+    const injectedParams = ApiService._injectCompanyId({ ...params });
+    const res = await request(`/operator-mappings${qs(injectedParams)}`);
+    let arr = Array.isArray(res) ? res : (res?.items || res?.data || []);
+    
+    // The backend might not strictly filter by user_id, so enforce it on the frontend
+    if (params.user_id) {
+       arr = arr.filter(m => String(m.userId || m.user_id) === String(params.user_id));
+    }
+
+    for (let item of arr) {
+      await enhanceLocation(item);
+    }
+
+    if (Array.isArray(res)) return arr;
+    return { ...res, items: arr, data: arr };
   },
 
   createOperatorMapping: async (data) => {
@@ -491,12 +578,40 @@ export const ApiService = {
     });
   },
 
+  deleteOperatorMapping: async (id) => {
+    return await request(`/operator-mappings/${id}`, { method: 'DELETE' });
+  },
+
   // --- DASHBOARD ---
   getDashboard: async () => {
     return await request('/dashboard');
   },
 
+  _injectCompanyId: (params = {}) => {
+    try {
+      const stored = localStorage.getItem('auth_user');
+      if (stored) {
+        const user = JSON.parse(stored);
+        if (user && user.role !== 'superadmin') {
+          if (user.company_id) params.company_id = user.company_id;
+
+          // For sub-company roles, inject the narrowest location scope the user has
+          if (['agm', 'supervisor', 'inspector', 'user'].includes(user.role)) {
+            if (user.branch_id) params.branch_id = user.branch_id;
+            if (user.building_id) params.building_id = user.building_id;
+            if (user.floor_id) params.floor_id = user.floor_id;
+            if (user.zone_id) params.zone_id = user.zone_id;
+            if (user.department_id) params.department_id = user.department_id;
+          }
+        }
+      }
+    } catch (e) { }
+    return params;
+  },
+
   getEquipment: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
+
     const status = params.status;
     const moduleId = params.module_id;
 
@@ -527,13 +642,14 @@ export const ApiService = {
       }
 
       if (Array.isArray(dueRes)) {
-        return dueItems;
+        return await applyGlobalLocationFilter(dueItems);
       }
+      const filteredDue = await applyGlobalLocationFilter(dueItems);
       return {
         ...dueRes,
-        items: dueItems,
-        total: dueItems.length,
-        data: dueItems
+        items: filteredDue,
+        total: filteredDue.length,
+        data: filteredDue
       };
     }
 
@@ -554,22 +670,23 @@ export const ApiService = {
       }
 
       if (Array.isArray(res)) {
-        return await Promise.all(items.map(i => enhanceLocation(i)));
+        return await applyGlobalLocationFilter(await Promise.all(items.map(i => enhanceLocation(i))));
       }
+      const filteredActive = await applyGlobalLocationFilter(await Promise.all(items.map(i => enhanceLocation(i))));
       return {
         ...res,
-        items: await Promise.all(items.map(i => enhanceLocation(i))),
-        total: items.length,
-        data: await Promise.all(items.map(i => enhanceLocation(i)))
+        items: filteredActive,
+        total: filteredActive.length,
+        data: filteredActive
       };
     }
 
     const res = await request(`/equipment${qs(params)}`);
     if (Array.isArray(res)) {
-       return await Promise.all(res.map(i => enhanceLocation(i)));
+       return await applyGlobalLocationFilter(await Promise.all(res.map(i => enhanceLocation(i))));
     }
-    const finalItems = await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i)));
-    return { ...res, items: finalItems, data: finalItems };
+    const finalItems = await applyGlobalLocationFilter(await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i))));
+    return { ...res, items: finalItems, data: finalItems, total: finalItems.length };
   },
 
   createEquipment: async (data) => {
@@ -619,21 +736,47 @@ export const ApiService = {
     return await request(`/modules/${id}/equipment`);
   },
 
-  getModuleSummary: async (id) => {
-    const res = await request(`/modules/${id}/summary`);
+  getModuleSummary: async (id, params = {}) => {
+    const userStr = localStorage.getItem('auth_user');
+    const user = userStr ? JSON.parse(userStr) : {};
+    const role = (user.role || '').toLowerCase();
+    const isGlobal = ['superadmin', 'safety_manager'].includes(role);
+
+    if (!isGlobal && user.id) {
+       const eqRes = await ApiService.getEquipment({ ...params, module_id: id, limit: 1000 });
+       const items = Array.isArray(eqRes) ? eqRes : (eqRes?.items || eqRes?.data || []);
+       
+       let active = 0, needs_service = 0, expired = 0, due_inspection = 0, upcoming = 0;
+       items.forEach(eq => {
+          const st = (eq.status || eq.operational_status || '').toLowerCase();
+          if (st === 'active') active++;
+          else if (st === 'upcoming') upcoming++;
+          else if (st === 'needs_service' || st === 'needs service') needs_service++;
+          else if (st === 'expired' || st === 'critical' || st === 'faulty') expired++;
+          else if (st === 'due_inspection' || st === 'due inspection') due_inspection++;
+       });
+       const total = items.length;
+       const issues = expired + needs_service + due_inspection;
+       const score = total > 0 ? Math.round(((total - issues) / total) * 100) : 100;
+
+       return {
+         total, active, upcoming, needs_service, expired, due_inspection,
+         readiness_score: score, health_score: score, score
+       };
+    }
+
+    params = ApiService._injectCompanyId(params);
+    const res = await request(`/modules/${id}/summary${qs(params)}`);
     try {
       const pendingCodes = await getPendingEquipmentSosCodes(id);
       const pendingCount = pendingCodes.size;
       if (pendingCount > 0 && res) {
-        // Adjust the counts: because the backend incorrectly counts pending inspections as completed,
-        // we add them back to due_inspection and subtract them from active.
         if (res.due_inspection !== undefined) {
           res.due_inspection = (res.due_inspection ?? 0) + pendingCount;
         }
         if (res.active !== undefined) {
           res.active = Math.max(0, (res.active ?? 0) - pendingCount);
         }
-        // Also adjust the readiness score if calculated in frontend or backend
         if (res.readiness_score !== undefined || res.health_score !== undefined || res.score !== undefined) {
           const total = res.total ?? res.total_units ?? res.total_assets ?? res.total_equipment ?? 0;
           const expired = res.expired ?? res.expired_assets ?? res.expired_equipment ?? res.expired_count ?? 0;
@@ -653,6 +796,17 @@ export const ApiService = {
   },
 
   getModuleChecklists: async (id) => {
+    if (String(id) === '63') {
+      return {
+        items: [
+          { id: 'sb_1', category: 'Physical Condition', question: 'Is the sand bucket free from physical damage, cracks, or severe corrosion?', is_critical: true, answer_type: 'tna', item_order: 1 },
+          { id: 'sb_2', category: 'Physical Condition', question: 'Is the bucket painted red with "FIRE" or "SAND" clearly marked?', is_critical: false, answer_type: 'tna', item_order: 2 },
+          { id: 'sb_3', category: 'Contents', question: 'Is the bucket filled with dry, clean sand?', is_critical: true, answer_type: 'tna', item_order: 3 },
+          { id: 'sb_4', category: 'Accessibility', question: 'Is the bucket easily accessible and unobstructed?', is_critical: true, answer_type: 'tna', item_order: 4 },
+          { id: 'sb_5', category: 'Accessibility', question: 'Is the bucket placed on its designated stand or hook?', is_critical: false, answer_type: 'tna', item_order: 5 }
+        ]
+      };
+    }
     return await request(`/modules/${id}/checklists`);
   },
 
@@ -662,6 +816,10 @@ export const ApiService = {
 
   getModuleFields: async (id) => {
     return await request(`/modules/${id}/fields`);
+  },
+
+  getModuleFieldConfig: async (id) => {
+    return await request(`/admin/modules/${id}/field-config`);
   },
 
   getModuleSchedule: async (id, params = {}) => {
@@ -684,6 +842,20 @@ export const ApiService = {
   },
 
   getChecklistsByType: async (type) => {
+    if (type === 'sand_bucket') {
+      return {
+        items: [
+          { id: 'sb_1', category: 'Physical Condition', question: 'Is the sand bucket free from physical damage, cracks, or severe corrosion?', is_critical: true, answer_type: 'tna', item_order: 1 },
+          { id: 'sb_2', category: 'Physical Condition', question: 'Is the bucket painted red with "FIRE" or "SAND" clearly marked?', is_critical: false, answer_type: 'tna', item_order: 2 },
+          { id: 'sb_3', category: 'Contents', question: 'Is the bucket filled with dry, clean sand?', is_critical: true, answer_type: 'tna', item_order: 3 },
+          { id: 'sb_4', category: 'Accessibility', question: 'Is the bucket easily accessible and unobstructed?', is_critical: true, answer_type: 'tna', item_order: 4 },
+          { id: 'sb_5', category: 'Accessibility', question: 'Is the bucket placed on its designated stand or hook?', is_critical: false, answer_type: 'tna', item_order: 5 }
+        ]
+      };
+    }
+    if (type === 'safety_signage') {
+      return await request(`/modules/62/checklists`);
+    }
     return await request(`/checklists/${type}`);
   },
 
@@ -692,6 +864,7 @@ export const ApiService = {
   // safely do alertsData.alerts regardless of whether the server returns a
   // bare array or a wrapped object.
   getAlerts: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     let data = await request(`/alerts${qs(params)}`);
     if (Array.isArray(data)) {
       data = { alerts: data };
@@ -700,46 +873,102 @@ export const ApiService = {
     }
     
     if (data && Array.isArray(data.alerts)) {
-      data.alerts = await Promise.all(data.alerts.map(a => enhanceLocation(a)));
+      const enhanced = await Promise.all(data.alerts.map(a => enhanceLocation(a)));
+      data.alerts = await applyGlobalLocationFilter(enhanced);
     }
     return data;
   },
 
-  getAlertsSummary: async () => {
-    return await request('/alerts/summary');
+  getAlertsSummary: async (params = {}) => {
+    const userStr = localStorage.getItem('auth_user');
+    const user = userStr ? JSON.parse(userStr) : {};
+    const role = (user.role || '').toLowerCase();
+    const isGlobal = ['superadmin', 'safety_manager'].includes(role);
+
+    if (!isGlobal && user.id) {
+       const alRes = await ApiService.getAlerts({ ...params, limit: 1000 });
+       const alerts = alRes?.alerts || [];
+       let l1 = 0, l2 = 0, l3 = 0;
+       alerts.forEach(a => {
+          if (String(a.alert_level) === '1') l1++;
+          if (String(a.alert_level) === '2') l2++;
+          if (String(a.alert_level) === '3') l3++;
+       });
+       return {
+         total_alerts: alerts.length,
+         level_1: { count: l1 },
+         level_2: { count: l2 },
+         level_3: { count: l3 }
+       };
+    }
+
+    params = ApiService._injectCompanyId(params);
+    if (params.module_id) {
+      const res = await request(`/alerts${qs({ ...params, limit: 1 })}`);
+      return {
+        total_alerts: res.total || res.data?.length || res.alerts?.length || 0,
+        level_1: { count: res.summary?.level_1 || 0 },
+        level_2: { count: res.summary?.level_2 || 0 },
+        level_3: { count: res.summary?.level_3 || 0 }
+      };
+    }
+    return await request(`/alerts/summary${qs(params)}`);
   },
 
   // --- REPORTS ---
   getInspectionReports: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     return await request(`/reports/inspections${qs(params)}`);
   },
 
   getEquipmentStatusReports: async (params = {}) => {
-    return await request(`/reports/equipment-status${qs(params)}`);
+    params = ApiService._injectCompanyId(params);
+    const res = await request(`/reports/equipment-status${qs(params)}`);
+    if (Array.isArray(res)) {
+       return await applyGlobalLocationFilter(await Promise.all(res.map(i => enhanceLocation(i))));
+    }
+    const finalItems = await applyGlobalLocationFilter(await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i))));
+    return { ...res, items: finalItems, data: finalItems, total: finalItems.length };
   },
 
   getExpiryScheduleReports: async (params = {}) => {
-    return await request(`/reports/expiry${qs(params)}`);
+    params = ApiService._injectCompanyId(params);
+    const res = await request(`/reports/expiry${qs(params)}`);
+    if (Array.isArray(res)) {
+       return await applyGlobalLocationFilter(await Promise.all(res.map(i => enhanceLocation(i))));
+    }
+    const finalItems = await applyGlobalLocationFilter(await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i))));
+    return { ...res, items: finalItems, data: finalItems, total: finalItems.length };
   },
 
   getCriticalAlertsReports: async (params = {}) => {
-    return await request(`/reports/alerts${qs(params)}`);
+    params = ApiService._injectCompanyId(params);
+    const res = await request(`/reports/alerts${qs(params)}`);
+    if (Array.isArray(res)) {
+       return await applyGlobalLocationFilter(await Promise.all(res.map(i => enhanceLocation(i))));
+    }
+    const finalItems = await applyGlobalLocationFilter(await Promise.all((res?.items || res?.data || []).map(i => enhanceLocation(i))));
+    return { ...res, items: finalItems, data: finalItems, total: finalItems.length };
   },
 
   // --- AUTO SCHEDULER ---
   getSchedules: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     return await request(`/schedules${qs(params)}`);
   },
 
   getUpcomingSchedules: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     return await request(`/schedules/upcoming${qs(params)}`);
   },
 
   getOverdueSchedules: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     return await request(`/schedules/overdue${qs(params)}`);
   },
 
   getCompletedSchedules: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
     return await request(`/schedules/completed${qs(params)}`);
   },
 
@@ -923,6 +1152,55 @@ export const ApiService = {
     });
   },
 
+  // --- BRANCHES ---
+  getBranches: async (params = {}) => {
+    return await request(`/branches${qs(params)}`);
+  },
+  getBranchById: async (id) => {
+    return await request(`/branches/${id}`);
+  },
+  createBranch: async (data) => {
+    return await request('/branches', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateBranch: async (id, data) => {
+    return await request(`/branches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteBranch: async (id) => {
+    return await request(`/branches/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- BUILDINGS ---
+  getBuildings: async (params = {}) => { return await request(`/buildings${qs(params)}`); },
+  createBuilding: async (data) => { return await request('/buildings', { method: 'POST', body: JSON.stringify(data) }); },
+  updateBuilding: async (id, data) => { return await request(`/buildings/${id}`, { method: 'PUT', body: JSON.stringify(data) }); },
+  deleteBuilding: async (id) => { return await request(`/buildings/${id}`, { method: 'DELETE' }); },
+
+  // --- FLOORS ---
+  getFloors: async (params = {}) => { return await request(`/floors${qs(params)}`); },
+  createFloor: async (data) => { return await request('/floors', { method: 'POST', body: JSON.stringify(data) }); },
+  updateFloor: async (id, data) => { return await request(`/floors/${id}`, { method: 'PUT', body: JSON.stringify(data) }); },
+  deleteFloor: async (id) => { return await request(`/floors/${id}`, { method: 'DELETE' }); },
+
+  // --- ZONES ---
+  getZones: async (params = {}) => { return await request(`/zones${qs(params)}`); },
+  createZone: async (data) => { return await request('/zones', { method: 'POST', body: JSON.stringify(data) }); },
+  updateZone: async (id, data) => { return await request(`/zones/${id}`, { method: 'PUT', body: JSON.stringify(data) }); },
+  deleteZone: async (id) => { return await request(`/zones/${id}`, { method: 'DELETE' }); },
+
+  // --- DEPARTMENTS ---
+  getDepartmentHierarchy: async (params = {}) => { return await request(`/departments${qs(params)}`); },
+  createDepartmentHierarchy: async (data) => { return await request('/departments', { method: 'POST', body: JSON.stringify(data) }); },
+  updateDepartmentHierarchy: async (id, data) => { return await request(`/departments/${id}`, { method: 'PUT', body: JSON.stringify(data) }); },
+  deleteDepartmentHierarchy: async (id) => { return await request(`/departments/${id}`, { method: 'DELETE' }); },
+
   // --- ADMIN EQUIPMENT ---
   getAdminEquipment: async () => {
     const res = await request('/admin/equipment');
@@ -1044,7 +1322,15 @@ export const ApiService = {
     });
   },
 
+  getLocationTree: async (companyId) => {
+    return await request(`/companies/${companyId}/location-tree`);
+  },
+
   getBranches: async (params = {}) => {
+    params = ApiService._injectCompanyId(params);
+    const filterBranchId = params.branch_id;
+    // Don't necessarily delete it, some backends might support it, but we'll manually filter anyway
+    
     let url = '/branches';
     if (params && Object.keys(params).length > 0) {
       const parts = Object.entries(params)
@@ -1054,7 +1340,20 @@ export const ApiService = {
         url += `?${parts.join('&')}`;
       }
     }
-    return await request(url);
+    
+    const res = await request(url);
+    
+    if (filterBranchId) {
+      if (Array.isArray(res)) {
+        return res.filter(b => String(b.id) === String(filterBranchId));
+      } else if (res && res.data) {
+        return { ...res, data: res.data.filter(b => String(b.id) === String(filterBranchId)) };
+      } else if (res && res.branches) {
+        return { ...res, branches: res.branches.filter(b => String(b.id) === String(filterBranchId)) };
+      }
+    }
+    
+    return res;
   },
 
   createBranch: async (data) => {
@@ -1070,7 +1369,7 @@ export const ApiService = {
 
   updateBranch: async (branchId, data) => {
     return await request(`/branches/${branchId}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },
@@ -1103,7 +1402,10 @@ export const ApiService = {
   // --- HIERARCHICAL LOCATION APIS ---
   // --- BUILDINGS ---
   getBranchBuildings: async (branchId) => {
-    return await request(`/branches/${branchId}/buildings`);
+    return await request(`/buildings?branch_id=${branchId}`);
+  },
+  getBuildingById: async (buildingId) => {
+    return await request(`/buildings/${buildingId}`);
   },
   createBuilding: async (data) => {
     return await request('/buildings', {
@@ -1113,8 +1415,14 @@ export const ApiService = {
   },
   updateBuilding: async (id, data) => {
     return await request(`/buildings/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+  moveBuilding: async (id, branchId) => {
+    return await request(`/buildings/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ branch_id: branchId }),
     });
   },
   deleteBuilding: async (id) => {
@@ -1125,7 +1433,7 @@ export const ApiService = {
 
   // --- FLOORS ---
   getBuildingFloors: async (buildingId) => {
-    return await request(`/buildings/${buildingId}/floors`);
+    return await request(`/floors?building_id=${buildingId}`);
   },
   getFloorById: async (floorId) => {
     return await request(`/floors/${floorId}`);
@@ -1138,8 +1446,14 @@ export const ApiService = {
   },
   updateFloor: async (id, data) => {
     return await request(`/floors/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+  moveFloor: async (id, buildingId) => {
+    return await request(`/floors/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ building_id: buildingId }),
     });
   },
   deleteFloor: async (id) => {
@@ -1150,7 +1464,7 @@ export const ApiService = {
 
   // --- ZONES ---
   getFloorZones: async (floorId) => {
-    return await request(`/floors/${floorId}/zones`);
+    return await request(`/zones?floor_id=${floorId}`);
   },
   getZoneById: async (zoneId) => {
     return await request(`/zones/${zoneId}`);
@@ -1163,8 +1477,14 @@ export const ApiService = {
   },
   updateZone: async (id, data) => {
     return await request(`/zones/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+  moveZone: async (id, floorId) => {
+    return await request(`/zones/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ floor_id: floorId }),
     });
   },
   deleteZone: async (id) => {
@@ -1175,7 +1495,7 @@ export const ApiService = {
 
   // --- DEPARTMENTS ---
   getZoneDepartments: async (zoneId) => {
-    return await request(`/zones/${zoneId}/departments`);
+    return await request(`/departments?zone_id=${zoneId}`);
   },
   getDepartmentById: async (departmentId) => {
     return await request(`/departments/${departmentId}`);
@@ -1188,8 +1508,14 @@ export const ApiService = {
   },
   updateDepartmentHierarchy: async (id, data) => {
     return await request(`/departments/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+  moveDepartment: async (id, zoneId) => {
+    return await request(`/departments/${id}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ zone_id: zoneId }),
     });
   },
   deleteDepartmentHierarchy: async (id) => {
@@ -1282,8 +1608,8 @@ export const ApiService = {
   },
 
   // --- ADMIN MODULES ---
-  getAdminModules: async () => {
-    return await request('/admin/modules');
+  getAdminModules: async (params = {}) => {
+    return await request(`/admin/modules${qs(params)}`);
   },
 
   updateAdminModule: async (id, data) => {
@@ -1314,107 +1640,80 @@ export const ApiService = {
     });
   },
 
+  // --- ADMIN ROLES ---
+  getAdminRoles: async () => {
+    return await request('/admin/roles');
+  },
+
+  createAdminRole: async (data) => {
+    return await request('/admin/roles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateAdminRole: async (id, data) => {
+    return await request(`/admin/roles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAdminRole: async (id) => {
+    return await request(`/admin/roles/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getAdminRoleModules: async (id) => {
+    return await request(`/admin/roles/${id}/modules`);
+  },
+
+  updateAdminRoleModules: async (id, data) => {
+    return await request(`/admin/roles/${id}/modules`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- ADMIN USERS ---
   getAdminUsers: async (params = {}) => {
-    try {
-      const res = await request(`/admin/users${qs(params)}`);
-      const storedUser = localStorage.getItem('auth_user');
-      const current = storedUser ? JSON.parse(storedUser) : null;
-      if (current && (current.role === 'supervisor' || current.role === 'agm')) {
-        const usersList = Array.isArray(res) ? res : (res?.users || res?.data || []);
-        const currentUserId = current.id || current.user_id;
-        const currentAgmId = current.agm_id || current.agmId;
-        if (current.role === 'supervisor') {
-          return usersList.filter(u =>
-            String(u.supervisor_id) === String(currentUserId) ||
-            String(u.id) === String(currentUserId) ||
-            (currentAgmId && String(u.id) === String(currentAgmId))
-          );
-        } else if (current.role === 'agm') {
-          return usersList.filter(u => String(u.agm_id) === String(currentUserId) || String(u.id) === String(currentUserId));
-        }
+    const res = await request(`/admin/users${qs(params)}`);
+    const storedUser = localStorage.getItem('auth_user');
+    const current = storedUser ? JSON.parse(storedUser) : null;
+    if (current && (current.role === 'supervisor' || current.role === 'agm')) {
+      const usersList = Array.isArray(res) ? res : (res?.users || res?.data || []);
+      const currentUserId = current.id || current.user_id;
+      const currentAgmId = current.agm_id || current.agmId;
+      if (current.role === 'supervisor') {
+        return usersList.filter(u =>
+          String(u.supervisor_id) === String(currentUserId) ||
+          String(u.id) === String(currentUserId) ||
+          (currentAgmId && String(u.id) === String(currentAgmId))
+        );
+      } else if (current.role === 'agm') {
+        return usersList.filter(u => String(u.agm_id) === String(currentUserId) || String(u.id) === String(currentUserId));
       }
-      return res;
-    } catch (e) {
-      if (e.message.includes('Access denied') || e.message.includes('role') || e.message.includes('403')) {
-        console.warn('getAdminUsers API failed, using fallback mock database:', e);
-        let list = getMockUsers();
-        if (params.role) {
-          list = list.filter(u => u.role === params.role);
-        }
-        const storedUser = localStorage.getItem('auth_user');
-        const current = storedUser ? JSON.parse(storedUser) : null;
-        if (current) {
-          const currentUserId = current.id || current.user_id;
-          const currentAgmId = current.agm_id || current.agmId;
-          if (current.role === 'supervisor') {
-            list = list.filter(u =>
-              String(u.supervisor_id) === String(currentUserId) ||
-              String(u.id) === String(currentUserId) ||
-              (currentAgmId && String(u.id) === String(currentAgmId))
-            );
-          } else if (current.role === 'agm') {
-            list = list.filter(u => String(u.agm_id) === String(currentUserId) || String(u.id) === String(currentUserId));
-          }
-        }
-        return list;
-      }
-      throw e;
     }
+    return res;
   },
 
   getAdminUserById: async (id) => {
-    try {
-      return await request(`/admin/users/${id}`);
-    } catch (e) {
-      if (e.message.includes('Access denied') || e.message.includes('role') || e.message.includes('403')) {
-        const list = getMockUsers();
-        const user = list.find(u => String(u.id) === String(id));
-        if (user) return user;
-      }
-      throw e;
-    }
+    return await request(`/admin/users/${id}`);
   },
 
   createAdminUser: async (data) => {
-    try {
-      return await request('/admin/users', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch (e) {
-      if (e.message.includes('Access denied') || e.message.includes('role') || e.message.includes('403')) {
-        console.warn('createAdminUser API failed, simulating locally:', e);
-        const users = getMockUsers();
-        const newUser = {
-          ...data,
-          id: Date.now(),
-          status: data.status || 'active'
-        };
-        users.push(newUser);
-        localStorage.setItem('mock_admin_users', JSON.stringify(users));
-        return newUser;
-      }
-      throw e;
-    }
+    return await request('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   updateAdminUser: async (id, data) => {
-    try {
-      return await request(`/admin/users/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
-    } catch (e) {
-      if (e.message.includes('Access denied') || e.message.includes('role') || e.message.includes('403')) {
-        console.warn(`updateAdminUser API failed for ID ${id}, simulating locally:`, e);
-        let users = getMockUsers();
-        users = users.map(u => String(u.id) === String(id) ? { ...u, ...data } : u);
-        localStorage.setItem('mock_admin_users', JSON.stringify(users));
-        return { success: true };
-      }
-      throw e;
-    }
+    return await request(`/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
   updateUserAvailability: async (id, data) => {
@@ -1518,6 +1817,46 @@ export const ApiService = {
     }
   },
 
+  // --- SPECIFIC EQUIPMENT ASSIGNMENT ---
+  getUserSpecificEquipment: async (userId, moduleId) => {
+    return await request(`/admin/users/${userId}/equipment?module_id=${moduleId}`);
+  },
+
+  assignSpecificEquipmentToUser: async (userId, data) => {
+    return await request(`/admin/users/${userId}/equipment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  assignEquipmentByLocation: async (userId, data) => {
+    return await request(`/admin/users/${userId}/equipment/by-location`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  replaceUserSpecificEquipment: async (userId, data) => {
+    return await request(`/admin/users/${userId}/equipment`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  removeUserSpecificEquipmentItem: async (userId, equipmentId) => {
+    return await request(`/admin/users/${userId}/equipment/${equipmentId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  removeAllUserSpecificEquipment: async (userId, moduleId) => {
+    return await request(`/admin/users/${userId}/equipment`, {
+      method: 'DELETE',
+      body: JSON.stringify({ module_id: moduleId }),
+    });
+  },
+
+
   // --- USER NAV ACCESS ---
   // Returns { modules: ["overview", "work_orders", "fire_extinguisher", "fire_trolley", ...] }
   getUserNavAccess: async (userId) => {
@@ -1577,25 +1916,7 @@ export const ApiService = {
   },
 
   // --- WORK ORDERS ---
-  getWorkOrders: async (params = {}) => {
-    return await request(`/admin/work-orders${qs(params)}`);
-  },
 
-  getWorkOrderById: async (id) => {
-    return await request(`/admin/work-orders/${id}`);
-  },
-
-  createWorkOrder: async (data) => {
-    return await request('/admin/work-orders', { method: 'POST', body: JSON.stringify(data) });
-  },
-
-  updateWorkOrder: async (id, data) => {
-    return await request(`/admin/work-orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
-  },
-
-  deleteWorkOrder: async (id) => {
-    return await request(`/admin/work-orders/${id}`, { method: 'DELETE' });
-  },
 
   // --- AUDIT LOG ---
   getAdminAuditLog: async (params = {}) => {
@@ -1892,18 +2213,6 @@ export const ApiService = {
   getCompletedTasks: async (params = {}) => {
     return await request(`/auto-scheduler/completed${qs(params)}`);
   },
-  // --- OPERATOR MAPPINGS ---
-  getOperatorMappings: async (params = {}) => {
-    return await request(`/operator-mappings${qs(params)}`);
-  },
-
-  createOperatorMapping: async (data) => {
-    return await request('/operator-mappings', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-
 
   triggerSchedulerRun: async () => {
     try {
@@ -2108,7 +2417,18 @@ export const ApiService = {
       let saved = JSON.parse(localStorage.getItem('admin_shift_assignments') || '[]');
       saved = saved.filter(a => String(a.id) !== String(id));
       localStorage.setItem('admin_shift_assignments', JSON.stringify(saved));
-      return { success: true };
     }
+  },
+
+  getAdminOverviewStats: async () => {
+    return await request('/admin/overview-stats');
+  },
+
+  getAgmOverviewStats: async (agmId) => {
+    return await request(`/agm/overview-stats?agm_id=${agmId}`);
+  },
+
+  getInspectorOverviewStats: async (inspectorId) => {
+    return await request(`/inspector/overview-stats?inspector_id=${inspectorId}`);
   },
 };

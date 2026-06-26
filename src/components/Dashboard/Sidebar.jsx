@@ -207,7 +207,7 @@ const Sidebar = ({ navCollapsed, setNavCollapsed, activePage, setActivePage, han
           <div className={`nav-submenu ${usersOpen && !navCollapsed ? 'open' : ''}`}>
             <div className={`nav-submenu-item ${activePage === 'users-manage' ? 'active' : ''}`} onClick={() => setActivePage('users-manage')}>
               <span className="nav-icon-small">👤</span>
-              <span className="nav-label-small">Manage Users</span>
+              <span className="nav-label-small">User Management</span>
             </div>
             <div className={`nav-submenu-item ${activePage === 'users-equipment-access' ? 'active' : ''}`} onClick={() => setActivePage('users-equipment-access')}>
               <span className="nav-icon-small">🔑</span>

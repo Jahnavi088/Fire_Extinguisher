@@ -10,7 +10,7 @@ const MODULE_EMOJI = {
   chemical_shower: '🚿', ppe_station: '🦺', fire_brigade: '👨‍🚒', wind_sock: '📍',
   spill_kit: '⚗️', safety_signage: '⚠️', muster_point: '📌', fire_noc: '📝',
   emergency_door: '🚪', emergency_light: '🔦', volunteers: '🙋', shift_volunteers: '👥',
-  trained_shift: '🎓',
+  trained_shift: '🎓', sand_bucket: '🪣',
 };
 
 const ACCESS_LEVELS = [
@@ -88,8 +88,78 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
   const [editLevel, setEditLevel] = useState('user');
   const [editLevelDropdownOpen, setEditLevelDropdownOpen] = useState(false);
 
+  // New specific equipment state
+  const [managingSpecificEquipment, setManagingSpecificEquipment] = useState(null);
+  const [specificEqTab, setSpecificEqTab] = useState('individual'); // 'individual' or 'location'
+  const [eqSearchQuery, setEqSearchQuery] = useState('');
+  const [specificEqLoading, setSpecificEqLoading] = useState(false);
+  const [availableEq, setAvailableEq] = useState([]);
+  const [selectedEqIds, setSelectedEqIds] = useState(new Set());
+  const [specificEqSaving, setSpecificEqSaving] = useState(false);
+  
+  // For location tab
+  const [locationOptions, setLocationOptions] = useState([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [assigningLocation, setAssigningLocation] = useState(false);
+  const [removingAllEq, setRemovingAllEq] = useState(false);
+
+  const handleOpenSpecificEq = async (assignment) => {
+    setManagingSpecificEquipment(assignment);
+    setSpecificEqTab('individual');
+    setEqSearchQuery('');
+    setSelectedLocationId('');
+    setLocationOptions([]);
+    setSpecificEqLoading(true);
+    try {
+      const [availableRes, assignedRes] = await Promise.all([
+        ApiService.getEquipment({ module_id: assignment.moduleId, limit: 1000 }).catch(e => {
+          console.warn('getEquipment failed:', e);
+          return [];
+        }),
+        ApiService.getUserSpecificEquipment(assignment.userId, assignment.moduleId).catch(e => {
+          console.warn('getUserSpecificEquipment failed:', e);
+          return [];
+        }),
+      ]);
+
+      const availableList = availableRes.items || availableRes.data || (Array.isArray(availableRes) ? availableRes : []);
+      const assignedList = assignedRes.items || assignedRes.data || (Array.isArray(assignedRes) ? assignedRes : []);
+
+      setAvailableEq(availableList);
+      const assignedIds = new Set(assignedList.map(e => String(e.id || e.equipment_id || e.sos_code || e.equipment_code)));
+      setSelectedEqIds(assignedIds);
+    } catch (err) {
+      alert("Failed to load specific equipment.");
+    } finally {
+      setSpecificEqLoading(false);
+    }
+  };
+
+
   const getAccessLevelOptionLabel = (val) =>
     accessLevels.find(l => l.value === val)?.label || val || 'User';
+
+  // Lazy-load branches when "By Location" tab is opened, filtered by company_id via _injectCompanyId
+  useEffect(() => {
+    if (specificEqTab !== 'location' || !managingSpecificEquipment) return;
+    if (locationOptions.length > 0) return;
+
+    const user = ApiService.getUser();
+    const companyId = user?.company_id;
+
+    setLocationLoading(true);
+    ApiService.getBranches(companyId ? { company_id: companyId } : {})
+      .then(res => {
+        const rawList = Array.isArray(res)
+          ? res
+          : (res?.data || res?.branches || res?.items || []);
+        const list = Array.isArray(rawList) ? rawList : [];
+        setLocationOptions(list.map(b => ({ id: b.id, name: b.name || b.branch_name || `Branch ${b.id}` })));
+      })
+      .catch(() => setLocationOptions([]))
+      .finally(() => setLocationLoading(false));
+  }, [specificEqTab, managingSpecificEquipment]);
 
   useEffect(() => {
     ApiService.getAccessLevels()
@@ -525,6 +595,17 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
                                     </svg>
                                   </button>
                                   <button
+                                    className="ea-action-btn specific-eq"
+                                    onClick={() => handleOpenSpecificEq(a)}
+                                    title="Manage Specific Equipment"
+                                    style={{ color: '#3b82f6' }}
+                                  >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                      <line x1="9" y1="3" x2="9" y2="21"></line>
+                                    </svg>
+                                  </button>
+                                  <button
                                     className="ea-action-btn view-module"
                                     onClick={() => {
                                       const u = users.find(usr => String(usr.id) === String(a.userId));
@@ -891,6 +972,216 @@ const EquipmentAccess = ({ onBack, onScroll, availableModules = [], isSuperAdmin
       {(userDropdownOpen || moduleDropdownOpen || levelDropdownOpen) && (
         <div className="ea-overlay" onClick={closeDropdowns} />
       )}
+
+      {managingSpecificEquipment && (
+        <div className="ea-modal-overlay" onClick={() => setManagingSpecificEquipment(null)}>
+          <div className="ea-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="ea-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className="ea-modal-card-icon">📋</span>
+                  <div className="ea-modal-card-title" style={{ fontSize: '18px' }}>
+                    Specific Equipment — {managingSpecificEquipment.userName}
+                  </div>
+                </div>
+                <button className="ea-modal-close-btn" onClick={() => setManagingSpecificEquipment(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '20px', cursor: 'pointer', outline: 'none' }}>&times;</button>
+              </div>
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <button 
+                  onClick={() => setSpecificEqTab('individual')} 
+                  style={{ background: 'none', border: 'none', color: specificEqTab === 'individual' ? '#fff' : 'rgba(255,255,255,0.5)', borderBottom: specificEqTab === 'individual' ? '2px solid #3b82f6' : '2px solid transparent', paddingBottom: '10px', fontSize: '14px', cursor: 'pointer' }}
+                >
+                  Individual Items
+                </button>
+                <button 
+                  onClick={() => setSpecificEqTab('location')} 
+                  style={{ background: 'none', border: 'none', color: specificEqTab === 'location' ? '#fff' : 'rgba(255,255,255,0.5)', borderBottom: specificEqTab === 'location' ? '2px solid #3b82f6' : '2px solid transparent', paddingBottom: '10px', fontSize: '14px', cursor: 'pointer' }}
+                >
+                  By Location
+                </button>
+              </div>
+            </div>
+
+            <div className="ea-modal-body" style={{ maxHeight: '450px', overflowY: 'auto', padding: '16px 20px' }}>
+              {specificEqTab === 'individual' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
+                      Selected: {selectedEqIds.size} / {availableEq.length}
+                    </div>
+                    <input 
+                      type="text" 
+                      placeholder="Search equipment..." 
+                      value={eqSearchQuery}
+                      onChange={(e) => setEqSearchQuery(e.target.value)}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', width: '200px' }}
+                    />
+                  </div>
+                  {specificEqLoading ? (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>Loading equipment...</div>
+                  ) : availableEq.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>No equipment found for this module.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {availableEq.filter(eq => {
+                         const code = eq.equipment_code || eq.sos_code || eq.id || '';
+                         const name = eq.equipment_name || eq.name || '';
+                         const loc = eq.location_name || eq.building_name || '';
+                         const q = eqSearchQuery.toLowerCase();
+                         return String(code).toLowerCase().includes(q) || String(name).toLowerCase().includes(q) || String(loc).toLowerCase().includes(q);
+                      }).map(eq => {
+                        const eqApiId = eq.id || eq.equipment_id;
+                        const eqId = String(eqApiId || eq.sos_code || eq.equipment_code);
+                        const isSelected = selectedEqIds.has(eqId);
+                        return (
+                          <label key={eqId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', cursor: 'pointer', border: isSelected ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent' }}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const newSet = new Set(selectedEqIds);
+                                if (e.target.checked) newSet.add(eqId);
+                                else newSet.delete(eqId);
+                                setSelectedEqIds(newSet);
+                              }}
+                              style={{ accentColor: '#3b82f6', width: '18px', height: '18px' }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '600', color: '#fff', fontSize: '14px' }}>{eq.equipment_code || eq.sos_code || eqId}</div>
+                              {(eq.equipment_name || eq.name) && (
+                                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{eq.equipment_name || eq.name}</div>
+                              )}
+                              <div style={{ fontSize: '12px', color: '#94a3b8' }}>{eq.location_name || eq.building_name || 'No location'}</div>
+                            </div>
+                            {isSelected && (
+                              <button
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  try {
+                                    await ApiService.removeUserSpecificEquipmentItem(managingSpecificEquipment.userId, eqApiId || eqId);
+                                    const newSet = new Set(selectedEqIds);
+                                    newSet.delete(eqId);
+                                    setSelectedEqIds(newSet);
+                                  } catch (err) {
+                                    alert('Failed to remove individual item');
+                                  }
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '12px' }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {specificEqTab === 'location' && (
+                <div style={{ padding: '20px 0' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>Select Location / Building</label>
+                  {locationLoading ? (
+                    <div style={{ color: '#94a3b8', fontSize: '13px', padding: '10px 0' }}>Loading locations...</div>
+                  ) : (
+                  <select
+                    value={selectedLocationId}
+                    onChange={e => setSelectedLocationId(e.target.value)}
+                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '14px' }}
+                  >
+                    <option value="">-- Choose a location --</option>
+                    {locationOptions.length === 0 ? (
+                      <option disabled value="">No locations found</option>
+                    ) : locationOptions.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                  )}
+                  <button 
+                    onClick={async () => {
+                      if (!selectedLocationId) return alert('Select a location first.');
+                      setAssigningLocation(true);
+                      try {
+                        await ApiService.assignEquipmentByLocation(managingSpecificEquipment.userId, {
+                          module_id: managingSpecificEquipment.moduleId,
+                          location_id: selectedLocationId
+                        });
+                        showToast('Location assigned successfully.');
+                        setManagingSpecificEquipment(null);
+                      } catch (err) {
+                        alert(err.message || 'Failed to assign location.');
+                      } finally {
+                        setAssigningLocation(false);
+                      }
+                    }}
+                    disabled={assigningLocation || !selectedLocationId || locationLoading}
+                    style={{ marginTop: '20px', width: '100%', padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: (assigningLocation || !selectedLocationId || locationLoading) ? 'not-allowed' : 'pointer' }}
+                  >
+                    {assigningLocation ? 'Assigning...' : 'Assign Entire Location'}
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            <div className="ea-modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button 
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to remove ALL equipment assignments for this module?')) {
+                    setRemovingAllEq(true);
+                    try {
+                      await ApiService.removeAllUserSpecificEquipment(managingSpecificEquipment.userId, managingSpecificEquipment.moduleId);
+                      showToast('All equipment removed.');
+                      setManagingSpecificEquipment(null);
+                    } catch (err) {
+                      alert('Failed to remove all equipment');
+                    } finally {
+                      setRemovingAllEq(false);
+                    }
+                  }
+                }}
+                disabled={removingAllEq}
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                {removingAllEq ? 'Removing...' : 'Remove All Equipment'}
+              </button>
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="ea-cancel-btn" onClick={() => setManagingSpecificEquipment(null)} style={{ padding: '8px 16px', fontSize: '13px' }}>Cancel</button>
+                {specificEqTab === 'individual' && (
+                  <button 
+                    className="ea-submit-btn" 
+                    onClick={async () => {
+                      setSpecificEqSaving(true);
+                      try {
+                        const equipmentIds = Array.from(selectedEqIds).map(id => {
+                          const n = Number(id);
+                          return Number.isFinite(n) && n > 0 ? n : id;
+                        });
+                        await ApiService.replaceUserSpecificEquipment(managingSpecificEquipment.userId, {
+                          module_id: managingSpecificEquipment.moduleId,
+                          equipment_ids: equipmentIds
+                        });
+                        showToast('Equipment assigned successfully.');
+                        setManagingSpecificEquipment(null);
+                      } catch (err) {
+                        alert(err.message || 'Failed to assign equipment.');
+                      } finally {
+                        setSpecificEqSaving(false);
+                      }
+                    }} 
+                    disabled={specificEqSaving || specificEqLoading}
+                    style={{ padding: '8px 16px', fontSize: '13px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: (specificEqSaving || specificEqLoading) ? 'not-allowed' : 'pointer' }}
+                  >
+                    {specificEqSaving ? 'Saving...' : 'Save Specific Equipment'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

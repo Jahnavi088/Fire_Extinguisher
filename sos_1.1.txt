@@ -155,12 +155,12 @@ Response
     }
   ]
 }
-Backend should maintain only:
-UNASSIGNED
-PENDING
-IN_PROGRESS
-COMPLETED
-OVERDUE
+OSHA Alignment	9/10
+NFPA Alignment	8.5/10
+ISO 45001 Alignment	8.5/10
+Auditor Friendliness	9/10
+Mobile Inspection Usability	9.5/10
+Enterprise Readiness
 
 
 

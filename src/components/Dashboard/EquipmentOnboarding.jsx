@@ -1,84 +1,66 @@
 import { useState, useEffect, useRef } from 'react';
 import { ApiService } from '../../services/apiService';
+import MapLocationPicker from './MapLocationPicker';
+import {
+  EQUIPMENT_ATTRIBUTE_SCHEMAS,
+  GENERIC_EQUIPMENT_SCHEMA,
+  getEquipmentSchema,
+  COMMON_SECTIONS,
+} from '../../config/onboardingConfig';
 import './EquipmentOnboarding.css';
 
-// ── Static master lists ──────────────────────────────────────────────────────
+const API_BASE = 'https://ehs.garrev.com';
+
+// COND array kept here for any inline use; canonical copy lives in onboardingConfig.js
+const COND = ['OK', 'Damaged', 'Missing', 'Needs Service'];
 
 
-const SHIFT_OPTIONS = ['Morning', 'Evening', 'Night', 'Anytime'];
-
-const EMPTY_FORM = {
-  equipment_code: '',
-  equipment_type: '',
-  company_id: '',
-  branch_id: '',
-  building_id: '',
-  floor_id: '',
-  zone_id: '',
-  department_id: '',
-  inspection_frequency: '',
-  custom_frequency_days: '',
-  shift_allowed: '',
-  checklist_template_id: '',
-  installation_date: '',
-  expiry_date: '',
-  status: '',
+// ── Logo resolver ─────────────────────────────────────────────────────────────
+const resolveLogoUrl = (company) => {
+  const raw = company?.logo_url || company?.logo || company?.company_logo || '';
+  if (!raw) return null;
+  if (raw.startsWith('http')) return raw;
+  return `${API_BASE}/${raw.replace(/^\//, '')}`;
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-const Field = ({ label, required, error, children, span }) => (
-  <div className={`eob-field ${error ? 'has-error' : ''} ${span ? `eob-span-${span}` : ''}`}>
-    <label className="eob-label">
-      {label}{required && <span className="eob-req">*</span>}
-    </label>
+// ── Shared sub-components ────────────────────────────────────────────────────
+const Field = ({ label, required, error, children, span2 }) => (
+  <div className={`eob-field${error ? ' has-error' : ''}${span2 ? ' eob-span-2' : ''}`}>
+    <label className="eob-label">{label}{required && <span className="eob-req">*</span>}</label>
     {children}
     {error && <span className="eob-error-msg">{error}</span>}
   </div>
 );
 
 const CustomSelect = ({ value, onChange, options, placeholder, disabled }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const ref = useRef(null);
-
   useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
-
-  const selected = options.find(o => String(o.value) === String(value));
-
+  const sel = options.find(o => String(o.value) === String(value));
   return (
-    <div className={`eob-custom-select ${isOpen ? 'is-open' : ''}`} ref={ref}>
+    <div className={`eob-custom-select${open ? ' is-open' : ''}`} ref={ref}>
       <div
-        className={`eob-select-trigger ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
-        onMouseDown={(e) => {
-          if (disabled) return;
-          e.preventDefault(); e.stopPropagation();
-          setIsOpen(v => !v);
-        }}
+        className={`eob-select-trigger${open ? ' open' : ''}${disabled ? ' disabled' : ''}`}
+        onMouseDown={e => { if (disabled) return; e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
       >
-        <span className={selected ? '' : 'placeholder-text'}>
-          {selected ? selected.label : placeholder}
-        </span>
+        <span className={sel ? '' : 'placeholder-text'}>{sel ? sel.label : placeholder}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
           className="eob-select-icon" style={{ pointerEvents: 'none' }}>
           <path d="M6 9l6 6 6-6" />
         </svg>
       </div>
-      <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`}>
+      <div className={`eob-select-dropdown${open ? ' open' : ''}`}>
         {options.length === 0
-          ? <div className="eob-select-option" style={{ opacity: 0.4, cursor: 'default' }}>No options available</div>
-          : options.map(opt => (
-            <div
-              key={opt.value}
-              className={`eob-select-option ${String(opt.value) === String(value) ? 'selected' : ''}`}
-              onMouseDown={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                onChange(opt.value); setIsOpen(false);
-              }}
-            >
-              {opt.label}
+          ? <div className="eob-select-option" style={{ opacity: 0.4, cursor: 'default' }}>No options</div>
+          : options.map(o => (
+            <div key={o.value}
+              className={`eob-select-option${String(o.value) === String(value) ? ' selected' : ''}`}
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onChange(o.value); setOpen(false); }}>
+              {o.label}
             </div>
           ))}
       </div>
@@ -86,74 +68,25 @@ const CustomSelect = ({ value, onChange, options, placeholder, disabled }) => {
   );
 };
 
-const ShiftDropdown = ({ value, onChange, placeholder, error, shifts = [] }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef(null);
+const StepIndicator = ({ current, steps }) => (
+  <div className="eob-step-bar">
+    {steps.map((s, i) => {
+      const stepIndex = i + 1;
+      const done = stepIndex < current, active = stepIndex === current;
+      return (
+        <div key={s.id} className="eob-step-item">
+          <div className={`eob-step-circle${done ? ' done' : active ? ' active' : ''}`}>
+            {done ? '✓' : s.icon}
+          </div>
+          <span className={`eob-step-label${active ? ' active' : done ? ' done' : ''}`}>{s.label}</span>
+          {i < steps.length - 1 && <div className={`eob-step-connector${done ? ' done' : ''}`} />}
+        </div>
+      );
+    })}
+  </div>
+);
 
-  useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
-
-  const toggleShift = (shift) => {
-    if (value.includes(shift)) {
-      onChange(value.filter(s => s !== shift));
-    } else {
-      onChange([...value, shift]);
-    }
-  };
-
-  const options = shifts.length > 0
-    ? shifts.map(s => s.name || s.shift_name).filter(Boolean)
-    : SHIFT_OPTIONS;
-
-  return (
-    <div className={`eob-custom-select ${isOpen ? 'is-open' : ''} ${error ? 'has-error' : ''}`} ref={ref}>
-      <div
-        className={`eob-select-trigger ${isOpen ? 'open' : ''}`}
-        onMouseDown={(e) => {
-          e.preventDefault(); e.stopPropagation();
-          setIsOpen(v => !v);
-        }}
-      >
-        <span className={value.length > 0 ? '' : 'placeholder-text'}>
-          {value.length > 0 ? value.join(', ') : placeholder}
-        </span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          className="eob-select-icon" style={{ pointerEvents: 'none' }}>
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </div>
-      <div className={`eob-select-dropdown ${isOpen ? 'open' : ''}`} style={{ maxHeight: '200px', overflowY: 'auto' }}>
-        {options.map(opt => {
-          const isSelected = value.includes(opt);
-          return (
-            <div
-              key={opt}
-              className={`eob-select-option ${isSelected ? 'selected' : ''}`}
-              onMouseDown={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                toggleShift(opt);
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px' }}
-            >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                readOnly
-                style={{ cursor: 'pointer', accentColor: '#3b82f6' }}
-              />
-              <span style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.7)' }}>{opt}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const SectionDivider = ({ icon, title }) => (
+const Section = ({ icon, title }) => (
   <div className="eob-section-divider">
     <span className="eob-section-icon">{icon}</span>
     <span className="eob-section-title">{title}</span>
@@ -161,327 +94,405 @@ const SectionDivider = ({ icon, title }) => (
   </div>
 );
 
-// ── Main component ────────────────────────────────────────────────────────────
-const EquipmentOnboarding = ({ onBack, onSuccess }) => {
-  const [form, setFormState] = useState(EMPTY_FORM);
-  const [certified, setCertified] = useState(false);
-  const [companies, setCompanies] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [allBuildings, setAllBuildings] = useState([]);
-  const [allZones, setAllZones] = useState([]);
-  const [allDepartments, setAllDepartments] = useState([]);
-  const [dropdownsLoading, setDropdownsLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [dynamicFloors, setDynamicFloors] = useState([]);
-  const [successData, setSuccessData] = useState(null);
-  const [equipmentTypes, setEquipmentTypes] = useState([]);
-  const [checklists, setChecklists] = useState([]);
-  const [frequencies, setFrequencies] = useState([]);
-  const [statuses, setStatuses] = useState([]);
-  const [actionError, setActionError] = useState(null);
+const ReviewBlock = ({ title, icon, rows }) => (
+  <div className="eob-review-card">
+    <div className="eob-review-card-title">{icon} {title}</div>
+    {rows.map(([label, value]) => (
+      <div key={label} className="eob-review-row">
+        <span className="eob-review-label">{label}</span>
+        <span className="eob-review-value">{value || <span style={{ opacity: 0.35 }}>—</span>}</span>
+      </div>
+    ))}
+  </div>
+);
 
-  // Load companies, equipment types, checklists, frequencies, and statuses on mount
+// Renders one dynamic attribute field from the schema
+const DynamicField = ({ attr, value, onChange, error }) => {
+  const type = attr.type || attr.field_type;
+  if (type === 'select' || type === 'dropdown' || type === 'multiselect') {
+    const rawOptions = attr.options || attr.values || attr.choices || [];
+    const normalizedOptions = rawOptions.map(o => {
+      if (typeof o === 'object' && o !== null) return { value: o.value || o.id || o.name, label: o.label || o.name || o.value };
+      return { value: o, label: o };
+    });
+    return (
+      <Field key={attr.key || attr.field_key} label={attr.label} required={attr.required || attr.is_required} error={error}>
+        <CustomSelect
+          value={value || ''}
+          onChange={v => onChange(attr.key || attr.field_key, v)}
+          placeholder={`Select ${attr.label}`}
+          options={normalizedOptions}
+        />
+      </Field>
+    );
+  }
+  return (
+    <Field key={attr.key || attr.field_key} label={attr.label} required={attr.required || attr.is_required} error={error}>
+      <input
+        className="eob-input"
+        type={attr.type || attr.field_type || 'text'}
+        placeholder={attr.placeholder || ''}
+        value={value || ''}
+        onChange={e => onChange(attr.key || attr.field_key, e.target.value)}
+        {...(attr.type === 'number' || attr.field_type === 'number' ? { min: 0 } : {})}
+      />
+    </Field>
+  );
+};
+
+// ── CASCADE RESET MAP ─────────────────────────────────────────────────────────
+const CASCADE = {
+  branch_id:   { building_id: '', floor_id: '', zone_id: '', department_id: '' },
+  building_id: { floor_id: '', zone_id: '', department_id: '' },
+  floor_id:    { zone_id: '', department_id: '' },
+  zone_id:     { department_id: '' },
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
+const EquipmentOnboarding = ({ onBack, onSuccess }) => {
+  const [step, setStep]               = useState(1);
+  const [errors, setErrors]           = useState({});
+  const [submitting, setSubmitting]   = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [successData, setSuccessData] = useState(null);
+  const [gpsCapturing, setGpsCapturing] = useState(false);
+
+  // ── Master data ─────────────────────────────────────────────────────────────
+  const [companies,  setCompanies]  = useState([]);
+  const [modules,    setModules]    = useState([]);
+  const [statuses,   setStatuses]   = useState([]);
+  const [masterLoading, setMasterLoading] = useState(true);
+  const [modulesLoading, setModulesLoading] = useState(false);
+
+  const [dynamicConfig, setDynamicConfig] = useState(null);
+  const [configLoading, setConfigLoading] = useState(false);
+
+  // ── Step 1 ──────────────────────────────────────────────────────────────────
+  const [selectedCompany, setSelectedCompany] = useState(null);
+
+  // ── Step 2 ──────────────────────────────────────────────────────────────────
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [identity, setIdentity] = useState({ serial_number: '', barcode: '', manufacturer_name: '' });
+  const [details,  setDetails]  = useState({});
+
+  // ── Step 3 — Location ───────────────────────────────────────────────────────
+  const [branches,    setBranches]    = useState([]);
+  const [buildings,   setBuildings]   = useState([]);
+  const [floors,      setFloors]      = useState([]);
+  const [zones,       setZones]       = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [locLoading,  setLocLoading]  = useState(false);
+  const [location, setLocationState] = useState({
+    branch_id: '', building_id: '', floor_id: '', zone_id: '', department_id: '',
+    exact_location_description: '',
+    latitude: null, longitude: null, geo_accuracy_m: null,
+  });
+
+  // ── Step 3 — Lifecycle ──────────────────────────────────────────────────────
+  const [lifecycle, setLifecycle] = useState({
+    installed_on: '', last_service_on: '', expiry_date: '', operational_status: '', remarks: '',
+  });
+
+  // ── Step 4 ──────────────────────────────────────────────────────────────────
+  const [certified, setCertified] = useState(false);
+
+  // ── Load companies + statuses on mount ─────────────────────────────────────
   useEffect(() => {
     Promise.allSettled([
       ApiService.getAdminCompanies(),
-      ApiService.getAdminModules(),
-      ApiService.getChecklists(),
-      ApiService.getFrequencies(),
-      ApiService.getStatuses()
-    ]).then(([companiesRes, modulesRes, checklistsRes, frequenciesRes, statusesRes]) => {
-      const compList = companiesRes.status === 'fulfilled'
-        ? (Array.isArray(companiesRes.value) ? companiesRes.value : (companiesRes.value?.companies || companiesRes.value?.data || []))
-        : [];
-      const moduleList = modulesRes.status === 'fulfilled'
-        ? (Array.isArray(modulesRes.value) ? modulesRes.value : (modulesRes.value?.data || modulesRes.value?.modules || []))
-        : [];
-      const checklistList = checklistsRes.status === 'fulfilled'
-        ? (checklistsRes.value?.types || [])
-        : [];
-      const freqList = frequenciesRes.status === 'fulfilled'
-        ? (Array.isArray(frequenciesRes.value) ? frequenciesRes.value : (frequenciesRes.value?.frequencies || frequenciesRes.value?.data || []))
-        : [];
-      const statusList = statusesRes.status === 'fulfilled'
-        ? (Array.isArray(statusesRes.value) ? statusesRes.value : (statusesRes.value?.statuses || statusesRes.value?.data || []))
-        : [];
-
-      setCompanies(compList);
-      setChecklists(checklistList);
-      setFrequencies(freqList);
-      setStatuses(statusList);
-
-      if (moduleList.length > 0) {
-        const activeModules = moduleList.filter(m => m.is_active || m.status === 'active' || m.is_active === 1 || m.is_active === '1');
-        const types = activeModules.map(m => m.name).filter(Boolean);
-        if (types.length > 0) {
-          setEquipmentTypes(types);
-        }
+      ApiService.getStatuses(),
+    ]).then(([compRes, statRes]) => {
+      if (compRes.status === 'fulfilled') {
+        const list = Array.isArray(compRes.value) ? compRes.value : (compRes.value?.companies || compRes.value?.data || []);
+        setCompanies(list);
       }
-    }).catch(() => {})
-      .finally(() => setLoadingData(false));
+      if (statRes.status === 'fulfilled') {
+        const list = Array.isArray(statRes.value) ? statRes.value : (statRes.value?.statuses || statRes.value?.data || []);
+        setStatuses(list);
+      }
+    }).finally(() => setMasterLoading(false));
   }, []);
 
-  // When company changes → fetch branches
+  // ── When company selected → load its modules ────────────────────────────────
   useEffect(() => {
-    if (!form.company_id) {
-      setBranches([]); setAllBuildings([]); setAllZones([]); setAllDepartments([]); setDynamicFloors([]);
-      return;
-    }
-    setDropdownsLoading(true);
-    ApiService.getBranches({ company_id: form.company_id })
+    if (!selectedCompany) { setModules([]); return; }
+    setModulesLoading(true);
+    setSelectedModule(null);
+    setDetails({});
+    setDynamicConfig(null);
+    ApiService.getAdminModules({ company_id: selectedCompany.id || selectedCompany.company_id })
       .then(res => {
-        const branchList = (Array.isArray(res) ? res : (res?.branches || res?.data || []))
-          .filter(b => !form.company_id || String(b.company_id) === String(form.company_id));
-        setBranches(branchList);
-      })
-      .catch(err => {
-        console.error('Failed to fetch branches:', err);
-        setBranches([]);
-      })
-      .finally(() => setDropdownsLoading(false));
+        const list = Array.isArray(res) ? res : (res?.data || res?.modules || []);
+        console.log('ADMIN MODULES LIST:', list);
+        
+        // Let's also check if the company object has modules
+        ApiService.getAdminCompanyById(selectedCompany.id || selectedCompany.company_id).then(c => {
+          console.log('COMPANY DETAILS from getAdminCompanyById:', c);
+        }).catch(e => console.error(e));
 
-    ApiService.getOnboardingDropdowns(form.company_id)
-      .then(d => {
-        setAllZones(d.zones || []);
+        setModules(list);
       })
-      .catch(() => {});
-  }, [form.company_id]);
+      .catch(() => setModules([]))
+      .finally(() => setModulesLoading(false));
+  }, [selectedCompany]);
 
-  // When branch changes → fetch buildings for this branch
+  // ── When company selected → load its branches ───────────────────────────────
   useEffect(() => {
-    if (!form.branch_id) {
-      setAllBuildings([]);
-      return;
-    }
-    setDropdownsLoading(true);
-    ApiService.getBranchBuildings(form.branch_id)
+    if (!selectedCompany) { setBranches([]); return; }
+    const cid = selectedCompany.id || selectedCompany.company_id;
+    ApiService.getBranches({ company_id: cid })
+      .then(res => setBranches(Array.isArray(res) ? res : (res?.branches || res?.data || [])))
+      .catch(() => setBranches([]));
+  }, [selectedCompany]);
+
+  // Location cascade
+  useEffect(() => {
+    if (!location.branch_id) { setBuildings([]); setFloors([]); setZones([]); setDepartments([]); return; }
+    setLocLoading(true);
+    ApiService.getBranchBuildings(location.branch_id)
+      .then(res => setBuildings(Array.isArray(res) ? res : (res?.buildings || res?.data || [])))
+      .catch(() => setBuildings([]))
+      .finally(() => setLocLoading(false));
+  }, [location.branch_id]);
+
+  useEffect(() => {
+    if (!location.building_id) { setFloors([]); setZones([]); setDepartments([]); return; }
+    setLocLoading(true);
+    ApiService.getBuildingFloors(location.building_id)
+      .then(res => setFloors(Array.isArray(res) ? res : (res?.floors || res?.data || [])))
+      .catch(() => setFloors([]))
+      .finally(() => setLocLoading(false));
+  }, [location.building_id]);
+
+  useEffect(() => {
+    if (!location.floor_id) { setZones([]); setDepartments([]); return; }
+    setLocLoading(true);
+    ApiService.getFloorZones(location.floor_id)
       .then(res => {
-        const buildingList = Array.isArray(res) ? res : (res?.buildings || res?.data || []);
-        setAllBuildings(buildingList);
+        const list = Array.isArray(res) ? res : (res?.zones || res?.data || []);
+        setZones(list.map(z => ({ ...z, name: z.zone_name || z.name })));
       })
-      .catch(err => {
-        console.error('Failed to fetch buildings for branch:', err);
-        setAllBuildings([]);
-      })
-      .finally(() => setDropdownsLoading(false));
+      .catch(() => setZones([]))
+      .finally(() => setLocLoading(false));
+  }, [location.floor_id]);
 
-    // Fetch branch details
-    ApiService.getBranchById(form.branch_id)
-      .catch(() => {});
-  }, [form.branch_id]);
-
-  // When building changes → fetch branch floors dynamically
   useEffect(() => {
-    if (!form.building_id) return;
-    
-    // Fetch floors
-    ApiService.getBuildingFloors(form.building_id)
-      .then(floors => {
-        const floorList = Array.isArray(floors) ? floors : (floors?.data || floors?.floors || []);
-        setDynamicFloors(floorList);
+    if (!location.zone_id) { setDepartments([]); return; }
+    setLocLoading(true);
+    ApiService.getZoneDepartments(location.zone_id)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.departments || res?.data || []);
+        setDepartments(list.map(d => ({ ...d, name: d.department_name || d.name })));
       })
-      .catch(err => {
-        console.warn('Failed to fetch building floors:', err);
-        setDynamicFloors([]);
-      });
-  }, [form.building_id]);
+      .catch(() => setDepartments([]))
+      .finally(() => setLocLoading(false));
+  }, [location.zone_id]);
 
-  // When floor changes → fetch zones dynamically
-  useEffect(() => {
-    if (!form.floor_id) {
-      setAllZones([]);
-      return;
-    }
-    setDropdownsLoading(true);
-    ApiService.getFloorZones(form.floor_id)
-      .then(zones => {
-        const zoneList = Array.isArray(zones) ? zones : (zones?.data || zones?.zones || []);
-        const mappedZones = zoneList.map(z => ({
-          ...z,
-          floor_id: form.floor_id,
-          name: z.zone_name || z.name
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const setId  = (k, v) => { setIdentity(s => ({ ...s, [k]: v }));   setErrors(e => ({ ...e, [k]: undefined })); };
+  const setLc  = (k, v) => { setLifecycle(s => ({ ...s, [k]: v }));  setErrors(e => ({ ...e, [k]: undefined })); };
+  const setDet = (k, v) => { setDetails(s => ({ ...s, [k]: v }));    setErrors(e => ({ ...e, [`det_${k}`]: undefined })); };
+
+  const setLoc = (k, v) => {
+    setLocationState(s => ({ ...s, [k]: v, ...(CASCADE[k] || {}) }));
+    setErrors(e => ({ ...e, [k]: undefined }));
+  };
+
+  const captureGPS = () => {
+    if (!navigator.geolocation) { alert('GPS not supported by this browser.'); return; }
+    setGpsCapturing(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setLocationState(s => ({
+          ...s,
+          latitude:      parseFloat(pos.coords.latitude.toFixed(6)),
+          longitude:     parseFloat(pos.coords.longitude.toFixed(6)),
+          geo_accuracy_m: Math.round(pos.coords.accuracy),
         }));
-        setAllZones(mappedZones);
-      })
-      .catch(err => {
-        console.warn('Failed to fetch floor zones:', err);
-        setAllZones([]);
-      })
-      .finally(() => setDropdownsLoading(false));
-  }, [form.floor_id]);
-
-  // When zone changes → fetch departments dynamically
-  useEffect(() => {
-    if (!form.zone_id) {
-      setAllDepartments([]);
-      return;
-    }
-    setDropdownsLoading(true);
-    ApiService.getZoneDepartments(form.zone_id)
-      .then(depts => {
-        const deptList = Array.isArray(depts) ? depts : (depts?.data || depts?.departments || []);
-        const mappedDepts = deptList.map(d => ({
-          ...d,
-          zone_id: form.zone_id,
-          name: d.department_name || d.name
-        }));
-        setAllDepartments(mappedDepts);
-      })
-      .catch(err => {
-        console.warn('Failed to fetch zone departments:', err);
-        setAllDepartments([]);
-      })
-      .finally(() => setDropdownsLoading(false));
-  }, [form.zone_id]);
-
-  // Cascaded options
-  const filteredZones = allZones.filter(z => !form.floor_id || z.floor_id === form.floor_id);
-
-  const set = (key, val) => {
-    setFormState(f => ({ ...f, [key]: val }));
-    setErrors(e => ({ ...e, [key]: undefined }));
+        setGpsCapturing(false);
+      },
+      () => { setGpsCapturing(false); alert('Could not get GPS. Allow location access.'); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
-  const setBranch = (val) => {
-    setFormState(f => ({ ...f, branch_id: val, building_id: '', floor_id: '', zone_id: '' }));
-    setErrors(e => ({ ...e, branch_id: undefined, building_id: undefined, floor_id: undefined, zone_id: undefined }));
+  const clearGPS = () => setLocationState(s => ({ ...s, latitude: null, longitude: null, geo_accuracy_m: null }));
+
+  const fmt = d => {
+    if (!d) return '';
+    const [y, m, day] = d.split('-');
+    return `${day}-${m}-${y}`;
   };
 
-  const setBuilding = (val) => {
-    setFormState(f => ({ ...f, building_id: val, floor_id: '', zone_id: '' }));
-    setErrors(e => ({ ...e, building_id: undefined, floor_id: undefined, zone_id: undefined }));
-  };
+  // ── Validation ───────────────────────────────────────────────────────────────
+  const STEPS = [
+    { id: 'company', label: 'Company', icon: '🏢' },
+    { id: 'equipment', label: 'Equipment', icon: '🔧' },
+    { id: 'location', label: 'Location & Dates', icon: '📍' },
+    { id: 'review', label: 'Review', icon: '✅' }
+  ];
 
-  const setFloor = (val) => {
-    setFormState(f => ({ ...f, floor_id: val, zone_id: '' }));
-    setErrors(e => ({ ...e, floor_id: undefined, zone_id: undefined }));
-  };
-
-  const setZone = (val) => {
-    setFormState(f => ({ ...f, zone_id: val, department_id: '' }));
-    setErrors(e => ({ ...e, zone_id: undefined, department_id: undefined }));
-  };
-
-  const validate = () => {
+  const validate = s => {
     const e = {};
-    if (!form.equipment_code.trim())     e.equipment_code = 'Required';
-    if (!form.equipment_type)            e.equipment_type = 'Required';
-    if (!form.company_id)                e.company_id = 'Required';
-    if (!form.branch_id)                 e.branch_id = 'Required';
-    if (!form.building_id)               e.building_id = 'Required';
-    if (!form.floor_id)                  e.floor_id = 'Required';
-    if (!form.zone_id)                   e.zone_id = 'Required';
-    if (!form.department_id)             e.department_id = 'Required';
-    if (!form.inspection_frequency)      e.inspection_frequency = 'Required';
-    if (String(form.inspection_frequency).toLowerCase() === 'custom' && (!form.custom_frequency_days || isNaN(form.custom_frequency_days) || Number(form.custom_frequency_days) <= 0)) {
-      e.custom_frequency_days = 'Valid positive number required';
+    const stepDef = STEPS[s - 1];
+
+    if (stepDef.id === 'company') {
+      if (!selectedCompany) e.company = 'Please select a company';
     }
-    if (!form.shift_allowed) e.shift_allowed = 'Select a shift';
-    if (!form.checklist_template_id)     e.checklist_template_id = 'Required';
-    if (!form.installation_date)         e.installation_date = 'Required';
-    if (!form.expiry_date)               e.expiry_date = 'Required';
-    if (!form.status)                    e.status = 'Required';
-    if (!certified)                      e.certified = 'Certification required before deploying';
+    if (stepDef.id === 'equipment') {
+      if (!selectedModule) e.module = 'Please select an equipment module';
+      if (!identity.serial_number.trim()) e.serial_number = 'Required';
+      if (!identity.manufacturer_name.trim()) e.manufacturer_name = 'Required';
+      
+      if (dynamicConfig?.layout?.steps) {
+        dynamicConfig.layout.steps.forEach(st => {
+          (st.fields || []).filter(f => f.required || f.is_required).forEach(f => {
+            const key = f.key || f.field_key;
+            if (!details[key]) e[`det_${key}`] = 'Required';
+          });
+        });
+      } else {
+        const schema = getEquipmentSchema(selectedModule?.name || '');
+        schema?.attributes?.filter(a => a.required).forEach(a => {
+          if (!details[a.key]) e[`det_${a.key}`] = 'Required';
+        });
+      }
+      if (!lifecycle.installed_on)       e.installed_on       = 'Required';
+      if (!lifecycle.expiry_date)        e.expiry_date        = 'Required';
+      if (!lifecycle.operational_status) e.operational_status = 'Required';
+    }
+    if (stepDef.id === 'location') {
+      if (!location.branch_id)   e.branch_id   = 'Required';
+      if (!location.building_id) e.building_id = 'Required';
+      if (!location.floor_id)    e.floor_id    = 'Required';
+      if (!location.zone_id)     e.zone_id     = 'Required';
+      if (!location.exact_location_description.trim()) e.exact_location_description = 'Required';
+    }
+    if (stepDef.id === 'review') {
+      if (!certified) e.certified = 'Certification required before deploying';
+    }
     return e;
   };
 
-  const formatDateToDDMMYYYY = (dateStr) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      // Convert YYYY-MM-DD from HTML input to DD-MM-YYYY for API
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return dateStr;
+  const goNext = () => {
+    const e = validate(step);
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setErrors({});
+    setStep(s => s + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  const goBack = () => { setErrors({}); setActionError(null); setStep(s => s - 1); };
 
+  // ── Submit ───────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    setActionError(null);
-    const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    const e = validate(STEPS.length);
+    if (Object.keys(e).length) { setErrors(e); return; }
     setSubmitting(true);
+    setActionError(null);
     try {
+      const cid = selectedCompany?.id || selectedCompany?.company_id;
+      
+      const bldg = buildings.find(b => b.id === location.building_id);
+      const flr = floors.find(f => f.id === location.floor_id);
+      const zn = zones.find(z => z.id === location.zone_id);
+      const locParts = [];
+      if (bldg) locParts.push(bldg.name || bldg.building_name);
+      if (flr) locParts.push(flr.name || flr.floor_name);
+      if (zn) locParts.push(zn.name || zn.zone_name);
+
       const payload = {
-        equipment_code: form.equipment_code.trim().toUpperCase(),
-        equipment_type: form.equipment_type,
-        company_id: form.company_id,
-        branch_id: form.branch_id,
-        building_id: form.building_id,
-        floor_id: form.floor_id,
-        zone_id: form.zone_id,
-        department_id: form.department_id,
-        inspection_frequency: form.inspection_frequency,
-        shift_allowed: form.shift_allowed ? [form.shift_allowed] : [],
-        checklist_template_id: form.checklist_template_id,
-        auto_generate_qr: true,
-        installation_date: formatDateToDDMMYYYY(form.installation_date),
-        expiry_date: formatDateToDDMMYYYY(form.expiry_date),
-        status: form.status,
+        serial_number:      identity.serial_number.trim().toUpperCase(),
+        equipment_code:     identity.serial_number.trim().toUpperCase(),
+        module_id:          selectedModule?.id || selectedModule?.module_id,
+        equipment_type:     selectedModule?.name,
+        manufacturer_name:  identity.manufacturer_name.trim(),
+        company_id:         cid,
+
+        branch_id:          location.branch_id,
+        location_id:        location.branch_id,
+        location_name:      locParts.join(' / ') || 'Unknown Location',
+        exact_location_desc: location.exact_location_description.trim(),
+        
+        building_id:        location.building_id,
+        floor_id:           location.floor_id,
+        zone_id:            location.zone_id,
+        department_id:      location.department_id || undefined,
+        
+        latitude:           location.latitude,
+        longitude:          location.longitude,
+        geo_accuracy_m:     location.geo_accuracy_m,
+
+        specs: {
+          barcode:        identity.barcode.trim() || identity.serial_number.trim().toUpperCase(),
+          equipment_code: identity.serial_number.trim().toUpperCase(),
+          ...details,
+        },
+        // We'll also keep details just in case the legacy backend expects it as well, but specs is the new format
+        details: {
+          barcode:        identity.barcode.trim() || identity.serial_number.trim().toUpperCase(),
+          equipment_code: identity.serial_number.trim().toUpperCase(),
+          ...details,
+        },
+
+        installed_on:        lifecycle.installed_on, // YYYY-MM-DD format from input
+        inspection_frequency_days: 365,
+        last_service_on:     lifecycle.last_service_on || undefined,
+        expiry_date:         lifecycle.expiry_date,
+        operational_status:  lifecycle.operational_status,
+        remarks:             lifecycle.remarks || "",
+
+        auto_generate_qr:             true,
         fda_21_cfr_part_11_certified: certified,
       };
 
-      if (String(form.inspection_frequency).toLowerCase() === 'custom') {
-        payload.custom_frequency_days = Number(form.custom_frequency_days);
-      }
-
       const result = await ApiService.onboardEquipment(payload);
-      setSuccessData(result);
+      let verified = result;
+      if (result?.sos_code) {
+        try { verified = await ApiService.getEquipmentBySosCode(result.sos_code); } catch (_) {}
+      }
+      setSuccessData({ ...result, ...verified });
     } catch (err) {
-      setActionError(err.message || 'Unknown error');
+      setActionError(err.message || 'Failed to onboard equipment');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleAddAnother = () => {
-    setFormState(EMPTY_FORM);
-    setCertified(false);
-    setErrors({});
-    setActionError(null);
-    setSuccessData(null);
-    setAllBuildings([]); setAllZones([]);
-  };
+  // ── Nav bar ──────────────────────────────────────────────────────────────────
+  const NavBar = () => (
+    <div className="eob-nav-bar">
+      <button className="eob-cancel-btn" onClick={step === 1 ? onBack : goBack} disabled={submitting}>
+        {step === 1 ? 'Cancel' : '← Back'}
+      </button>
+      <span className="eob-step-counter">Step {step} of {STEPS.length}</span>
+      {step < STEPS.length
+        ? <button className="eob-submit-btn" onClick={goNext}>Next →</button>
+        : <button className="eob-submit-btn" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? <><div className="eob-btn-spinner" />Deploying…</> : '⚡ Onboard & Deploy'}
+          </button>}
+    </div>
+  );
 
-  // Company options — use database ID as value for APIs
-  const companyOptions = companies.map(c => ({
-    value: c.id || c.company_id,
-    label: c.name || c.company_name,
-  }));
-
-  // ── Success screen ──────────────────────────────────────────────────────────
+  // ── Success screen ───────────────────────────────────────────────────────────
   if (successData) {
     return (
       <div className="eob-page">
         <div className="eob-header">
-          <button className="eob-back-btn" onClick={onBack} title="Back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-              strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+          <button className="eob-back-btn" onClick={onBack}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
           </button>
-          <div className="eob-header-info">
-            <div className="eob-header-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <div><div className="eob-title">Equipment Onboarding</div></div>
-          </div>
+          <div className="eob-header-info"><div className="eob-title">Equipment Onboarding</div></div>
         </div>
-
         <div className="eob-body">
           <div className="eob-success-card">
             <div className="eob-success-icon">✅</div>
             <div className="eob-success-title">Equipment Deployed Successfully</div>
-            <div className="eob-success-subtitle">{successData.message || 'Equipment has been onboarded and is ready for inspection scheduling.'}</div>
-
+            <div className="eob-success-subtitle">{successData.message || 'Equipment is ready for inspection.'}</div>
             <div className="eob-success-detail-grid">
               <div className="eob-success-detail">
-                <span className="eob-success-detail-label">Generated SOS Code</span>
+                <span className="eob-success-detail-label">SOS Code</span>
                 <span className="eob-success-sos">{successData.sos_code || '—'}</span>
               </div>
               <div className="eob-success-detail">
@@ -489,24 +500,31 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
                 <span className="eob-success-id">#{successData.id || '—'}</span>
               </div>
               <div className="eob-success-detail">
-                <span className="eob-success-detail-label">Equipment Code</span>
-                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{form.equipment_code.toUpperCase()}</span>
+                <span className="eob-success-detail-label">Serial Number</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{identity.serial_number.toUpperCase()}</span>
               </div>
               <div className="eob-success-detail">
                 <span className="eob-success-detail-label">Equipment Type</span>
-                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{form.equipment_type}</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{selectedModule?.name}</span>
               </div>
-              <div className="eob-success-detail">
-                <span className="eob-success-detail-label">QR Code URL</span>
-                <span className="eob-success-qr">https://ehs.garrev.com/scan/{successData.sos_code}</span>
-              </div>
+              {successData.sos_code && (
+                <div className="eob-success-detail" style={{ gridColumn: '1/-1' }}>
+                  <span className="eob-success-detail-label">QR Scan URL</span>
+                  <span className="eob-success-qr">https://ehs.garrev.com/scan/{successData.sos_code}</span>
+                </div>
+              )}
             </div>
-
             <div className="eob-success-actions">
               <button className="eob-cancel-btn" onClick={onSuccess || onBack}>Back to Dashboard</button>
-              <button className="eob-submit-btn" onClick={handleAddAnother}>
-                + Onboard Another Equipment
-              </button>
+              <button className="eob-submit-btn" onClick={() => {
+                setSuccessData(null); setStep(1);
+                setSelectedCompany(null); setSelectedModule(null);
+                setIdentity({ serial_number: '', barcode: '', manufacturer_name: '' });
+                setDetails({});
+                setLocationState({ branch_id: '', building_id: '', floor_id: '', zone_id: '', department_id: '', exact_location_description: '', latitude: null, longitude: null, geo_accuracy_m: null });
+                setLifecycle({ installed_on: '', last_service_on: '', expiry_date: '', operational_status: '', remarks: '' });
+                setCertified(false); setErrors({});
+              }}>+ Onboard Another</button>
             </div>
           </div>
         </div>
@@ -514,293 +532,403 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
     );
   }
 
-  // ── Form screen ─────────────────────────────────────────────────────────────
+  const schema = selectedModule ? getEquipmentSchema(selectedModule.name) : null;
+
   return (
     <div className="eob-page">
       {/* Header */}
       <div className="eob-header">
-        <button className="eob-back-btn" onClick={onBack} title="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-            strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <button className="eob-back-btn" onClick={onBack}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="18" height="18">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
         <div className="eob-header-info">
-          <div className="eob-header-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <div><div className="eob-title">Equipment Onboarding</div></div>
+          <div className="eob-title">Equipment Onboarding</div>
+          {selectedCompany && (
+            <span className="eob-breadcrumb">
+              {selectedCompany.name}
+              {selectedModule && <> › {selectedModule.name}</>}
+            </span>
+          )}
         </div>
-        {(loadingData || dropdownsLoading) && (
+        {(masterLoading || locLoading || modulesLoading) && (
           <div className="eob-header-loading">
             <div className="eob-spinner" />
-            <span>{dropdownsLoading ? 'Loading locations…' : 'Loading…'}</span>
+            <span>{locLoading ? 'Loading locations…' : modulesLoading ? 'Loading modules…' : 'Loading…'}</span>
           </div>
         )}
       </div>
 
-      {/* Form body */}
+      <StepIndicator current={step} steps={STEPS} />
+
       <div className="eob-body">
         {actionError && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            color: '#fca5a5',
-            padding: '12px 16px',
-            fontSize: '13px',
-            marginBottom: '20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px' }}>⚠️</span>
-              <span><strong>Failed to deploy:</strong> {actionError}</span>
-            </div>
-            <button
-              onClick={() => setActionError(null)}
-              style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' }}
-            >
-              &times;
-            </button>
+          <div className="eob-action-error">
+            <span>⚠️ <strong>Error:</strong> {actionError}</span>
+            <button onClick={() => setActionError(null)}>×</button>
           </div>
         )}
 
-        {/* ── SECTION 1: IDENTITY ── */}
-        <SectionDivider icon="🏷️" title="Equipment Identity" />
-        <div className="eob-grid">
-          <Field label="Equipment Code" required error={errors.equipment_code}>
-            <input
-              className="eob-input"
-              type="text"
-              placeholder="e.g. FE-501"
-              value={form.equipment_code}
-              onChange={e => set('equipment_code', e.target.value.toUpperCase())}
-              maxLength={20}
-            />
-          </Field>
+        {/* ══════════════ STEP 1 — COMPANY ══════════════ */}
+        {STEPS[step - 1]?.id === 'company' && (
+          <>
+            <Section icon="🏢" title="Select Company" />
+            {errors.company && (
+              <div style={{ color: '#fc8181', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                ⚠ {errors.company}
+              </div>
+            )}
 
-          <Field label="Equipment Type" required error={errors.equipment_type}>
-            <CustomSelect
-              value={form.equipment_type}
-              onChange={v => set('equipment_type', v)}
-              placeholder="Select Type"
-              options={equipmentTypes.map(t => ({ value: t, label: t }))}
-            />
-          </Field>
+            {masterLoading ? (
+              <div className="eob-loading-placeholder">
+                <div className="eob-spinner" style={{ width: 28, height: 28 }} />
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Loading companies…</span>
+              </div>
+            ) : companies.length === 0 ? (
+              <div className="eob-empty-state">No companies found. Add a company first.</div>
+            ) : (
+              <div className="eob-company-grid">
+                {companies.map(c => {
+                  const isSelected = selectedCompany?.id === c.id || selectedCompany?.company_id === c.company_id;
+                  const logo = resolveLogoUrl(c);
+                  return (
+                    <div
+                      key={c.id || c.company_id}
+                      className={`eob-company-card${isSelected ? ' selected' : ''}`}
+                      onClick={() => { setSelectedCompany(c); setErrors(e => ({ ...e, company: undefined })); }}
+                    >
+                      <div className="eob-company-logo">
+                        {logo
+                          ? <img src={logo} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
+                          : <span style={{ fontSize: 24 }}>🏢</span>}
+                      </div>
+                      <div className="eob-company-info">
+                        <div className="eob-company-name">{c.name || c.company_name}</div>
+                        <div className="eob-company-id">{c.comapany_ref || c.company_ref || c.company_id || ''}</div>
+                        {c.address && <div className="eob-company-addr">{c.address}</div>}
+                      </div>
+                      {isSelected && (
+                        <input 
+                          type="checkbox" 
+                          className="eob-native-checkbox" 
+                          checked={true} 
+                          readOnly 
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <NavBar />
+          </>
+        )}
 
-          <Field label="Company" required error={errors.company_id}>
-            <CustomSelect
-              value={form.company_id}
-              onChange={v => set('company_id', v)}
-              placeholder="Select Company"
-              options={companyOptions}
-              disabled={loadingData}
-            />
-          </Field>
-        </div>
+        {/* ══════════════ STEP 2 — MODULE + ATTRIBUTES ══════════════ */}
+        {STEPS[step - 1]?.id === 'equipment' && (
+          <>
+            <Section icon="🔧" title="Select Equipment Module" />
+            {errors.module && (
+              <div style={{ color: '#fc8181', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                ⚠ {errors.module}
+              </div>
+            )}
 
-        {/* ── SECTION 2: LOCATION (cascades from company) ── */}
-        <SectionDivider icon="📍" title="Location Details" />
-        <div className="eob-grid">
-          <Field label="Branch" required error={errors.branch_id}>
-            <CustomSelect
-              value={form.branch_id}
-              onChange={setBranch}
-              placeholder={!form.company_id ? 'Select company first' : dropdownsLoading ? 'Loading…' : 'Select Branch'}
-              options={branches.map(b => ({ value: b.id, label: b.branch_name || b.name || `Branch #${b.id}` }))}
-              disabled={!form.company_id || dropdownsLoading}
-            />
-          </Field>
+            {modulesLoading ? (
+              <div className="eob-loading-placeholder">
+                <div className="eob-spinner" style={{ width: 24, height: 24 }} />
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Loading modules for {selectedCompany?.name}…</span>
+              </div>
+            ) : modules.length === 0 ? (
+              <div className="eob-empty-state">No modules found for this company.</div>
+            ) : (
+              <div style={{ maxWidth: '500px' }}>
+                <CustomSelect
+                  value={selectedModule?.id || ''}
+                  placeholder="Select Equipment Module..."
+                  options={modules.map(m => ({
+                    label: m.name || m.module_name || `Module ${m.id}`,
+                    value: m.id
+                  }))}
+                  onChange={(val) => {
+                    const mod = modules.find(m => String(m.id) === String(val));
+                    setSelectedModule(mod || null);
+                    setDetails({});
+                    setDynamicConfig(null);
+                    setErrors(e => ({ ...e, module: undefined }));
+                    if (mod) {
+                      setConfigLoading(true);
+                      ApiService.getModuleFieldConfig(mod.id || mod.module_id)
+                        .then(res => {
+                          const rawCfg = res?.data || res;
+                          let cfg = { ...rawCfg };
+                          if (cfg?.layout?.steps) {
+                            cfg.layout = {
+                              ...cfg.layout,
+                              steps: cfg.layout.steps.filter(st => !(st.label || '').toLowerCase().includes('compliance'))
+                            };
+                          }
+                          setDynamicConfig(cfg);
+                        })
+                        .catch(err => console.error(err))
+                        .finally(() => setConfigLoading(false));
+                    }
+                  }}
+                />
+              </div>
+            )}
 
-          <Field label="Building" required error={errors.building_id}>
-            <CustomSelect
-              value={form.building_id}
-              onChange={setBuilding}
-              placeholder={!form.branch_id ? 'Select branch first' : dropdownsLoading ? 'Loading…' : 'Select Building'}
-              options={allBuildings.map(b => ({ value: b.id, label: b.building_name || b.name || `Building #${b.id}` }))}
-              disabled={!form.branch_id || dropdownsLoading}
-            />
-          </Field>
+            {/* Equipment Identity + Module Attributes */}
+            {selectedModule && (
+              <>
+                <Section icon="🏷️" title="Equipment Identity" />
+                <div className="eob-grid">
+                  <Field label="Serial Number" required error={errors.serial_number}>
+                    <input className="eob-input" type="text"
+                      placeholder="e.g. FE-2024-501"
+                      value={identity.serial_number}
+                      onChange={e => setId('serial_number', e.target.value.toUpperCase())}
+                      maxLength={30}
+                    />
+                  </Field>
+                  <Field label="Barcode" error={errors.barcode}>
+                    <input className="eob-input" type="text"
+                      placeholder="Physical barcode (defaults to serial if blank)"
+                      value={identity.barcode}
+                      onChange={e => setId('barcode', e.target.value.toUpperCase())}
+                      maxLength={30}
+                    />
+                  </Field>
+                  <Field label="Manufacturer Name" required error={errors.manufacturer_name}>
+                    <input className="eob-input" type="text"
+                      placeholder="e.g. Tyco, Ceasefire, Kanex"
+                      value={identity.manufacturer_name}
+                      onChange={e => setId('manufacturer_name', e.target.value)}
+                      maxLength={100}
+                    />
+                  </Field>
+                </div>
 
-          <Field label="Floor" required error={errors.floor_id}>
-            <CustomSelect
-              value={form.floor_id}
-              onChange={setFloor}
-              placeholder="Select Floor"
-              options={dynamicFloors.map(f => ({ value: f.id, label: f.floor_name || f.name }))}
-            />
-          </Field>
+                {/* DYNAMIC STEPS (SPECS) RENDERED INLINE */}
+                {dynamicConfig?.layout?.steps && dynamicConfig.layout.steps.map((st, idx) => (
+                  <div key={idx}>
+                    <Section icon="⚙️" title={`${selectedModule?.name} — ${st.label}`} />
+                    <div className="eob-grid">
+                      {(st.fields || []).map(attr => {
+                        const key = attr.key || attr.field_key;
+                        return (
+                          <DynamicField
+                            key={key}
+                            attr={attr}
+                            value={details[key]}
+                            onChange={setDet}
+                            error={errors[`det_${key}`]}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
 
-          <Field label="Zone" required error={errors.zone_id}>
-            <CustomSelect
-              value={form.zone_id}
-              onChange={setZone}
-              placeholder={!form.floor_id ? 'Select floor first' : 'Select Zone'}
-              options={filteredZones.map(z => ({ value: z.id, label: z.zone_name || z.name }))}
-              disabled={!form.floor_id}
-            />
-          </Field>
+                {!dynamicConfig?.layout?.steps && schema && (
+                  <>
+                    <Section icon={schema.icon} title={`${selectedModule.name} Specifications`} />
+                    <div className="eob-grid">
+                      {schema.attributes.map(attr => (
+                        <DynamicField
+                          key={attr.key}
+                          attr={attr}
+                          value={details[attr.key]}
+                          onChange={setDet}
+                          error={errors[`det_${attr.key}`]}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
 
-          <Field label="Department" required error={errors.department_id}>
-            <CustomSelect
-              value={form.department_id}
-              onChange={v => set('department_id', v)}
-              placeholder={!form.zone_id ? 'Select zone first' : 'Select Department'}
-              options={allDepartments.map(d => ({ value: d.id, label: d.department_name || d.name }))}
-              disabled={!form.zone_id}
-            />
-          </Field>
-        </div>
+                <Section icon="📅" title="Lifecycle & Status" />
+                <div className="eob-grid">
+                  <Field label="Installation Date" required error={errors.installed_on}>
+                    <input className="eob-input eob-date-input" type="date"
+                      value={lifecycle.installed_on}
+                      onChange={e => setLc('installed_on', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Last Service Date" error={errors.last_service_on}>
+                    <input className="eob-input eob-date-input" type="date"
+                      value={lifecycle.last_service_on}
+                      onChange={e => setLc('last_service_on', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Expiry Date" required error={errors.expiry_date}>
+                    <input className="eob-input eob-date-input" type="date"
+                      value={lifecycle.expiry_date}
+                      onChange={e => setLc('expiry_date', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Operational Status" required error={errors.operational_status}>
+                    <CustomSelect
+                      value={lifecycle.operational_status}
+                      onChange={v => setLc('operational_status', v)}
+                      placeholder="Select Status"
+                      options={
+                        statuses.length > 0
+                          ? statuses.map(s => ({ value: s.key || s.name || s, label: s.name || s.key || s }))
+                          : [
+                              { value: 'active',            label: 'Active' },
+                              { value: 'inactive',          label: 'Inactive' },
+                              { value: 'under_maintenance', label: 'Under Maintenance' },
+                              { value: 'decommissioned',    label: 'Decommissioned' },
+                            ]
+                      }
+                    />
+                  </Field>
+                  <Field label="Remarks" error={errors.remarks} span2>
+                    <textarea className="eob-input" rows={2}
+                      placeholder="Any additional notes…"
+                      value={lifecycle.remarks}
+                      onChange={e => setLc('remarks', e.target.value)}
+                      style={{ resize: 'vertical', minHeight: 48 }}
+                    />
+                  </Field>
+                </div>
+              </>
+            )}
+            <NavBar />
+          </>
+        )}
 
-        {/* ── SECTION 3: OPERATIONAL CONFIG ── */}
-        <SectionDivider icon="⚙️" title="Operational Configuration" />
-        <div className="eob-grid">
-          <Field label="Inspection Frequency" required error={errors.inspection_frequency}>
-            <CustomSelect
-              value={form.inspection_frequency}
-              onChange={v => set('inspection_frequency', v)}
-              placeholder="Select Frequency"
-              options={frequencies.map(f => ({ 
-                value: f.key || f.name || f, 
-                label: f.name || f.key || f 
-              }))}
-            />
-          </Field>
-
-          {String(form.inspection_frequency).toLowerCase() === 'custom' && (
-            <Field label="Custom Frequency (Days)" required error={errors.custom_frequency_days}>
-              <input
-                className="eob-input"
-                type="number"
-                min="1"
-                placeholder="e.g. 13"
-                value={form.custom_frequency_days}
-                onChange={e => set('custom_frequency_days', e.target.value)}
-              />
-            </Field>
-          )}
-
-          <Field label="Checklist Template" required error={errors.checklist_template_id}>
-            <CustomSelect
-              value={form.checklist_template_id}
-              onChange={v => set('checklist_template_id', v)}
-              placeholder="Select Template"
-              options={checklists.map(t => ({ 
-                value: t.equipment_type, 
-                label: `${(t.equipment_type || '').replace(/_/g, ' ').toUpperCase()} (${t.total_items || 0} items)` 
-              }))}
-            />
-          </Field>
-
-          <Field label="QR Code" span={1}>
-            <div className="eob-qr-field">
-              <svg className="eob-qr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="5" height="5" rx="1" />
-                <rect x="16" y="3" width="5" height="5" rx="1" />
-                <rect x="3" y="16" width="5" height="5" rx="1" />
-                <path d="M21 16h-3a2 2 0 0 0-2 2v3" /><path d="M21 21v.01" />
-                <path d="M12 7v3a2 2 0 0 1-2 2H7" /><path d="M3 12h.01" />
-                <path d="M12 3h.01" /><path d="M12 16v.01" />
-                <path d="M16 12h1" /><path d="M21 12v.01" /><path d="M12 21v-1" />
-              </svg>
-              <input
-                className="eob-input eob-qr-input"
-                type="text"
-                readOnly
-                placeholder="Auto-generated by server on deploy"
-                value={form.equipment_code.trim() ? `https://ehs.garrev.com/scan/[auto]` : ''}
-              />
-              {form.equipment_code.trim() && (
-                <span className="eob-qr-badge">Auto-generated</span>
-              )}
+        {/* ══════════════ STEP 3 — LOCATION ══════════════ */}
+        {STEPS[step - 1]?.id === 'location' && (
+          <>
+            <Section icon="🏢" title="Organisation & Location" />
+            <div className="eob-grid">
+              <Field label="Branch / Location" required error={errors.branch_id}>
+                <CustomSelect
+                  value={location.branch_id}
+                  onChange={v => setLoc('branch_id', v)}
+                  placeholder={locLoading ? 'Loading…' : 'Select Branch'}
+                  options={branches.map(b => ({ value: b.id, label: b.branch_name || b.name }))}
+                  disabled={locLoading}
+                />
+              </Field>
+              <Field label="Building" required error={errors.building_id}>
+                <CustomSelect
+                  value={location.building_id}
+                  onChange={v => setLoc('building_id', v)}
+                  placeholder={!location.branch_id ? 'Select branch first' : locLoading ? 'Loading…' : 'Select Building'}
+                  options={buildings.map(b => ({ value: b.id, label: b.building_name || b.name }))}
+                  disabled={!location.branch_id || locLoading}
+                />
+              </Field>
+              <Field label="Floor" required error={errors.floor_id}>
+                <CustomSelect
+                  value={location.floor_id}
+                  onChange={v => setLoc('floor_id', v)}
+                  placeholder={!location.building_id ? 'Select building first' : locLoading ? 'Loading…' : 'Select Floor'}
+                  options={floors.map(f => ({ value: f.id, label: f.floor_name || f.name }))}
+                  disabled={!location.building_id || locLoading}
+                />
+              </Field>
+              <Field label="Zone" required error={errors.zone_id}>
+                <CustomSelect
+                  value={location.zone_id}
+                  onChange={v => setLoc('zone_id', v)}
+                  placeholder={!location.floor_id ? 'Select floor first' : locLoading ? 'Loading…' : 'Select Zone'}
+                  options={zones.map(z => ({ value: z.id, label: z.zone_name || z.name }))}
+                  disabled={!location.floor_id || locLoading}
+                />
+              </Field>
+              <Field label="Department" error={errors.department_id}>
+                <CustomSelect
+                  value={location.department_id}
+                  onChange={v => setLoc('department_id', v)}
+                  placeholder={!location.zone_id ? 'Select zone first' : locLoading ? 'Loading…' : 'Select Department'}
+                  options={departments.map(d => ({ value: d.id, label: d.department_name || d.name }))}
+                  disabled={!location.zone_id || locLoading}
+                />
+              </Field>
+              <Field label="Exact Location Description" required error={errors.exact_location_description} span2>
+                <input className="eob-input" type="text"
+                  placeholder="e.g. Adjacent to Reactor-3 exit, left wall"
+                  value={location.exact_location_description}
+                  onChange={e => setLoc('exact_location_description', e.target.value)}
+                  maxLength={200}
+                />
+              </Field>
             </div>
-          </Field>
 
-          {/* Shift dropdown single-select */}
-          <Field label="Shift Allowed" required error={errors.shift_allowed} span={1}>
-            <CustomSelect
-              value={form.shift_allowed}
-              onChange={v => set('shift_allowed', v)}
-              placeholder="Select Shift"
-              options={SHIFT_OPTIONS.map(s => ({ value: s, label: s }))}
+            <Section icon="🗺️" title="Pin on Map" />
+            <MapLocationPicker
+              position={location.latitude != null ? { latitude: location.latitude, longitude: location.longitude, geo_accuracy_m: location.geo_accuracy_m } : null}
+              onChange={({ latitude, longitude, geo_accuracy_m }) =>
+                setLocationState(s => ({ ...s, latitude, longitude, geo_accuracy_m }))}
+              gpsCapturing={gpsCapturing}
+              onCaptureGPS={captureGPS}
+              onClear={clearGPS}
             />
-          </Field>
-        </div>
 
-        {/* ── SECTION 4: LIFECYCLE ── */}
-        <SectionDivider icon="📅" title="Lifecycle & Status" />
-        <div className="eob-grid">
-          <Field label="Installation Date" required error={errors.installation_date}>
-            <input
-              className="eob-input eob-date-input"
-              type="date"
-              value={form.installation_date}
-              onChange={e => set('installation_date', e.target.value)}
-            />
-          </Field>
+            <NavBar />
+          </>
+        )}
 
-          <Field label="Expiry Date" required error={errors.expiry_date}>
-            <input
-              className="eob-input eob-date-input"
-              type="date"
-              value={form.expiry_date}
-              onChange={e => set('expiry_date', e.target.value)}
-            />
-          </Field>
+        {/* ══════════════ STEP 4 — REVIEW ══════════════ */}
+        {STEPS[step - 1]?.id === 'review' && (
+          <>
+            <Section icon="📋" title="Review Your Submission" />
+            <div className="eob-review-grid">
+              <ReviewBlock title="Company & Module" icon="🏢" rows={[
+                ['Company',   selectedCompany?.name],
+                ['Module',    selectedModule?.name],
+                ['Serial No.',identity.serial_number],
+                ['Barcode',   identity.barcode || identity.serial_number],
+                ['Manufacturer', identity.manufacturer_name],
+              ]} />
 
-          <Field label="Status" required error={errors.status}>
-            <CustomSelect
-              value={form.status}
-              onChange={v => set('status', v)}
-              placeholder="Select Status"
-              options={statuses.map(s => ({ value: s.key || s.name || s, label: s.name || s.key || s }))}
-            />
-          </Field>
-        </div>
+              <ReviewBlock title="Specifications" icon="🔧" rows={
+                schema
+                  ? schema.attributes.slice(0, 8).map(a => [a.label, details[a.key] ? String(details[a.key]) : null])
+                  : []
+              } />
 
-        {/* ── FDA 21 CFR CERTIFICATION ── */}
-        <div className={`eob-cert-card ${errors.certified ? 'has-error' : ''}`}>
-          <label className="eob-cert-label">
-            <input
-              type="checkbox"
-              className="eob-cert-checkbox"
-              checked={certified}
-              onChange={e => { setCertified(e.target.checked); setErrors(v => ({ ...v, certified: undefined })); }}
-            />
-            <span className="eob-cert-title">FDA 21 CFR Part 11 — Electronic Signature Certification</span>
-          </label>
-          <p className="eob-cert-text">
-            I certify that this equipment has undergone required physical verification and complies
-            with applicable safety standards. This electronic signature authorizes its secure
-            provisioning into the system.
-          </p>
-          {errors.certified && <span className="eob-error-msg">{errors.certified}</span>}
-        </div>
+              <ReviewBlock title="Location" icon="📍" rows={[
+                ['Branch',    branches.find(b => String(b.id) === String(location.branch_id))?.branch_name],
+                ['Building',  buildings.find(b => String(b.id) === String(location.building_id))?.building_name],
+                ['Floor',     floors.find(f => String(f.id) === String(location.floor_id))?.floor_name],
+                ['Zone',      zones.find(z => String(z.id) === String(location.zone_id))?.zone_name || zones.find(z => String(z.id) === String(location.zone_id))?.name],
+                ['Exact Loc', location.exact_location_description],
+                ['GPS',       location.latitude != null ? `${location.latitude}°N, ${location.longitude}°E (±${location.geo_accuracy_m}m)` : 'Not captured'],
+              ]} />
 
-        {/* ── ACTIONS ── */}
-        <div className="eob-actions">
-          <button className="eob-cancel-btn" onClick={onBack} disabled={submitting}>
-            Cancel
-          </button>
-          <button
-            className="eob-submit-btn"
-            onClick={handleSubmit}
-            disabled={submitting || loadingData}
-          >
-            {submitting
-              ? <><div className="eob-btn-spinner" /> Deploying…</>
-              : '⚡ Onboard & Deploy Asset'}
-          </button>
-        </div>
+              <ReviewBlock title="Lifecycle" icon="📅" rows={[
+                ['Installed On',  lifecycle.installed_on],
+                ['Last Serviced', lifecycle.last_service_on],
+                ['Expiry Date',   lifecycle.expiry_date],
+                ['Status',        lifecycle.operational_status],
+                ['Remarks',       lifecycle.remarks],
+              ]} />
+            </div>
 
+            <div className={`eob-cert-card${errors.certified ? ' has-error' : ''}`}>
+              <label className="eob-cert-label">
+                <input type="checkbox" className="eob-cert-checkbox"
+                  checked={certified}
+                  onChange={e => { setCertified(e.target.checked); setErrors(v => ({ ...v, certified: undefined })); }}
+                />
+                <span className="eob-cert-title">FDA 21 CFR Part 11 — Electronic Signature Certification</span>
+              </label>
+              <p className="eob-cert-text">
+                I certify that this equipment has undergone required physical verification and complies with
+                applicable safety standards. This electronic signature authorizes its secure provisioning into the system.
+              </p>
+              {errors.certified && <span className="eob-error-msg">{errors.certified}</span>}
+            </div>
+
+            <NavBar />
+          </>
+        )}
       </div>
     </div>
   );
