@@ -1,0 +1,195 @@
+Backend : C:\Users\Administrator\Documents\ELT_Projects1\modules\01_SOS
+Database:PostgreSQL 17.9 ,Database Name: sos
+frontend :C:\Jahnavi Data\Fire_Extinguisher
+  
+
+
+
+PHASE 1 — PREPARE SOURCE (YOU ARE HERE NOW)
+📍 Step 1: Confirm backend is ready
+
+In VS Code terminal (you are already here):
+
+cd C:\Users\Administrator\Documents\ELT_Projects1\modules\01_SOS
+
+Check:
+
+dir
+
+You should see:
+
+node-app
+package.json
+src/
+.env
+📍 Step 2: REMOVE unwanted folders
+
+Before sending to server:
+
+❌ delete:
+
+node_modules
+dist (if exists)
+logs
+📍 Step 3: Create backend ZIP
+
+Go to folder:
+
+C:\Users\Administrator\Documents\ELT_Projects1\modules\01_SOS
+
+Right click → Compress:
+
+👉 create:
+
+node-app.zip
+📍 Step 4: Create database backup (VERY IMPORTANT)
+
+Open PowerShell (Admin):
+
+pg_dump -U postgres -d sos > C:\backup\sos.sql
+
+Check:
+
+dir C:\backup\sos.sql
+📍 Step 5: Check frontend
+
+Open:
+
+C:\Jahnavi Data\Fire_Extinguisher
+
+Now tell me:
+
+If you see build/ → OK
+If only src/ → needs build later
+🟡 PHASE 2 — MOVE FILES TO SERVER (69.62.84.28)
+📍 Step 6: Open WinSCP
+
+Login:
+
+Field	Value
+Host	69.62.84.28
+User	root
+Password	(your server password)
+Protocol	SFTP
+
+Click Login
+
+📍 Step 7: Upload files
+
+On WinSCP:
+
+📤 Drag these to /root/:
+
+From Windows → Server:
+
+node-app.zip
+C:\backup\sos.sql
+🟢 PHASE 3 — SETUP ON UBUNTU SERVER
+
+Now SSH:
+
+ssh root@69.62.84.28
+📍 Step 8: Install required software
+apt update
+apt install -y nodejs npm postgresql postgresql-contrib unzip
+npm install -g pm2
+📍 Step 9: Extract backend
+mkdir -p /opt/elt/backend
+unzip /root/node-app.zip -d /opt/elt/backend
+cd /opt/elt/backend
+📍 Step 10: Create database
+sudo -u postgres psql
+
+Inside:
+
+CREATE DATABASE sos;
+\q
+📍 Step 11: Restore database
+sudo -u postgres psql sos < /root/sos.sql
+📍 Step 12: Install backend dependencies
+cd /opt/elt/backend
+npm install
+📍 Step 13: Fix .env file
+nano .env
+
+Set ONLY:
+
+DB_HOST=localhost
+DB_PORT=5432
+
+Save:
+CTRL + X → Y → ENTER
+
+📍 Step 14: Run backend test
+node server.js
+
+If you see:
+
+Server running on port 3001
+
+Stop:
+
+CTRL + C
+📍 Step 15: Start PM2 (production mode)
+pm2 start server.js --name elt-server
+pm2 save
+pm2 startup
+🟣 PHASE 4 — FRONTEND (NEXT AFTER BACKEND WORKS)
+
+If frontend has build:
+
+scp -r build root@69.62.84.28:/var/www/elt-frontend
+
+If not:
+
+On Windows:
+
+npm install
+npm run build
+
+Then upload build/
+
+🔵 PHASE 5 — NGINX (FINAL STEP)
+apt install nginx -y
+
+Config:
+
+nano /etc/nginx/sites-available/elt
+
+Paste:
+
+server {
+    listen 80;
+    server_name 69.62.84.28;
+
+    root /var/www/elt-frontend;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:3001/;
+    }
+}
+
+Enable:
+
+ln -s /etc/nginx/sites-available/elt /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
+🎯 FINAL RESULT
+
+You will get:
+
+🌐 Frontend: http://69.62.84.28
+⚙ Backend: running via PM2
+🗄 DB: sos restored
+🔁 API: connected via Nginx
+⚠️ IMPORTANT (DON’T SKIP)
+
+✔ Always upload .sql before backend run
+✔ Never overwrite existing server apps
+✔ Always use /opt/elt/ folder
+✔ Always check pm2 list after deploy

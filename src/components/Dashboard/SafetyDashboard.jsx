@@ -2145,6 +2145,7 @@ const SafetyDashboard = ({ user, onLogout, navAccess, equipmentAccess }) => {
             <section className={`page ${activePage === 'equipment-onboarding' ? 'active' : ''}`}>
               {activePage === 'equipment-onboarding' && (
                 <EquipmentOnboarding
+                  user={user}
                   onBack={() => setActivePage('grid')}
                   onSuccess={() => {
                     setActivePage('grid');

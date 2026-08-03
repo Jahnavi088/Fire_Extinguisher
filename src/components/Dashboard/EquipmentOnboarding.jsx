@@ -149,7 +149,11 @@ const CASCADE = {
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const EquipmentOnboarding = ({ onBack, onSuccess }) => {
+const EquipmentOnboarding = ({ onBack, onSuccess, user }) => {
+  const loggedInUserStr = localStorage.getItem('auth_user') || localStorage.getItem('user');
+  const loggedInUser = user || (loggedInUserStr ? JSON.parse(loggedInUserStr) : null);
+  const isSuperAdmin = loggedInUser?.role === 'superadmin';
+
   const [step, setStep]               = useState(1);
   const [errors, setErrors]           = useState({});
   const [submitting, setSubmitting]   = useState(false);
@@ -212,6 +216,17 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
       }
     }).finally(() => setMasterLoading(false));
   }, []);
+
+  // ── Auto-select company for non-superadmin ──────────────────────────────────
+  useEffect(() => {
+    if (!isSuperAdmin && companies.length > 0) {
+      const userCompanyId = loggedInUser?.company_id || loggedInUser?.company?.id || loggedInUser?.company?.company_id;
+      const userCompany = companies.find(c => String(c.id || c.company_id) === String(userCompanyId)) || companies[0];
+      if (userCompany) {
+        setSelectedCompany(userCompany);
+      }
+    }
+  }, [companies, isSuperAdmin, loggedInUser]);
 
   // ── When company selected → load its modules ────────────────────────────────
   useEffect(() => {
@@ -325,8 +340,12 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
   };
 
   // ── Validation ───────────────────────────────────────────────────────────────
-  const STEPS = [
+  const STEPS = isSuperAdmin ? [
     { id: 'company', label: 'Company', icon: '🏢' },
+    { id: 'equipment', label: 'Equipment', icon: '🔧' },
+    { id: 'location', label: 'Location & Dates', icon: '📍' },
+    { id: 'review', label: 'Review', icon: '✅' }
+  ] : [
     { id: 'equipment', label: 'Equipment', icon: '🔧' },
     { id: 'location', label: 'Location & Dates', icon: '📍' },
     { id: 'review', label: 'Review', icon: '✅' }
@@ -518,7 +537,10 @@ const EquipmentOnboarding = ({ onBack, onSuccess }) => {
               <button className="eob-cancel-btn" onClick={onSuccess || onBack}>Back to Dashboard</button>
               <button className="eob-submit-btn" onClick={() => {
                 setSuccessData(null); setStep(1);
-                setSelectedCompany(null); setSelectedModule(null);
+                if (isSuperAdmin) {
+                  setSelectedCompany(null);
+                }
+                setSelectedModule(null);
                 setIdentity({ serial_number: '', barcode: '', manufacturer_name: '' });
                 setDetails({});
                 setLocationState({ branch_id: '', building_id: '', floor_id: '', zone_id: '', department_id: '', exact_location_description: '', latitude: null, longitude: null, geo_accuracy_m: null });
